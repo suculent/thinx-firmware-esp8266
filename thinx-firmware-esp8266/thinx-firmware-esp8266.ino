@@ -31,7 +31,9 @@ void setup() {
 
   Serial.println("[update] WiFi connected, trying direct update...");
 
-  t_httpUpdate_return ret = ESPhttpUpdate.update("207.154.200.217", 80, "/bin/5ccf7fee90e0.bin");
+  // test == our tenant name from THINX platform
+
+  t_httpUpdate_return ret = ESPhttpUpdate.update("iot.teacloud.net", 80, "/bin/test/firmware.elf");
 
   switch(ret) {
       case HTTP_UPDATE_FAILED:
