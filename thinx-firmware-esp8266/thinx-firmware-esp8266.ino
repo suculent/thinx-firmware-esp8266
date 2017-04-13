@@ -1,5 +1,7 @@
 /* OTA enabled firmware for Wemos D1 (ESP 8266, Arduino) */
 
+#define __USE_WIFI_MANAGER__
+
 #include <stdio.h>
 #include <Arduino.h>
 
@@ -34,42 +36,71 @@ int status = WL_IDLE_STATUS;
 PubSubClient thx_mqtt_client(thx_wifi_client);
 int last_mqtt_reconnect;
 
+bool shouldSaveConfig = false;
+
+void configModeCallback (WiFiManager *myWiFiManager) {
+  Serial.println("Entered config mode");
+  Serial.println(WiFi.softAPIP());
+  //mqtt_server = custom_mqtt_server.getValue();
+  Serial.println(myWiFiManager->getConfigPortalSSID());
+}
+
+//callback notifying us of the need to save config
+void saveConfigCallback () {
+  Serial.println("Should save config");
+  shouldSaveConfig = true;
+}
+
 void setup() {
 
   Serial.begin(115200);
 
-  while (!Serial) {
+  while (!Serial);
 
-  };
-
+#ifdef __USE_WIFI_MANAGER__
   WiFiManager wifiManager;
+  // id/name, placeholder/prompt, default, length
+  //WiFiManagerParameter custom_mqtt_server("server", "mqtt server", mqtt_server, 40);
+  //wifiManager.addParameter(&custom_mqtt_server);
+  wifiManager.setAPCallback(configModeCallback);
   wifiManager.autoConnect(autoconf_ssid,autoconf_pwd);
-
-  // check for the presence of the shield:
-  if (WiFi.status() == WL_NO_SHIELD) {
-    Serial.println("WiFi shield not present");
-    // don't continue:
-    while(true);
-  }
+#else
+  status = WiFi.begin(ssid, pass);
+#endif
 
   // attempt to connect to Wifi network:
   while ( status != WL_CONNECTED) {
-    Serial.print("Attempting to connect to WPA SSID: ");
-    Serial.println(ssid);
-    status = WiFi.begin(ssid, pass);
-    delay(10000);
+#ifdef __USE_WIFI_MANAGER__
+      Serial.print("Waiting for WiFiManager... ");
+      wifiManager.setTimeout(1000);
+      if (wifiManager.autoConnect(autoconf_ssid,autoconf_pwd)) {
+        status = WL_CONNECTED;
+        Serial.println(status);
+      } else {
+        delay(3000);
+      }
+#else
+      Serial.print("Waiting for WiFi... ");
+      Serial.println(status);
+      delay(10000);
+      status = WiFi.begin(ssid, pass);
+#endif
   }
+
+  Serial.println("[setup] Connected to WiFi...");
 
   delay(500);
 
-  Serial.println("[update] WiFi connected...");
+  Serial.println("[setup] Contacting API...");
+
+  checkin();
+
+  Serial.println("[setup] Contacting MQTT...");
 
   thx_mqtt_client.setServer(thinx_mqtt_url.c_str(), thinx_mqtt_port);
   thx_mqtt_client.setCallback(thinx_mqtt_callback);
   thinx_mqtt_reconnect();
   last_mqtt_reconnect = 0;
-
-  checkin();
 
   // test == our tenant name from THINX platform
   // Serial.println("[update] Trying direct update...");
@@ -138,11 +169,12 @@ static const String thx_disconnected_response = "{ \"status\" : \"disconnected\"
 bool thinx_mqtt_reconnect() {
 
   Serial.print(thinx_mqtt_channel());
-  Serial.println(" reconnecting...");
+  Serial.println(" (re)connecting...");
   String channel = thinx_mqtt_channel();
   String mac = thinx_mac();
 
   if ( thx_mqtt_client.connect(mac.c_str(),channel.c_str(),0,false,thx_disconnected_response.c_str()) ) {
+    Serial.println("Connected.");
     if (thx_mqtt_client.subscribe(channel.c_str())) {
       Serial.print(channel);
       Serial.println(" subscribed.");
@@ -150,6 +182,8 @@ bool thinx_mqtt_reconnect() {
       Serial.println("Not subscribed.");
     }
     thx_mqtt_client.publish(channel.c_str(), thx_connected_response.c_str());
+  } else {
+    Serial.println("MQTT Not connected.");
   }
   return thx_mqtt_client.connected();
 }
@@ -240,7 +274,7 @@ String thinx_mac() {
 
   byte mac[] = {
     0xDE, 0xFA, 0x01, 0x70, 0x32, 0x42
-  };
+  }; // 0x5C, 0xCF, 0x7F, 0xF0, 0x9C, 0x39
 
   WiFi.macAddress(mac);
   char macString[16] = {0};
@@ -257,26 +291,32 @@ void checkin() {
     0xDE, 0xFA, 0xDE, 0xFA, 0xDE, 0xFA
   };
 
-  StaticJsonBuffer<200> jsonBuffer;
+  StaticJsonBuffer<2048> jsonBuffer;
 
   JsonObject& root = jsonBuffer.createObject();
+  root["registration"]["mac"] = thinx_mac();
+  root["registration"]["firmware"] = thinx_firmware_version;
+  root["registration"]["hash"] = thinx_commit_id;
+  root["registration"]["owner"] = thinx_owner;
+  root["registration"]["alias"] = thinx_alias;
+  root["mac"] = thinx_mac();
+  root["firmware"] = thinx_firmware_version;
+  root["hash"] = thinx_commit_id;
+  root["owner"] = thinx_owner;
+  root["alias"] = thinx_alias;
 
-  JsonObject& registration = jsonBuffer.createObject();
-  registration["mac"] = thinx_mac();
-  registration["firmware"] = thinx_firmware_version;
-  registration["hash"] = thinx_commit_id;
-  registration["owner"] = thinx_owner;
-  registration["alias"] = thinx_alias;
-
-  root["registration"] = registration;
-
-  root.printTo(Serial);
+  StaticJsonBuffer<2048> wrapperBuffer;
+  JsonObject& wrapper = wrapperBuffer.createObject();
+  wrapper["registration"] = root;
+  Serial.print("JSON: ");
+  wrapper.printTo(Serial);
 
   senddata(root);
 }
 
 
 void senddata(JsonObject& json) {
+
   const char* host="http://thinx.cloud:7442";
 
   thx_wifi_client.print("POST /device/register"); thx_wifi_client.println(" HTTP/1.1");
@@ -291,19 +331,23 @@ void senddata(JsonObject& json) {
 
   String out;
   json.printTo(out);
+  Serial.print("POST BODY: ");
+  Serial.println(out);
+  Serial.print("Sending body...");
   thx_wifi_client.println(out);
 
-  long interval = 2000;
+  long interval = 5000;
   unsigned long currentMillis = millis(), previousMillis = millis();
 
   while(!thx_wifi_client.available()) {
     if( (currentMillis - previousMillis) > interval ){
-      Serial.println("Timeout");
+      Serial.println("Client not available (timeout)!");
       thx_wifi_client.stop();
       return;
     }
     currentMillis = millis();
   }
+
 
   char response[2048];
   int index = 0;
