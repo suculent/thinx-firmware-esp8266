@@ -280,6 +280,9 @@ void senddata(String body) {
   // whole URL string
   String url = String("http://") + thinx_cloud_url + String(":") + String(thinx_api_port) + String("/device/register");
 
+  // Response payload placeholder
+  String payload = "{}";
+
 #ifdef __DEBUG__
   Serial.print("*TH: Sending to ");
   Serial.println(host);
@@ -320,10 +323,14 @@ void senddata(String body) {
       if ( thx_wifi_client.available() ) {
         char str=thx_wifi_client.read();
         Serial.println(str);
+        payload = payload + String(str);
       }
     }
+
+    thx_wifi_client.close();
+
   } else {
-    Serial.println("Cannot drive, cannot serve.");
+    Serial.println("*TH: API connection failed.");
     return;
   }
 #endif
@@ -354,7 +361,7 @@ void senddata(String body) {
   Serial.println(ESP.getFreeHeap());
 
   Serial.print("HTTP PAYLOAD");
-  String payload = http.getString();
+  payload = http.getString();
   Serial.println(ESP.getFreeHeap());
   Serial.print("HTTPCode: ");
   Serial.println(httpCode);
