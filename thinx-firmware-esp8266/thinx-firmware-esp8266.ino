@@ -150,13 +150,24 @@ bool thinx_mqtt_reconnect() {
 
 void thinx_parse(String payload) {
 
-  StaticJsonBuffer<200> jsonBuffer;
+  Serial.print("Parsing response: ");
+  Serial.println(payload);
+
+  StaticJsonBuffer<4096> jsonBuffer;
 
   JsonObject& root = jsonBuffer.parseObject(payload.c_str());
 
-  // TODO: Unwrap JSON payload:
+  if ( !root.success() ) {
+    Serial.println("Failed parsing root node.");
+    return;
+  }
 
-  if (root["registration"]) {
+  JsonObject& registration = root["registration"];
+
+    if ( !registration.success() ) {
+      Serial.println("Failed parsing registration node.");
+      // return;
+    }
 
     /*
     - registration:
@@ -164,8 +175,14 @@ void thinx_parse(String payload) {
     - status: "OK"
     */
 
-    bool success = root["registration"]["success"];
-    String status = root["registration"]["status"];
+    bool success = registration["success"];
+    String status = registration["status"];
+
+    Serial.print("success: ");
+    Serial.println(success);
+
+    Serial.print("status: ");
+    Serial.println(status);
 
     // TODO: if status == OK
     // TODO: Extract alias override
@@ -179,29 +196,29 @@ void thinx_parse(String payload) {
 
 
 
-    String mac = root["registration"]["mac"];
+    String mac = registration["mac"];
     // TODO: must be this or ANY
 
-    String commit = root["registration"]["commit"];
+    String commit = registration["commit"];
     // TODO: must not be this
 
-    String version = root["registration"]["version"];
+    String version = registration["version"];
 
-    String sha256 = root["registration"]["sha256"];
+    // LX6 cannot calculate hash in reasonable time
+    // String sha256 = registration["sha256"];
     // TODO: use this by modifying ESP8266httpUpdate esp_update(url, hash);
 
     Serial.println("Starting update...");
 
-    bool forced = root["registration"]["forced"];
+    // bool forced = registration["forced"]; not supported yet
+    bool forced = true; // for testing only to see URL unwrapping...
 
     if (forced == true) {
-      String url = root["registration"]["url"];
-      String update_url = thinx_cloud_url + url;
-      Serial.println("Update URL:" + update_url);
+      String url = registration["url"];
+      Serial.println("*TH: NOT Forcing update with URL:" + url);
       // TODO: must not contain HTTP, extend with http://thinx.cloud/" // could use node.js as a secure provider instead of Apache!
-      esp_update(update_url);
+      //esp_update(url);
     }
-  }
 }
 
 /*
@@ -231,10 +248,10 @@ String thinx_mac() {
 
 void checkin() {
 
-  Serial.println("[setup] Contacting API...");
+  Serial.println("*TH: Contacting API...");
 
   if(!connected) {
-    Serial.println("Cannot checkin while not connected, exiting...");
+    Serial.println("*TH: Cannot checkin while not connected, exiting.");
     return;
   }
 
@@ -243,9 +260,9 @@ void checkin() {
     0xDE, 0xFA, 0xDE, 0xFA, 0xDE, 0xFA
   };
 
-  Serial.println("Building JSON Response...");
+  Serial.println("*TH: Building JSON Response...");
 
-  StaticJsonBuffer<2000> jsonBuffer;
+  StaticJsonBuffer<2048> jsonBuffer;
   JsonObject& root = jsonBuffer.createObject();
   root["mac"] = thinx_mac();
   root["firmware"] = thinx_firmware_version;
@@ -253,22 +270,21 @@ void checkin() {
   root["owner"] = thinx_owner;
   root["alias"] = thinx_alias;
 
-  Serial.println("Wrapping JSON Response...");
-
-  StaticJsonBuffer<2048> wrapperBuffer;
+  StaticJsonBuffer<4096> wrapperBuffer;
   JsonObject& wrapper = wrapperBuffer.createObject();
   wrapper["registration"] = root;
-  Serial.print("JSON: ");
+#ifdef __DEBUG__
   wrapper.printTo(Serial);
+#endif
 
-  senddata(root);
+  senddata(wrapper);
 }
 
 
 void senddata(JsonObject& json) {
 
   char host[256] = {0};
-  sprintf(host, "http://%s:7442", thinx_cloud_url);
+  sprintf(host, "http://%s:7442", thinx_cloud_url.c_str());
 
   thx_wifi_client.print("POST /device/register"); thx_wifi_client.println(" HTTP/1.1");
   thx_wifi_client.print("User-Agent: THiNX-Client");
@@ -282,10 +298,13 @@ void senddata(JsonObject& json) {
 
   String out;
   json.printTo(out);
-  Serial.print("POST BODY: ");
+  Serial.print("*TH: POST "); // OK until here
   Serial.println(out);
-  Serial.print("Sending body...");
+  //Serial.print("Sending body...");
+  //json.printTo(thx_wifi_client);
   thx_wifi_client.println(out);
+
+  Serial.print("*TH: Sent, waiting for response...");
 
   long interval = 5000;
   unsigned long currentMillis = millis(), previousMillis = millis();
@@ -299,18 +318,29 @@ void senddata(JsonObject& json) {
     currentMillis = millis();
   }
 
+  Serial.print("*TH: Client available...");
 
-  char response[2048];
+  while(thx_wifi_client
+    .available()){
+   String line = thx_wifi_client.readStringUntil('\r');
+   Serial.print(line);
+ }
+
+  char response[4096];
   int index = 0;
   while (thx_wifi_client.connected()) {
+    Serial.print("-");
     if ( thx_wifi_client.available() ) {
+      Serial.print("+");
       char str = thx_wifi_client.read();
       response[index] = str;
       Serial.println(str);
       index++;
     }
   }
-  response[index] = '\0';
+  //response[index] = 0;
+
+  Serial.print("Response: ");
 
   Serial.println(String(response));
 
