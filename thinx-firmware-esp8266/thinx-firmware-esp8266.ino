@@ -284,35 +284,36 @@ void checkin() {
 void senddata(JsonObject& json) {
 
   char host[256] = {0};
-  sprintf(host, "http://%s:7442", thinx_cloud_url.c_str());
+  sprintf(host, "http://%s", thinx_cloud_url.c_str());
+  Serial.println(host);
+  WiFiClient client;
+  const int httpPort = 7442;
+  if (!client.connect(host, httpPort)) {
+    Serial.println("*TH: API connection failed.");
+    return;
+  }
 
-  thx_wifi_client.print("POST /device/register"); thx_wifi_client.println(" HTTP/1.1");
-  thx_wifi_client.print("User-Agent: THiNX-Client");
-  thx_wifi_client.print("Content-Type: application/json");
+  client.print("POST /device/register"); thx_wifi_client.println(" HTTP/1.1");
+  client.print("User-Agent: THiNX-Client");
+  client.print("Content-Type: application/json");
   int length = json.measureLength();
-  thx_wifi_client.print("Content-Length:"); thx_wifi_client.println(length);
-  thx_wifi_client.println(); // End of headers
-
-  // POST message body
-  //json.printTo(client); // very slow ??
+  client.print("Content-Length:"); thx_wifi_client.println(length);
+  client.println(); // End of headers
 
   String out;
   json.printTo(out);
   Serial.print("*TH: POST "); // OK until here
   Serial.println(out);
-  //Serial.print("Sending body...");
-  //json.printTo(thx_wifi_client);
-  thx_wifi_client.println(out);
+  client.println(out);
 
   Serial.print("*TH: Sent, waiting for response...");
 
   long interval = 5000;
   unsigned long currentMillis = millis(), previousMillis = millis();
-
-  while(!thx_wifi_client.available()) {
+  while(!client.available()) {
     if( (currentMillis - previousMillis) > interval ){
       Serial.println("Client not available (timeout)!");
-      thx_wifi_client.stop();
+      client.stop();
       return;
     }
     currentMillis = millis();
@@ -320,19 +321,19 @@ void senddata(JsonObject& json) {
 
   Serial.print("*TH: Client available...");
 
-  while(thx_wifi_client
+  while(client
     .available()){
-   String line = thx_wifi_client.readStringUntil('\r');
+   String line = client.readStringUntil('\r');
    Serial.print(line);
  }
 
   char response[4096];
   int index = 0;
-  while (thx_wifi_client.connected()) {
+  while (client.connected()) {
     Serial.print("-");
-    if ( thx_wifi_client.available() ) {
+    if ( client.available() ) {
       Serial.print("+");
-      char str = thx_wifi_client.read();
+      char str = client.read();
       response[index] = str;
       Serial.println(str);
       index++;
