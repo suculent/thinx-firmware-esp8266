@@ -1,6 +1,11 @@
 /* OTA enabled firmware for Wemos D1 (ESP 8266, Arduino) */
 
 #define __DEBUG__
+// #define __DEBUG_JSON__
+
+// #define __USE_HTTPCLIENT__
+#define __USE_ESP8266WIFI__
+
 #define __USE_WIFI_MANAGER__
 
 #include <stdio.h>
@@ -22,18 +27,13 @@
 // IN PROGRESS: Add MQTT client (target IP defined using Thinx.h) and forced firmware update responder (will update on force or save in-memory state from new or retained mqtt notification)
 // TODO: Add UDP responder AT&U only to update to next available firmware (from save in-memory state)
 
-#include <ESP8266httpUpdate.h>
-#include <ESP8266HTTPClient.h>
-
 #include <ESP8266WiFi.h>
+#include <ESP8266HTTPClient.h>
+#include <ESP8266httpUpdate.h>
 #include <PubSubClient.h>
 
-// #include <WiFiClient.h> // from ESP8266WiFi
-
-
-
 // Default OTA login
-const char* autoconf_ssid  = "THiNX_FIRMWARE_AP"; // SSID in AP mode
+const char* autoconf_ssid  = "AP-THiNX"; // SSID in AP mode
 const char* autoconf_pwd   = "PASSWORD"; // fallback to default password, however this should be generated uniquely as it is logged to console
 
 // WiFiClient is required by PubSubClient and HTTP POST
@@ -47,12 +47,15 @@ bool shouldSaveConfig = false;
 bool connected = false;
 
 void setup() {
-
   Serial.begin(115200);
-
   while (!Serial);
 
-  delay(500);
+  thinx_init();
+}
+
+/* Should be moved to library constructor */
+
+void thinx_init() {
 
   connect();
 
@@ -62,16 +65,18 @@ void setup() {
     Serial.println("*TH: Connection to WiFi failed...");
   }
 
+  delay(500);
   mqtt();
 
-  checkin();
-
-
+  delay(5000);
+  checkin(); // crashes so far in HTTP POST
 
   // test == our tenant name from THINX platform
   // Serial.println("[update] Trying direct update...");
   // esp_update("/bin/test/firmware.elf");
 }
+
+/* Should be moved to private library method */
 
 void esp_update(String url) {
 
@@ -111,10 +116,16 @@ void esp_update(String url) {
   }
 }
 
+/* Private library definitions */
+
 static const String thx_connected_response = "{ \"status\" : \"connected\" }";
 static const String thx_disconnected_response = "{ \"status\" : \"disconnected\" }";
 
+/* Private library method */
+
 void thinx_parse(String payload) {
+
+  // {"registration":{"success":true,"status":"OK","alias":"","owner":"","device_id":"00:00:00:00:00:00"}}I
 
   Serial.print("Parsing response: ");
   Serial.println(payload);
@@ -187,6 +198,8 @@ void thinx_parse(String payload) {
     }
 }
 
+/* Private library method */
+
 /*
 * Designated MQTT channel for each device. In case devices know their channels, they can talk together.
 * Update must be skipped unless forced and matching MAC, even though a lot should be validated to prevent overwrite.
@@ -195,6 +208,8 @@ void thinx_parse(String payload) {
 String thinx_mqtt_channel() {
   return String("/thinx/device/") + thinx_mac();
 }
+
+/* Private library method */
 
 /*
 * May return hash only in future.
@@ -212,9 +227,11 @@ String thinx_mac() {
   return String(macString);
 }
 
+/* Private library method */
+
 void checkin() {
 
-  Serial.println("*TH: Contacting API...");
+  Serial.println("*TH: Starting API checkin...");
 
   if(!connected) {
     Serial.println("*TH: Cannot checkin while not connected, exiting.");
@@ -228,7 +245,7 @@ void checkin() {
 
   Serial.println("*TH: Building JSON...");
 
-  StaticJsonBuffer<2048> jsonBuffer;
+  StaticJsonBuffer<256> jsonBuffer;
   JsonObject& root = jsonBuffer.createObject();
   root["mac"] = thinx_mac();
   root["firmware"] = thinx_firmware_version;
@@ -236,83 +253,123 @@ void checkin() {
   root["owner"] = thinx_owner;
   root["alias"] = thinx_alias;
 
-  StaticJsonBuffer<4096> wrapperBuffer;
+  StaticJsonBuffer<256> wrapperBuffer;
   JsonObject& wrapper = wrapperBuffer.createObject();
   wrapper["registration"] = root;
-#ifdef __DEBUG__
+#ifdef __DEBUG_JSON__
   wrapper.printTo(Serial);
+  Serial.println();
 #endif
 
-  senddata(wrapper);
+  String body;
+  wrapper.printTo(body);
+
+  senddata(body);
 }
 
-void senddata(JsonObject& json) {
+/* Private library method */
 
+void senddata(String body) {
+
+  // hostname with http://
   char host[256] = {0};
-  sprintf(host, "%s", thinx_cloud_url.c_str());
-  Serial.print("*TH: Connecting to ");
+  sprintf(host, "http://%s", thinx_cloud_url.c_str());
+  char shorthost[256] = {0};
+  sprintf(shorthost, "%s", thinx_cloud_url.c_str());
+
+  // whole URL string
+  String url = String("http://") + thinx_cloud_url + String(":") + String(thinx_api_port) + String("/device/register");
+
+#ifdef __DEBUG__
+  Serial.print("*TH: Sending to ");
   Serial.println(host);
-  WiFiClient client = thx_wifi_client;
-  const int httpPort = 7442;
+  Serial.println(url);
+  Serial.println(body);
+  Serial.println(ESP.getFreeHeap());
+#endif
 
-  if (!client.connect(host, httpPort)) {
-    Serial.println("*TH: API connection failed.");
-    return;
+// equivalent to WiFiClient
+#ifdef __USE_ESP8266WIFI__
+  if (thx_wifi_client.connect(shorthost, 7442)) {
+    thx_wifi_client.println("POST /device/register HTTP/1.1");
+    thx_wifi_client.println("Host: thinx.cloud");
+    thx_wifi_client.println("Accept: */*"); // application/json
+    thx_wifi_client.println("Origin: device");
+    thx_wifi_client.println("Content-Type: application/json");
+    thx_wifi_client.println("User-Agent: THiNX-Client");
+    thx_wifi_client.print("Content-Length: ");
+    thx_wifi_client.println(body.length());
+    thx_wifi_client.println();
+    Serial.println("Headers set...");
+    thx_wifi_client.println(body);
+    Serial.println("Body sent...");
+
+    long interval = 2000;
+    unsigned long currentMillis = millis(), previousMillis = millis();
+
+    while(!thx_wifi_client.available()){
+      if( (currentMillis - previousMillis) > interval ){
+        Serial.println("Timeout");
+        thx_wifi_client.stop();
+        return;
+      }
+      currentMillis = millis();
+    }
+
+    while (thx_wifi_client.connected()) {
+      if ( thx_wifi_client.available() ) {
+        char str=thx_wifi_client.read();
+        Serial.println(str);
+      }
+    }
   } else {
-    Serial.println("*TH: API connected.");
+    Serial.println("Cannot drive, cannot serve.");
+    return;
   }
+#endif
+// __USE_ESP8266WIFI__
 
-  client.print("POST /device/register"); client.println(" HTTP/1.1");
-  client.println("User-Agent: THiNX-Client");
-  client.println("Content-Type: application/json");
-  int length = json.measureLength();
-  client.print("Content-Length:"); client.println(length);
-  client.println(); // End of headers
+// Using ESP8266HTTPClient crashes as well as anything else
+#ifdef __USE_HTTPCLIENT__
+  HTTPClient http;
+  http.setTimeout(5000);
+  Serial.println(ESP.getFreeHeap());
 
-  String out;
-  json.printTo(out);
-  Serial.print("*TH: POST "); // OK until here
-  Serial.println(out);
-  client.println(out);
+  Serial.println("HTTP BEGIN");
+  //http.begin(url);
+  http.begin(host, thinx_api_port, "/device/register");
 
-  Serial.print("*TH: Sent, waiting for response...");
+  http.addHeader("Accept", "*/*"); // application/json
+  http.addHeader("Origin", "device");
+  http.addHeader("Content-Type", "application/json");
+  http.setUserAgent("THiNX-Client");
+  //http.setAuthorization("thinxdevice", "guest")
 
-  unsigned long timeout = millis();
-  while (client.available() == 0) {
-    if (millis() - timeout > 5000) {
-      Serial.println(">>> Client Timeout !");
-      client.stop();
-      return;
-    }
-  }
+   Serial.println(ESP.getFreeHeap());
 
-  Serial.print("*TH: Client available...");
+   Serial.print("POST:");
+  int httpCode = http.POST(body);
 
-  while(client.available()){
-   String line = client.readStringUntil('\r');
-   Serial.print(line);
- }
+  Serial.print("POST Completed");
+  Serial.println(ESP.getFreeHeap());
 
-  char response[4096];
-  int index = 0;
-  while (client.connected()) {
-    Serial.print("-");
-    if ( client.available() ) {
-      //Serial.print("+");
-      char str = client.read();
-      response[index] = str;
-      Serial.println(str);
-      index++;
-    }
-  }
-  //response[index] = 0;
-
+  Serial.print("HTTP PAYLOAD");
+  String payload = http.getString();
+  Serial.println(ESP.getFreeHeap());
+  Serial.print("HTTPCode: ");
+  Serial.println(httpCode);
   Serial.print("Response: ");
+  Serial.println(payload);
 
-  Serial.println(String(response));
+  http.end();
 
-  thinx_parse(response);
+  Serial.print("Parsing payload...");
+  thinx_parse(payload);
+#endif
+
 }
+
+/* Private library method */
 
 //
 // MQTT Connection
@@ -329,10 +386,12 @@ void mqtt() {
   last_mqtt_reconnect = 0;
 }
 
+/* Private library method */
+
 bool thinx_mqtt_reconnect() {
 
   String channel = thinx_mqtt_channel();
-  Serial.print("*TH: Connecting to mqtt...");
+  Serial.println("*TH: Connecting to MQTT...");
 
   String mac = thinx_mac();
   if ( thx_mqtt_client.connect(mac.c_str(),channel.c_str(),0,false,thx_disconnected_response.c_str()) ) {
@@ -350,6 +409,8 @@ bool thinx_mqtt_reconnect() {
   }
   return thx_mqtt_client.connected();
 }
+
+/* Private library method */
 
 void thinx_mqtt_callback(char* topic, byte* payload, unsigned int length) {
 
@@ -369,6 +430,8 @@ void thinx_mqtt_callback(char* topic, byte* payload, unsigned int length) {
   }
 }
 
+/* Optional methods */
+
 //
 // WiFiManager Setup Callbacks
 //
@@ -386,11 +449,13 @@ void saveConfigCallback () {
   shouldSaveConfig = true;
 }
 
+/* Private library method */
+
 //
 // WiFi Connection
 //
 
-void connect() {
+void connect() { // should return status bool
   #ifdef __USE_WIFI_MANAGER__
   WiFiManager wifiManager;
 
@@ -409,12 +474,10 @@ void connect() {
   // attempt to connect to Wifi network:
   while ( !connected ) {
     #ifdef __USE_WIFI_MANAGER__
-    Serial.print("Waiting for WiFiManager autoconnect... ");
     status = wifiManager.autoConnect(autoconf_ssid,autoconf_pwd);
-    Serial.println("*TH: Connected... ");
     if (status == true) {
       connected = true;
-      //break;
+      return;
     } else {
       Serial.print("*TH: Connection Status: false!");
       delay(3000);
@@ -434,8 +497,13 @@ void connect() {
   }
 }
 
-// TODO: Add client receive data to fetch update info on registration. Optional for forced updates, not required at the moment; exit by calling`thinx_parse(c_payload);`
+// TODO: Add client receive data to fetch update info on registration.
+// Optional for forced updates, not required at the moment;
+// should exit by calling`thinx_parse(c_payload);`
 
 void loop() {
-
+  delay(5000); // supposed to help processing currently not-incoming MQTT callbacks
+  if (thx_mqtt_client.connected() == false) {
+    thinx_mqtt_reconnect();
+  }
 }

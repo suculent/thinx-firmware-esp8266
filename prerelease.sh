@@ -33,3 +33,4 @@ echo "static const String thinx_firmware_version = \"${REPO_NAME}-${REPO_VERSION
 echo "" >> $THINX_FILE
 
 echo "int thinx_mqtt_port = 1883;" >> $THINX_FILE
+echo "int thinx_api_port = 7442;" >> $THINX_FILE
