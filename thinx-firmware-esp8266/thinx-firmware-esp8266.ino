@@ -3,9 +3,6 @@
 #define __DEBUG__
 // #define __DEBUG_JSON__
 
-// #define __USE_HTTPCLIENT__
-#define __USE_ESP8266WIFI__
-
 #define __USE_WIFI_MANAGER__
 
 #include <stdio.h>
@@ -57,13 +54,27 @@ void setup() {
 
 void thinx_init() {
 
+  restoreDeviceInfo();
+
+#ifdef __DEBUG__
+  Serial.println(thinx_firmware_version);
+
+  Serial.print("Owner: ");
+  Serial.println(thinx_owner);
+
+  Serial.print("Device Alias: ");
+  Serial.println(thinx_alias);
+#endif
+
   connect();
 
+#ifdef __DEBUG__
   if (connected) {
     Serial.println("*TH: Connected to WiFi...");
   } else {
     Serial.println("*TH: Connection to WiFi failed...");
   }
+#endif
 
   delay(500);
   mqtt();
@@ -71,16 +82,20 @@ void thinx_init() {
   delay(5000);
   checkin(); // crashes so far in HTTP POST
 
+#ifdef __DEBUG__
   // test == our tenant name from THINX platform
   // Serial.println("[update] Trying direct update...");
   // esp_update("/bin/test/firmware.elf");
+#endif
 }
 
 /* Should be moved to private library method */
 
 void esp_update(String url) {
 
+#ifdef __DEBUG__
   Serial.println("[update] Starting update...");
+#endif
 
   t_httpUpdate_return ret = ESPhttpUpdate.update("thinx.cloud", 80, url.c_str());
 
@@ -99,9 +114,8 @@ void esp_update(String url) {
 
   if (ret != HTTP_UPDATE_OK) {
     Serial.println("[update] WiFi connected, trying advanced update...");
-
+    Serial.println("[update] TODO: Rewrite to secure binary provider on the API side!");
     ret = ESPhttpUpdate.update("images.thinx.cloud", 80, "ota.php", "5ccf7fee90e0");
-
     switch(ret) {
       case HTTP_UPDATE_FAILED:
       Serial.println("[update] Update failed.");
@@ -125,25 +139,37 @@ static const String thx_disconnected_response = "{ \"status\" : \"disconnected\"
 
 void thinx_parse(String payload) {
 
-  // {"registration":{"success":true,"status":"OK","alias":"","owner":"","device_id":"00:00:00:00:00:00"}}I
+  // TODO: Should parse response only for this device_id (which must be internal and not a mac)
+  // TODO: store device_id, alias and owner using SPIFFS in thinx.json
+  // TODO: status can be OK or FIRMWARE_UPDATE; ignore rest
+  // {"registration":{"success":true,"status":"OK","alias":"","owner":"","device_id":"5CCF7FF09C39"}}
 
+#ifdef __DEBUG__
   Serial.print("Parsing response: ");
   Serial.println(payload);
+#endif
+
+  int startIndex = payload.indexOf("\n{");
+  String body = payload.substring(startIndex + 1);
 
   StaticJsonBuffer<4096> jsonBuffer;
 
-  JsonObject& root = jsonBuffer.parseObject(payload.c_str());
+  JsonObject& root = jsonBuffer.parseObject(body.c_str());
 
   if ( !root.success() ) {
+#ifdef __DEBUG__
     Serial.println("Failed parsing root node.");
+#endif
     return;
   }
 
   JsonObject& registration = root["registration"];
 
     if ( !registration.success() ) {
+#ifdef __DEBUG__
       Serial.println("Failed parsing registration node.");
-      // return;
+      return;
+#endif
     }
 
     /*
@@ -155,46 +181,58 @@ void thinx_parse(String payload) {
     bool success = registration["success"];
     String status = registration["status"];
 
-    Serial.print("success: ");
-    Serial.println(success);
+    #ifdef __DEBUG__
+      Serial.print("success: ");
+      Serial.println(success);
 
-    Serial.print("status: ");
-    Serial.println(status);
+      Serial.print("status: ");
+      Serial.println(status);
+    #endif
 
-    // TODO: if status == OK
-    // TODO: Extract alias override
-    // TODO: Extract owner override (?) SEC?
+    if (status == "OK") {
 
-    // TODO: if status == FIRMWARE_UPDATE
+      String alias = registration["alias"];
+      Serial.println(String("alias: ") + alias);
 
+      String owner = registration["owner"];
+      Serial.println(String("owner: ") + owner);
 
+      String device_id = registration["device_id"];
+      Serial.println(String("device_id: ") + device_id);
 
-    // TODO: Check if this is update or what?
+      thinx_alias = alias;
+      thinx_owner = owner;
 
+      saveDeviceInfo(); // saves owner and alias
 
+    } else if (status == "FIRMWARE_UPDATE") {
 
-    String mac = registration["mac"];
-    // TODO: must be this or ANY
+      String mac = registration["mac"];
+      Serial.println(String("mac: ") + mac);
+      // TODO: must be this or ANY
 
-    String commit = registration["commit"];
-    // TODO: must not be this
+      String commit = registration["commit"];
+      Serial.println(String("commit: ") + commit);
 
-    String version = registration["version"];
+      // should not be this
+      if (commit == thinx_commit_id) {
+        Serial.println("*TH: Warning: new firmware has same commit_id as current.");
+      }
 
-    // LX6 cannot calculate hash in reasonable time
-    // String sha256 = registration["sha256"];
-    // TODO: use this by modifying ESP8266httpUpdate esp_update(url, hash);
+      String version = registration["version"];
+      Serial.println(String("version: ") + version);
 
-    Serial.println("Starting update...");
+      Serial.println("Starting update...");
 
-    // bool forced = registration["forced"]; not supported yet
-    bool forced = true; // for testing only to see URL unwrapping...
-
-    if (forced == true) {
       String url = registration["url"];
-      Serial.println("*TH: NOT Forcing update with URL:" + url);
-      // TODO: must not contain HTTP, extend with http://thinx.cloud/" // could use node.js as a secure provider instead of Apache!
-      //esp_update(url);
+      if (url) {
+#ifdef __DEBUG__
+        Serial.println("*TH: SKIPPING force update with URL:" + url);
+#else
+        // TODO: must not contain HTTP, extend with http://thinx.cloud/" // could use node.js as a secure provider instead of Apache!
+        esp_update(url);
+#endif
+      }
     }
 }
 
@@ -245,7 +283,7 @@ void checkin() {
 
   Serial.println("*TH: Building JSON...");
 
-  StaticJsonBuffer<256> jsonBuffer;
+  StaticJsonBuffer<512> jsonBuffer;
   JsonObject& root = jsonBuffer.createObject();
   root["mac"] = thinx_mac();
   root["firmware"] = thinx_firmware_version;
@@ -253,7 +291,7 @@ void checkin() {
   root["owner"] = thinx_owner;
   root["alias"] = thinx_alias;
 
-  StaticJsonBuffer<256> wrapperBuffer;
+  StaticJsonBuffer<512> wrapperBuffer;
   JsonObject& wrapper = wrapperBuffer.createObject();
   wrapper["registration"] = root;
 #ifdef __DEBUG_JSON__
@@ -271,28 +309,19 @@ void checkin() {
 
 void senddata(String body) {
 
-  // hostname with http://
-  char host[256] = {0};
-  sprintf(host, "http://%s", thinx_cloud_url.c_str());
   char shorthost[256] = {0};
   sprintf(shorthost, "%s", thinx_cloud_url.c_str());
-
-  // whole URL string
-  String url = String("http://") + thinx_cloud_url + String(":") + String(thinx_api_port) + String("/device/register");
 
   // Response payload placeholder
   String payload = "{}";
 
 #ifdef __DEBUG__
   Serial.print("*TH: Sending to ");
-  Serial.println(host);
-  Serial.println(url);
+  Serial.println(shorthost);
   Serial.println(body);
   Serial.println(ESP.getFreeHeap());
 #endif
 
-// equivalent to WiFiClient
-#ifdef __USE_ESP8266WIFI__
   if (thx_wifi_client.connect(shorthost, 7442)) {
     thx_wifi_client.println("POST /device/register HTTP/1.1");
     thx_wifi_client.println("Host: thinx.cloud");
@@ -319,61 +348,24 @@ void senddata(String body) {
       currentMillis = millis();
     }
 
-    while (thx_wifi_client.connected()) {
+    while ( thx_wifi_client.connected() ) {
       if ( thx_wifi_client.available() ) {
-        char str=thx_wifi_client.read();
-        Serial.println(str);
+        char str = thx_wifi_client.read();
+        Serial.print(str);
         payload = payload + String(str);
       }
     }
 
-    thx_wifi_client.close();
+    Serial.println();
+
+    thx_wifi_client.stop();
+    
+    thinx_parse(payload);
 
   } else {
     Serial.println("*TH: API connection failed.");
     return;
   }
-#endif
-// __USE_ESP8266WIFI__
-
-// Using ESP8266HTTPClient crashes as well as anything else
-#ifdef __USE_HTTPCLIENT__
-  HTTPClient http;
-  http.setTimeout(5000);
-  Serial.println(ESP.getFreeHeap());
-
-  Serial.println("HTTP BEGIN");
-  //http.begin(url);
-  http.begin(host, thinx_api_port, "/device/register");
-
-  http.addHeader("Accept", "*/*"); // application/json
-  http.addHeader("Origin", "device");
-  http.addHeader("Content-Type", "application/json");
-  http.setUserAgent("THiNX-Client");
-  //http.setAuthorization("thinxdevice", "guest")
-
-   Serial.println(ESP.getFreeHeap());
-
-   Serial.print("POST:");
-  int httpCode = http.POST(body);
-
-  Serial.print("POST Completed");
-  Serial.println(ESP.getFreeHeap());
-
-  Serial.print("HTTP PAYLOAD");
-  payload = http.getString();
-  Serial.println(ESP.getFreeHeap());
-  Serial.print("HTTPCode: ");
-  Serial.println(httpCode);
-  Serial.print("Response: ");
-  Serial.println(payload);
-
-  http.end();
-
-  Serial.print("Parsing payload...");
-  thinx_parse(payload);
-#endif
-
 }
 
 /* Private library method */
@@ -501,6 +493,58 @@ void connect() { // should return status bool
       connected = true;
     }
     #endif
+  }
+}
+
+//
+// PERSISTENCE
+//
+
+bool restoreDeviceInfo() {
+  File f = SPIFFS.open("/thinx.conf", "r");
+  if (!f) {
+      Serial.println("*TH: Cannot restore configuration.");
+      return false;
+  } else {
+    String data = f.readStringUntil('\n');
+    JsonObject& config = jsonBuffer.parseObject(json.c_str());
+    if (!config.success()) {
+      Serial.println("*TH: parseObject() failed");
+    } else {
+       thinx_alias = String(root["alias"]);
+       thinx_owner = String(root["owner"]);
+       Serial.print("*TH: Alias: ");
+       Serial.println(thinx_alias);
+       Serial.print("*TH: Owner: ");
+       Serial.println(thinx_owner);
+    }
+  }
+}
+
+/* Stores mutable device data (alias, owner) retrieved from API */
+bool saveDeviceInfo() {
+  File f = SPIFFS.open("/thinx.conf", "w");
+  if (!f) {
+      Serial.println("*TH: Cannot save configuration.");
+      return false;
+  } else {
+    Serial.print("*TH: saveConfiguration");
+    Serial.print("     alias: ");
+    Serial.println(thinx_alias);
+    Serial.print("     owner: ");
+    Serial.println(thinx_owner);
+
+    StaticJsonBuffer<256> jsonBuffer;
+    JsonObject& root = jsonBuffer.createObject();
+    root["alias"] = thinx_alias;
+    root["owner"] = thinx_owner;
+
+    String jsonString;
+    root.printTo(jsonString);
+    f.println(jsonString);
+    f.close();
+    Serial.println("*TH: saveConfiguration completed.");
+    return true;
   }
 }
 
