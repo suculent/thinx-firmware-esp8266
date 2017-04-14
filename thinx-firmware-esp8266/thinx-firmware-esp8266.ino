@@ -1,5 +1,6 @@
 /* OTA enabled firmware for Wemos D1 (ESP 8266, Arduino) */
 
+#define __DEBUG__
 #define __USE_WIFI_MANAGER__
 
 #include <stdio.h>
@@ -55,13 +56,18 @@ void setup() {
 
   connect();
 
-  Serial.println("*TH: Connected to WiFi...");
+  if (connected) {
+    Serial.println("*TH: Connected to WiFi...");
+  } else {
+    Serial.println("*TH: Connection to WiFi failed...");
+  }
+
+  mqtt();
 
   checkin();
 
-  Serial.println("*TH: Contacting MQTT...");
 
-  mqtt();
+
   // test == our tenant name from THINX platform
   // Serial.println("[update] Trying direct update...");
   // esp_update("/bin/test/firmware.elf");
@@ -105,48 +111,8 @@ void esp_update(String url) {
   }
 }
 
-void thinx_mqtt_callback(char* topic, byte* payload, unsigned int length) {
-
-  char c_payload[length];
-  memcpy(c_payload, payload, length);
-  c_payload[length] = '\0';
-
-  String s_topic = String(topic);
-  String s_payload = String(c_payload);
-
-  Serial.println("MQTT Callback:");
-  Serial.println(topic);
-  Serial.println(c_payload);
-
-  if ( s_topic == thinx_mqtt_channel() ) {
-    thinx_parse(c_payload);
-  }
-}
-
 static const String thx_connected_response = "{ \"status\" : \"connected\" }";
 static const String thx_disconnected_response = "{ \"status\" : \"disconnected\" }";
-
-bool thinx_mqtt_reconnect() {
-
-  Serial.print(thinx_mqtt_channel());
-  Serial.println(" (re)connecting...");
-  String channel = thinx_mqtt_channel();
-  String mac = thinx_mac();
-
-  if ( thx_mqtt_client.connect(mac.c_str(),channel.c_str(),0,false,thx_disconnected_response.c_str()) ) {
-    Serial.println("Connected.");
-    if (thx_mqtt_client.subscribe(channel.c_str())) {
-      Serial.print(channel);
-      Serial.println(" subscribed.");
-    } else {
-      Serial.println("Not subscribed.");
-    }
-    thx_mqtt_client.publish(channel.c_str(), thx_connected_response.c_str());
-  } else {
-    Serial.println("MQTT Not connected.");
-  }
-  return thx_mqtt_client.connected();
-}
 
 void thinx_parse(String payload) {
 
@@ -242,7 +208,7 @@ String thinx_mac() {
 
   WiFi.macAddress(mac);
   char macString[16] = {0};
-  sprintf(macString, "THiNX:%06X", ESP.getChipId());
+  sprintf(macString, "5CCF7F%6X", ESP.getChipId());
   return String(macString);
 }
 
@@ -260,7 +226,7 @@ void checkin() {
     0xDE, 0xFA, 0xDE, 0xFA, 0xDE, 0xFA
   };
 
-  Serial.println("*TH: Building JSON Response...");
+  Serial.println("*TH: Building JSON...");
 
   StaticJsonBuffer<2048> jsonBuffer;
   JsonObject& root = jsonBuffer.createObject();
@@ -280,24 +246,27 @@ void checkin() {
   senddata(wrapper);
 }
 
-
 void senddata(JsonObject& json) {
 
   char host[256] = {0};
-  sprintf(host, "http://%s", thinx_cloud_url.c_str());
+  sprintf(host, "%s", thinx_cloud_url.c_str());
+  Serial.print("*TH: Connecting to ");
   Serial.println(host);
-  WiFiClient client;
+  WiFiClient client = thx_wifi_client;
   const int httpPort = 7442;
+
   if (!client.connect(host, httpPort)) {
     Serial.println("*TH: API connection failed.");
     return;
+  } else {
+    Serial.println("*TH: API connected.");
   }
 
-  client.print("POST /device/register"); thx_wifi_client.println(" HTTP/1.1");
-  client.print("User-Agent: THiNX-Client");
-  client.print("Content-Type: application/json");
+  client.print("POST /device/register"); client.println(" HTTP/1.1");
+  client.println("User-Agent: THiNX-Client");
+  client.println("Content-Type: application/json");
   int length = json.measureLength();
-  client.print("Content-Length:"); thx_wifi_client.println(length);
+  client.print("Content-Length:"); client.println(length);
   client.println(); // End of headers
 
   String out;
@@ -308,21 +277,18 @@ void senddata(JsonObject& json) {
 
   Serial.print("*TH: Sent, waiting for response...");
 
-  long interval = 5000;
-  unsigned long currentMillis = millis(), previousMillis = millis();
-  while(!client.available()) {
-    if( (currentMillis - previousMillis) > interval ){
-      Serial.println("Client not available (timeout)!");
+  unsigned long timeout = millis();
+  while (client.available() == 0) {
+    if (millis() - timeout > 5000) {
+      Serial.println(">>> Client Timeout !");
       client.stop();
       return;
     }
-    currentMillis = millis();
   }
 
   Serial.print("*TH: Client available...");
 
-  while(client
-    .available()){
+  while(client.available()){
    String line = client.readStringUntil('\r');
    Serial.print(line);
  }
@@ -332,7 +298,7 @@ void senddata(JsonObject& json) {
   while (client.connected()) {
     Serial.print("-");
     if ( client.available() ) {
-      Serial.print("+");
+      //Serial.print("+");
       char str = client.read();
       response[index] = str;
       Serial.println(str);
@@ -353,10 +319,54 @@ void senddata(JsonObject& json) {
 //
 
 void mqtt() {
+  Serial.print("*TH: Contacting MQTT server ");
+  Serial.print(thinx_mqtt_url);
+  Serial.print(" on port ");
+  Serial.println(thinx_mqtt_port);
   thx_mqtt_client.setServer(thinx_mqtt_url.c_str(), thinx_mqtt_port);
   thx_mqtt_client.setCallback(thinx_mqtt_callback);
   thinx_mqtt_reconnect();
   last_mqtt_reconnect = 0;
+}
+
+bool thinx_mqtt_reconnect() {
+
+  String channel = thinx_mqtt_channel();
+  Serial.print("*TH: Connecting to mqtt...");
+
+  String mac = thinx_mac();
+  if ( thx_mqtt_client.connect(mac.c_str(),channel.c_str(),0,false,thx_disconnected_response.c_str()) ) {
+    Serial.println("*TH: MQTT Connected.");
+    if (thx_mqtt_client.subscribe(channel.c_str())) {
+      Serial.print("*TH: ");
+      Serial.print(channel);
+      Serial.println(" successfully subscribed.");
+    } else {
+      Serial.println("*TH: Not subscribed.");
+    }
+    thx_mqtt_client.publish(channel.c_str(), thx_connected_response.c_str());
+  } else {
+    Serial.println("*TH: MQTT Not connected.");
+  }
+  return thx_mqtt_client.connected();
+}
+
+void thinx_mqtt_callback(char* topic, byte* payload, unsigned int length) {
+
+  char c_payload[length];
+  memcpy(c_payload, payload, length);
+  c_payload[length] = '\0';
+
+  String s_topic = String(topic);
+  String s_payload = String(c_payload);
+
+  Serial.println("*TH: MQTT Callback:");
+  Serial.println(topic);
+  Serial.println(c_payload);
+
+  if ( s_topic == thinx_mqtt_channel() ) {
+    thinx_parse(c_payload);
+  }
 }
 
 //
@@ -403,11 +413,10 @@ void connect() {
     status = wifiManager.autoConnect(autoconf_ssid,autoconf_pwd);
     Serial.println("*TH: Connected... ");
     if (status == true) {
-      Serial.println("*TH: Status: true... ");
       connected = true;
       //break;
     } else {
-      Serial.print("*TH: Status: false... ");
+      Serial.print("*TH: Connection Status: false!");
       delay(3000);
       connected = false;
     }

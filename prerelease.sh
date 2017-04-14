@@ -9,8 +9,8 @@ echo
 THINX_FILE=$(find . | grep "/Thinx.h")
 THINX_OWNER="test" # todo: override with parameter
 THINX_ALIAS="vanilla" # todo: override with parameter
-THINX_CLOUD_URL="thinx.cloud"
-THINX_MQTT_URL="mqtt://${THINX_CLOUD_URL}"
+THINX_CLOUD_URL="rtm.thinx.cloud" # IP causes crashes
+THINX_MQTT_URL="${THINX_CLOUD_URL}" # mqtt://?
 
 REPO_NAME='thinx-firmware-esp8266'
 VERSION=$(git rev-list HEAD --count)
