@@ -2,26 +2,18 @@
 
 THiNX::THiNX(char* __thisOTAServer) {
   _thisOTAServer = __thisOTAServer;
-  connect(); // MQTT
-  connectingMQTT = true;
+  //connect(); // MQTT
+  //connectingMQTT = true;
 }
 
 THiNX::THiNX() {
   _thisOTAServer = "http://thinx.cloud:7442";
-  cconnect(); // MQTT
-  flagSoftwareSerial = true;
+  //connect(); // MQTT
+  //flagSoftwareSerial = true;
 }
 
-#ifdef __ARDUINO__
-/*THiNX::THiNX(Serial_* _thisSerial_) {
-  thisSerial_ = _thisSerial_;
-  setAllFlagsFalse();
-  flagSerial_ = true;
-}*/
-#endif
-
 /* register to HTTP server (no MQTT involved), might result in forced update */
-void THiNX::register() {
+void THiNX::checkin() {
   // HTTP POST here
   conect();
   // if any, save to updateAvailable and update();
@@ -33,7 +25,7 @@ void THiNX::end() {
 }
 
 /* connect to mqtt and check for update */
-void THiNX:connect() {
+void THiNX::connect() {
   // conect to mqtt MQTT set lwt for exit,
   if (true) update();
 }
