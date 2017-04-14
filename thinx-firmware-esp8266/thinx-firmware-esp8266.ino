@@ -4,8 +4,16 @@
 
 #include <stdio.h>
 #include <Arduino.h>
+#include <ArduinoJson.h>
 
 #include "Thinx.h"
+
+// Inject SSID and Password from 'Settings.h' where we do not use WiFiManager
+#ifndef __USE_WIFI_MANAGER__
+#include "Settings.h"
+#else
+#include <WiFiManager.h>
+#endif
 
 // WORK IN PROGRESS: Send a registration post request with current MAC, Firmware descriptor, commit ID; sha and version if known (with all other useful params like expected device owner).
 
@@ -16,20 +24,18 @@
 #include <ESP8266httpUpdate.h>
 #include <ESP8266HTTPClient.h>
 
-#include <PubSubClient.h>
 #include <ESP8266WiFi.h>
-#include <WiFiManager.h>
-#include <ArduinoJson.h>
-#include <WiFiClient.h>
+#include <PubSubClient.h>
 
-// Requires connectivity, that should be served through WiFiManager
-char ssid[] = "<ssid>";     //  your network SSID (name)
-char pass[] = "<password>";  // your network password
+// #include <WiFiClient.h> // from ESP8266WiFi
+
+
 
 // Default OTA login
-const char* autoconf_ssid  = "THINX_ESP8266_OTA"; // SSID in AP mode
-const char* autoconf_pwd   = "PASSWORD"; // fallback to default password, however this should be generated uniquely and logged to console for substantially better security
+const char* autoconf_ssid  = "THiNX_FIRMWARE_AP"; // SSID in AP mode
+const char* autoconf_pwd   = "PASSWORD"; // fallback to default password, however this should be generated uniquely as it is logged to console
 
+// WiFiClient is required by PubSubClient and HTTP POST
 WiFiClient thx_wifi_client;
 int status = WL_IDLE_STATUS;
 
@@ -37,19 +43,7 @@ PubSubClient thx_mqtt_client(thx_wifi_client);
 int last_mqtt_reconnect;
 
 bool shouldSaveConfig = false;
-
-void configModeCallback (WiFiManager *myWiFiManager) {
-  Serial.println("Entered config mode");
-  Serial.println(WiFi.softAPIP());
-  //mqtt_server = custom_mqtt_server.getValue();
-  Serial.println(myWiFiManager->getConfigPortalSSID());
-}
-
-//callback notifying us of the need to save config
-void saveConfigCallback () {
-  Serial.println("Should save config");
-  shouldSaveConfig = true;
-}
+bool connected = false;
 
 void setup() {
 
@@ -57,51 +51,17 @@ void setup() {
 
   while (!Serial);
 
-#ifdef __USE_WIFI_MANAGER__
-  WiFiManager wifiManager;
-  // id/name, placeholder/prompt, default, length
-  //WiFiManagerParameter custom_mqtt_server("server", "mqtt server", mqtt_server, 40);
-  //wifiManager.addParameter(&custom_mqtt_server);
-  wifiManager.setAPCallback(configModeCallback);
-  wifiManager.autoConnect(autoconf_ssid,autoconf_pwd);
-#else
-  status = WiFi.begin(ssid, pass);
-#endif
-
-  // attempt to connect to Wifi network:
-  while ( status != WL_CONNECTED) {
-#ifdef __USE_WIFI_MANAGER__
-      Serial.print("Waiting for WiFiManager... ");
-      wifiManager.setTimeout(1000);
-      if (wifiManager.autoConnect(autoconf_ssid,autoconf_pwd)) {
-        status = WL_CONNECTED;
-        Serial.println(status);
-      } else {
-        delay(3000);
-      }
-#else
-      Serial.print("Waiting for WiFi... ");
-      Serial.println(status);
-      delay(10000);
-      status = WiFi.begin(ssid, pass);
-#endif
-  }
-
-  Serial.println("[setup] Connected to WiFi...");
-
   delay(500);
 
-  Serial.println("[setup] Contacting API...");
+  connect();
+
+  Serial.println("*TH: Connected to WiFi...");
 
   checkin();
 
-  Serial.println("[setup] Contacting MQTT...");
+  Serial.println("*TH: Contacting MQTT...");
 
-  thx_mqtt_client.setServer(thinx_mqtt_url.c_str(), thinx_mqtt_port);
-  thx_mqtt_client.setCallback(thinx_mqtt_callback);
-  thinx_mqtt_reconnect();
-  last_mqtt_reconnect = 0;
-
+  mqtt();
   // test == our tenant name from THINX platform
   // Serial.println("[update] Trying direct update...");
   // esp_update("/bin/test/firmware.elf");
@@ -214,47 +174,34 @@ void thinx_parse(String payload) {
     // TODO: if status == FIRMWARE_UPDATE
 
 
-    /*
-    {
-    "registration" : {
-    "success" : true,
-    "status" : "FIRMWARE_UPDATE",
-    "url" : "/bin/test/firmware.elf",
-    "mac" : "5C:CF:7F:EE:90:E0;ANY",
-    "commit" : "18ee75e3a56c07a9eff08f75df69ef96f919653f",
-    "version" : "0.1",
-    "sha256" : "6bf6bd7fc983af6c900d8fe162acc3ba585c446ae0188e52802004631d854c60"
+
+    // TODO: Check if this is update or what?
+
+
+
+    String mac = root["registration"]["mac"];
+    // TODO: must be this or ANY
+
+    String commit = root["registration"]["commit"];
+    // TODO: must not be this
+
+    String version = root["registration"]["version"];
+
+    String sha256 = root["registration"]["sha256"];
+    // TODO: use this by modifying ESP8266httpUpdate esp_update(url, hash);
+
+    Serial.println("Starting update...");
+
+    bool forced = root["registration"]["forced"];
+
+    if (forced == true) {
+      String url = root["registration"]["url"];
+      String update_url = thinx_cloud_url + url;
+      Serial.println("Update URL:" + update_url);
+      // TODO: must not contain HTTP, extend with http://thinx.cloud/" // could use node.js as a secure provider instead of Apache!
+      esp_update(update_url);
+    }
   }
-}
-*/
-
-// TODO: Check if this is update or what?
-
-
-
-String mac = root["registration"]["mac"];
-// TODO: must be this or ANY
-
-String commit = root["registration"]["commit"];
-// TODO: must not be this
-
-String version = root["registration"]["version"];
-
-String sha256 = root["registration"]["sha256"];
-// TODO: use this by modifying ESP8266httpUpdate esp_update(url, hash);
-
-Serial.println("Starting update...");
-
-bool forced = root["registration"]["forced"];
-
-if (forced == true) {
-  String url = root["registration"]["url"];
-  String update_url = thinx_cloud_url + url;
-  Serial.println("Update URL:" + update_url);
-  // TODO: must not contain HTTP, extend with http://thinx.cloud/" // could use node.js as a secure provider instead of Apache!
-  esp_update(update_url);
-}
-}
 }
 
 /*
@@ -284,26 +231,29 @@ String thinx_mac() {
 
 void checkin() {
 
-  // TODO: if((WiFiMulti.run() == WL_CONNECTED)) {
+  Serial.println("[setup] Contacting API...");
+
+  if(!connected) {
+    Serial.println("Cannot checkin while not connected, exiting...");
+    return;
+  }
 
   // Default MAC address for AP controller
   byte mac[] = {
     0xDE, 0xFA, 0xDE, 0xFA, 0xDE, 0xFA
   };
 
-  StaticJsonBuffer<2048> jsonBuffer;
+  Serial.println("Building JSON Response...");
 
+  StaticJsonBuffer<2000> jsonBuffer;
   JsonObject& root = jsonBuffer.createObject();
-  root["registration"]["mac"] = thinx_mac();
-  root["registration"]["firmware"] = thinx_firmware_version;
-  root["registration"]["hash"] = thinx_commit_id;
-  root["registration"]["owner"] = thinx_owner;
-  root["registration"]["alias"] = thinx_alias;
   root["mac"] = thinx_mac();
   root["firmware"] = thinx_firmware_version;
   root["hash"] = thinx_commit_id;
   root["owner"] = thinx_owner;
   root["alias"] = thinx_alias;
+
+  Serial.println("Wrapping JSON Response...");
 
   StaticJsonBuffer<2048> wrapperBuffer;
   JsonObject& wrapper = wrapperBuffer.createObject();
@@ -317,7 +267,8 @@ void checkin() {
 
 void senddata(JsonObject& json) {
 
-  const char* host="http://thinx.cloud:7442";
+  char host[256] = {0};
+  sprintf(host, "http://%s:7442", thinx_cloud_url);
 
   thx_wifi_client.print("POST /device/register"); thx_wifi_client.println(" HTTP/1.1");
   thx_wifi_client.print("User-Agent: THiNX-Client");
@@ -364,6 +315,83 @@ void senddata(JsonObject& json) {
   Serial.println(String(response));
 
   thinx_parse(response);
+}
+
+//
+// MQTT Connection
+//
+
+void mqtt() {
+  thx_mqtt_client.setServer(thinx_mqtt_url.c_str(), thinx_mqtt_port);
+  thx_mqtt_client.setCallback(thinx_mqtt_callback);
+  thinx_mqtt_reconnect();
+  last_mqtt_reconnect = 0;
+}
+
+//
+// WiFiManager Setup Callbacks
+//
+
+void configModeCallback (WiFiManager *myWiFiManager) {
+  Serial.println("Entered config mode");
+  Serial.println(WiFi.softAPIP());
+  //mqtt_server = custom_mqtt_server.getValue();
+  Serial.println(myWiFiManager->getConfigPortalSSID());
+}
+
+//callback notifying us of the need to save config
+void saveConfigCallback () {
+  Serial.println("Should save config");
+  shouldSaveConfig = true;
+}
+
+//
+// WiFi Connection
+//
+
+void connect() {
+  #ifdef __USE_WIFI_MANAGER__
+  WiFiManager wifiManager;
+
+  // Add custom parameter when required:
+  // id/name, placeholder/prompt, default, length
+  //WiFiManagerParameter custom_mqtt_server("server", "mqtt server", mqtt_server, 40);
+  //wifiManager.addParameter(&custom_mqtt_server);
+
+  //wifiManager.setAPCallback(configModeCallback);
+  wifiManager.setTimeout(10000);
+  wifiManager.autoConnect(autoconf_ssid,autoconf_pwd);
+  #else
+  status = WiFi.begin(ssid, pass);
+  #endif
+
+  // attempt to connect to Wifi network:
+  while ( !connected ) {
+    #ifdef __USE_WIFI_MANAGER__
+    Serial.print("Waiting for WiFiManager autoconnect... ");
+    status = wifiManager.autoConnect(autoconf_ssid,autoconf_pwd);
+    Serial.println("*TH: Connected... ");
+    if (status == true) {
+      Serial.println("*TH: Status: true... ");
+      connected = true;
+      //break;
+    } else {
+      Serial.print("*TH: Status: false... ");
+      delay(3000);
+      connected = false;
+    }
+    #else
+    Serial.print("*TH: Connecting to SSID: ");
+    Serial.print(ssid);
+    Serial.print("*TH: Waiting for WiFi. Status: ");
+    Serial.println(status);
+    delay(3000);
+    status = WiFi.begin(ssid, pass);
+    if (status == WL_CONNECTED) {
+      connected = true;
+    }
+    #endif
+  }
 }
 
 // TODO: Add client receive data to fetch update info on registration. Optional for forced updates, not required at the moment; exit by calling`thinx_parse(c_payload);`

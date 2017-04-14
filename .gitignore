@@ -1,1 +1,4 @@
 .pioenvs/
+
+# developer secret
+thinx-firmware-esp8266/Settings.h
