@@ -300,9 +300,11 @@ void checkin() {
   JsonObject& root = jsonBuffer.createObject();
   root["mac"] = thinx_mac();
   root["firmware"] = thinx_firmware_version;
+  root["vesion"] = thinx_firmware_version_short;
   root["hash"] = thinx_commit_id;
   root["owner"] = thinx_owner;
   root["alias"] = thinx_alias;
+  root["device_id"] = thinx_udid;
 
   StaticJsonBuffer<512> wrapperBuffer;
   JsonObject& wrapper = wrapperBuffer.createObject();
