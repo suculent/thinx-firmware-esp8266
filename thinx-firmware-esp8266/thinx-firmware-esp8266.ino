@@ -40,6 +40,10 @@
 const char* autoconf_ssid  = "AP-THiNX"; // SSID in AP mode
 const char* autoconf_pwd   = "PASSWORD"; // fallback to default password, however this should be generated uniquely as it is logged to console
 
+// Requires API v126+
+char thx_api_key[40];
+EAVManagerParameter api_key_param("apikey", "API Key", thx_api_key, 40);
+
 // WiFiClient is required by PubSubClient and HTTP POST
 WiFiClient thx_wifi_client;
 int status = WL_IDLE_STATUS;
@@ -62,21 +66,16 @@ void setup() {
 // Designated initialized
 void THiNX_initWithAPIKey(String api_key) {
 
-  if (api_key != null) {
+  if (api_key != "") {
     thinx_api_key = api_key;
+    sprintf(thx_api_key, "%s", thinx_api_key.c_str()); // 40 max
   }
 
+  Serial.println("Mounting SPIFFS...");
+  bool result = SPIFFS.begin();
+  Serial.println("SPIFFS mounted: " + result);
+
   restoreDeviceInfo();
-
-#ifdef __DEBUG__
-  Serial.println(thinx_firmware_version);
-
-  Serial.print("Build-time Owner: ");
-  Serial.println(thinx_owner);
-
-  Serial.print("Build-time Device Alias: ");
-  Serial.println(thinx_alias);
-#endif
 
   connect();
 
@@ -177,18 +176,12 @@ void thinx_parse(String payload) {
 
   JsonObject& registration = root["registration"];
 
-    if ( !registration.success() ) {
+  if ( !registration.success() ) {
 #ifdef __DEBUG__
-      Serial.println("Failed parsing registration node.");
-      return;
+    Serial.println("Failed parsing registration node.");
 #endif
-    }
-
-    /*
-    - registration:
-    - success: true,
-    - status: "OK"
-    */
+    return;
+  }
 
     bool success = registration["success"];
     String status = registration["status"];
@@ -204,18 +197,24 @@ void thinx_parse(String payload) {
     if (status == "OK") {
 
       String alias = registration["alias"];
-      Serial.println(String("alias: ") + alias);
+      if ( alias.length() > 0 ) {
+        Serial.println(String("alias: ") + alias);
+        thinx_alias = alias;
+      }
 
       String owner = registration["owner"];
-      Serial.println(String("owner: ") + owner);
+      if ( owner.length() > 0 ) {
+        Serial.println(String("owner: ") + owner);
+        thinx_owner = owner;
+      }
 
-      String device_id = registration["device_id"];
-      Serial.println(String("device_id: ") + device_id);
+      String udid = registration["device_id"];
+      if ( udid.length() > 0 ) {
+        Serial.println(String("device_id: ") + udid);
+        thinx_udid = udid;
+      }
 
-      thinx_alias = alias;
-      thinx_owner = owner;
-
-      saveDeviceInfo(); // saves owner and alias
+      bool result = saveDeviceInfo(); // saves owner, alias and apikey (not device_id at the moment)
 
     } else if (status == "FIRMWARE_UPDATE") {
 
@@ -245,6 +244,8 @@ void thinx_parse(String payload) {
         esp_update(url);
 #endif
       }
+    } else {
+      Serial.println(String("Unhandled status: ") + status);
     }
 }
 
@@ -334,10 +335,12 @@ void senddata(String body) {
   Serial.println(ESP.getFreeHeap());
 #endif
 
+  Serial.print("*TH: thx_api_key API KEY "); Serial.println(thx_api_key);
+
   if (thx_wifi_client.connect(shorthost, 7442)) {
     thx_wifi_client.println("POST /device/register HTTP/1.1");
     thx_wifi_client.println("Host: thinx.cloud");
-    thx_wifi_client.print("Authentication: "); thx_wifi_client.println(thinx_api_key);
+    thx_wifi_client.print("Authentication: "); thx_wifi_client.println(thx_api_key);
     thx_wifi_client.println("Accept: */*"); // application/json
     thx_wifi_client.println("Origin: device");
     thx_wifi_client.println("Content-Type: application/json");
@@ -354,7 +357,7 @@ void senddata(String body) {
 
     while(!thx_wifi_client.available()){
       if( (currentMillis - previousMillis) > interval ){
-        Serial.println("Timeout");
+        Serial.println("Response Timeout. TODO: Should retry later.");
         thx_wifi_client.stop();
         return;
       }
@@ -451,16 +454,17 @@ void thinx_mqtt_callback(char* topic, byte* payload, unsigned int length) {
 void configModeCallback (EAVManager *myEAVManager) {
   Serial.println("Entered config mode");
   Serial.println(WiFi.softAPIP());
-  thinx_api_key = api_key.getValue();
   Serial.println(myEAVManager->getConfigPortalSSID());
 }
 
 //callback notifying us of the need to save config
 void saveConfigCallback () {
-  Serial.println("Should save config");
-  shouldSaveConfig = true;
-
-  // TODO: Save config
+  Serial.println("Save config callback:");
+  strcpy(thx_api_key, api_key_param.getValue());
+  thinx_api_key = String(thx_api_key);
+  Serial.print("Saving thinx_api_key: ");
+  Serial.println(thinx_api_key);
+  bool result = saveDeviceInfo();
 }
 
 /* Private library method */
@@ -469,14 +473,15 @@ void saveConfigCallback () {
 // WiFi Connection
 //
 
+
 void connect() { // should return status bool
   #ifdef __USE_WIFI_MANAGER__
   EAVManager EAVManager;
 
-  // Add custom parameter when required:
   // id/name, placeholder/prompt, default, length
-  EAVManagerParameter api_key("apikey", "API Key", api_key, 40);
-  EAVManager.addParameter(&api_key);
+
+
+  EAVManager.addParameter(&api_key_param);
 
   EAVManager.setAPCallback(configModeCallback);
   EAVManager.setTimeout(10000);
@@ -516,9 +521,7 @@ void connect() { // should return status bool
 //
 
 bool restoreDeviceInfo() {
-  Serial.println("Mounting SPIFFS...");
-  bool result = SPIFFS.begin();
-  Serial.println("SPIFFS mounted: " + result);
+
   File f = SPIFFS.open("/thinx.cfg", "r");
   if (!f) {
       Serial.println("*TH: Cannot restore configuration.");
@@ -530,32 +533,59 @@ bool restoreDeviceInfo() {
     if (!config.success()) {
       Serial.println("*TH: parseObject() failed");
     } else {
-      const char* alias = config["alias"];
-       thinx_alias = String(alias);
-       const char* owner = config["owner"];
-       thinx_owner = String(owner);
 
-       Serial.print("*TH: Alias: ");
-       Serial.println(thinx_alias);
-       Serial.print("*TH: Owner: ");
-       Serial.println(thinx_owner);
+      const char* saved_alias = config["alias"];
+      if (strlen(saved_alias) > 0) {
+        thinx_alias = String(saved_alias);
+      }
+
+      const char* saved_owner = config["owner"];
+      if (strlen(saved_owner) > 0) {
+        thinx_owner = String(saved_owner);
+      }
+
+      const char* saved_apikey = config["apikey"];
+      if (strlen(saved_apikey) > 0) {
+       thinx_api_key = String(saved_apikey);
+       sprintf(thx_api_key, "%s", saved_apikey); // 40 max
+      }
+
+      // TODO: device_id
     }
   }
+
+  #ifdef __DEBUG__
+    Serial.println("*TH: Restored configuration:");
+
+    Serial.print("     Alias: ");
+    Serial.println(thinx_alias);
+    Serial.print("     Owner: ");
+    Serial.println(thinx_owner);
+    Serial.print("     API Key: ");
+    Serial.println(thx_api_key);
+    Serial.print("     Firmware: ");
+    Serial.println(thinx_firmware_version);
+
+    //Serial.print("*TH: DEBUG Build-time Owner: ");
+    //Serial.println(thinx_owner);
+    //Serial.print("*TH: DEBUG Build-time Device Alias: ");
+    //Serial.println(thinx_alias);
+  #endif
 }
 
 /* Stores mutable device data (alias, owner) retrieved from API */
 bool saveDeviceInfo() {
+  Serial.println("*TH: Opening/creating config file...");
   Serial.println("Mounting SPIFFS...");
   bool result = SPIFFS.begin();
-  Serial.println("SPIFFS mounted: " + result);
-  Serial.println("*TH: Opening/creating config file...");
+  Serial.println("SPIFFS re-mounted: " + result);
   File f = SPIFFS.open("/thinx.cfg", "w");
   if (!f) {
+    Serial.println("*TH: Cannot save configuration, formatting SPIFFS...");
     SPIFFS.format();
-      Serial.println("*TH: Cannot save configuration.");
-      return false;
+    return false;
   } else {
-    Serial.print("*TH: saveConfiguration");
+    Serial.print("*TH: saving configuration:");
     f.println(deviceInfo());
     f.close();
     Serial.println("*TH: saveConfiguration completed.");
@@ -564,19 +594,20 @@ bool saveDeviceInfo() {
 }
 
 String deviceInfo() {
-  Serial.print("     alias: ");
-  Serial.println(thinx_alias);
-  Serial.print("     owner: ");
-  Serial.println(thinx_owner);
-
   StaticJsonBuffer<256> jsonBuffer;
   JsonObject& root = jsonBuffer.createObject();
   root["alias"] = thinx_alias;
   root["owner"] = thinx_owner;
-  root["apikey"] = thinx_api_key;
+  root["apikey"] = thx_api_key;
 
   String jsonString;
   root.printTo(jsonString);
+
+#ifdef __DEBUG__
+  Serial.print("deviceInfo(): ");
+  Serial.println(jsonString);
+#endif
+
   return jsonString;
 }
 
@@ -585,7 +616,7 @@ String deviceInfo() {
 // should exit by calling`thinx_parse(c_payload);`
 
 void loop() {
-  delay(5000); // supposed to help processing currently not-incoming MQTT callbacks
+  delay(60000); // supposed to help processing currently not-incoming MQTT callbacks
   if (thx_mqtt_client.connected() == false) {
     thinx_mqtt_reconnect();
   }
