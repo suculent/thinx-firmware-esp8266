@@ -10,12 +10,19 @@
 #include <ArduinoJson.h>
 
 #include "Thinx.h"
+#include "FS.h"
 
-// Inject SSID and Password from 'Settings.h' where we do not use WiFiManager
+// Inject SSID and Password from 'Settings.h' where we do not use EAVManager
 #ifndef __USE_WIFI_MANAGER__
 #include "Settings.h"
 #else
-#include <WiFiManager.h>
+// Custom clone of WiFiManager (we shall revert back to OpenSource if this won't be needed)
+// Purpose: SSID/password injection in AP mode
+// Solution: re-implement from UDP in mobile application
+//
+// Changes so far: `int connectWifi()` moved to public section in header
+// - buildable, but requires UDP end-to-end)
+#include "EAVManager/EAVManager.h"
 #endif
 
 // WORK IN PROGRESS: Send a registration post request with current MAC, Firmware descriptor, commit ID; sha and version if known (with all other useful params like expected device owner).
@@ -47,22 +54,27 @@ void setup() {
   Serial.begin(115200);
   while (!Serial);
 
-  thinx_init();
+  THiNX_initWithAPIKey("4ae7fa8276e4cd6e61e8a3ba133f2c237176e8d5"); // init with API key
 }
 
 /* Should be moved to library constructor */
 
-void thinx_init() {
+// Designated initialized
+void THiNX_initWithAPIKey(String api_key) {
+
+  if (api_key != null) {
+    thinx_api_key = api_key;
+  }
 
   restoreDeviceInfo();
 
 #ifdef __DEBUG__
   Serial.println(thinx_firmware_version);
 
-  Serial.print("Owner: ");
+  Serial.print("Build-time Owner: ");
   Serial.println(thinx_owner);
 
-  Serial.print("Device Alias: ");
+  Serial.print("Build-time Device Alias: ");
   Serial.println(thinx_alias);
 #endif
 
@@ -325,6 +337,7 @@ void senddata(String body) {
   if (thx_wifi_client.connect(shorthost, 7442)) {
     thx_wifi_client.println("POST /device/register HTTP/1.1");
     thx_wifi_client.println("Host: thinx.cloud");
+    thx_wifi_client.print("Authentication: "); thx_wifi_client.println(thinx_api_key);
     thx_wifi_client.println("Accept: */*"); // application/json
     thx_wifi_client.println("Origin: device");
     thx_wifi_client.println("Content-Type: application/json");
@@ -359,7 +372,7 @@ void senddata(String body) {
     Serial.println();
 
     thx_wifi_client.stop();
-    
+
     thinx_parse(payload);
 
   } else {
@@ -432,20 +445,22 @@ void thinx_mqtt_callback(char* topic, byte* payload, unsigned int length) {
 /* Optional methods */
 
 //
-// WiFiManager Setup Callbacks
+// EAVManager Setup Callbacks
 //
 
-void configModeCallback (WiFiManager *myWiFiManager) {
+void configModeCallback (EAVManager *myEAVManager) {
   Serial.println("Entered config mode");
   Serial.println(WiFi.softAPIP());
-  //mqtt_server = custom_mqtt_server.getValue();
-  Serial.println(myWiFiManager->getConfigPortalSSID());
+  thinx_api_key = api_key.getValue();
+  Serial.println(myEAVManager->getConfigPortalSSID());
 }
 
 //callback notifying us of the need to save config
 void saveConfigCallback () {
   Serial.println("Should save config");
   shouldSaveConfig = true;
+
+  // TODO: Save config
 }
 
 /* Private library method */
@@ -456,16 +471,16 @@ void saveConfigCallback () {
 
 void connect() { // should return status bool
   #ifdef __USE_WIFI_MANAGER__
-  WiFiManager wifiManager;
+  EAVManager EAVManager;
 
   // Add custom parameter when required:
   // id/name, placeholder/prompt, default, length
-  //WiFiManagerParameter custom_mqtt_server("server", "mqtt server", mqtt_server, 40);
-  //wifiManager.addParameter(&custom_mqtt_server);
+  EAVManagerParameter api_key("apikey", "API Key", api_key, 40);
+  EAVManager.addParameter(&api_key);
 
-  //wifiManager.setAPCallback(configModeCallback);
-  wifiManager.setTimeout(10000);
-  wifiManager.autoConnect(autoconf_ssid,autoconf_pwd);
+  EAVManager.setAPCallback(configModeCallback);
+  EAVManager.setTimeout(10000);
+  EAVManager.autoConnect(autoconf_ssid,autoconf_pwd);
   #else
   status = WiFi.begin(ssid, pass);
   #endif
@@ -473,7 +488,7 @@ void connect() { // should return status bool
   // attempt to connect to Wifi network:
   while ( !connected ) {
     #ifdef __USE_WIFI_MANAGER__
-    status = wifiManager.autoConnect(autoconf_ssid,autoconf_pwd);
+    status = EAVManager.autoConnect(autoconf_ssid,autoconf_pwd);
     if (status == true) {
       connected = true;
       return;
@@ -501,18 +516,25 @@ void connect() { // should return status bool
 //
 
 bool restoreDeviceInfo() {
-  File f = SPIFFS.open("/thinx.conf", "r");
+  Serial.println("Mounting SPIFFS...");
+  bool result = SPIFFS.begin();
+  Serial.println("SPIFFS mounted: " + result);
+  File f = SPIFFS.open("/thinx.cfg", "r");
   if (!f) {
       Serial.println("*TH: Cannot restore configuration.");
       return false;
   } else {
     String data = f.readStringUntil('\n');
-    JsonObject& config = jsonBuffer.parseObject(json.c_str());
+    StaticJsonBuffer<256> jsonBuffer;
+    JsonObject& config = jsonBuffer.parseObject(data.c_str());
     if (!config.success()) {
       Serial.println("*TH: parseObject() failed");
     } else {
-       thinx_alias = String(root["alias"]);
-       thinx_owner = String(root["owner"]);
+      const char* alias = config["alias"];
+       thinx_alias = String(alias);
+       const char* owner = config["owner"];
+       thinx_owner = String(owner);
+
        Serial.print("*TH: Alias: ");
        Serial.println(thinx_alias);
        Serial.print("*TH: Owner: ");
@@ -523,29 +545,39 @@ bool restoreDeviceInfo() {
 
 /* Stores mutable device data (alias, owner) retrieved from API */
 bool saveDeviceInfo() {
-  File f = SPIFFS.open("/thinx.conf", "w");
+  Serial.println("Mounting SPIFFS...");
+  bool result = SPIFFS.begin();
+  Serial.println("SPIFFS mounted: " + result);
+  Serial.println("*TH: Opening/creating config file...");
+  File f = SPIFFS.open("/thinx.cfg", "w");
   if (!f) {
+    SPIFFS.format();
       Serial.println("*TH: Cannot save configuration.");
       return false;
   } else {
     Serial.print("*TH: saveConfiguration");
-    Serial.print("     alias: ");
-    Serial.println(thinx_alias);
-    Serial.print("     owner: ");
-    Serial.println(thinx_owner);
-
-    StaticJsonBuffer<256> jsonBuffer;
-    JsonObject& root = jsonBuffer.createObject();
-    root["alias"] = thinx_alias;
-    root["owner"] = thinx_owner;
-
-    String jsonString;
-    root.printTo(jsonString);
-    f.println(jsonString);
+    f.println(deviceInfo());
     f.close();
     Serial.println("*TH: saveConfiguration completed.");
     return true;
   }
+}
+
+String deviceInfo() {
+  Serial.print("     alias: ");
+  Serial.println(thinx_alias);
+  Serial.print("     owner: ");
+  Serial.println(thinx_owner);
+
+  StaticJsonBuffer<256> jsonBuffer;
+  JsonObject& root = jsonBuffer.createObject();
+  root["alias"] = thinx_alias;
+  root["owner"] = thinx_owner;
+  root["apikey"] = thinx_api_key;
+
+  String jsonString;
+  root.printTo(jsonString);
+  return jsonString;
 }
 
 // TODO: Add client receive data to fetch update info on registration.
