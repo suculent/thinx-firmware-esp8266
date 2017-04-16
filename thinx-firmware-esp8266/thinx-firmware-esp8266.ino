@@ -309,6 +309,7 @@ void checkin() {
   StaticJsonBuffer<512> wrapperBuffer;
   JsonObject& wrapper = wrapperBuffer.createObject();
   wrapper["registration"] = root;
+
 #ifdef __DEBUG_JSON__
   wrapper.printTo(Serial);
   Serial.println();
@@ -578,16 +579,16 @@ bool restoreDeviceInfo() {
 /* Stores mutable device data (alias, owner) retrieved from API */
 bool saveDeviceInfo() {
   Serial.println("*TH: Opening/creating config file...");
-  Serial.println("Mounting SPIFFS...");
-  bool result = SPIFFS.begin();
-  Serial.println("SPIFFS re-mounted: " + result);
+  //Serial.println("Mounting SPIFFS...");
+  //bool result = SPIFFS.begin();
+  //Serial.println("SPIFFS re-mounted: " + result);
   File f = SPIFFS.open("/thinx.cfg", "w");
   if (!f) {
     Serial.println("*TH: Cannot save configuration, formatting SPIFFS...");
     SPIFFS.format();
     return false;
   } else {
-    Serial.print("*TH: saving configuration:");
+    Serial.print("*TH: saving configuration: (crashes)");
     f.println(deviceInfo());
     f.close();
     Serial.println("*TH: saveConfiguration completed.");
@@ -618,7 +619,7 @@ String deviceInfo() {
 // should exit by calling`thinx_parse(c_payload);`
 
 void loop() {
-  delay(60000); // supposed to help processing currently not-incoming MQTT callbacks
+  delay(10000); // supposed to help processing currently not-incoming MQTT callbacks
   if (thx_mqtt_client.connected() == false) {
     thinx_mqtt_reconnect();
   }
