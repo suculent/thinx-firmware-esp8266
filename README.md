@@ -5,6 +5,14 @@
 - Arduino IDE or Platform.io
 - Arduino libraries: ArduinoJSON, WiFiManager, ESP8266httpUpdate (to be replaced)
 
+# Work in progress!
+
+WARNING! Open this folder using Atom with installed Platform.io or thinx-firmware-esp8266/thinx-firmware-esp8266.ino using Arduino IDE.
+
+Contents of thinx-lib-esp is not working yet.
+
+Run prerelease.sh to bake your commit ID into the Thinx.h file.
+
 # Usage
 
 1. Create API Key on the thinx.cloud site (you can store this in Thinx.h file in case your project is not stored in public repository).
@@ -18,4 +26,3 @@
 Note: In case you'll build/upload your project (e.g. the library) using thinx.cloud, API key will be injected automatically and you should not need to set it up anymore.
 
 TODO: Prevent adding apikey parameter to Captive Portal when aready exists? Really? Ask users.
-
