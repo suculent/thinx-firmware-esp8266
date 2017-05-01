@@ -1,5 +1,7 @@
 /* OTA enabled firmware for Wemos D1 (ESP 8266, Arduino) */
 
+#include "Arduino.h"
+
 #define __DEBUG__
 // #define __DEBUG_JSON__
 
@@ -7,12 +9,12 @@
 
 #include <stdio.h>
 #include <Arduino.h>
-#include <ArduinoJson.h>
+#include "ArduinoJson/ArduinoJson.h"
 
 #include "Thinx.h"
 #include "FS.h"
 
-// Inject SSID and Password from 'Settings.h' where we do not use EAVManager
+// Inject SSID and Password from 'Settings.h' for testing where we do not use WiFiManager
 #ifndef __USE_WIFI_MANAGER__
 #include "Settings.h"
 #else
@@ -22,7 +24,7 @@
 //
 // Changes so far: `int connectWifi()` moved to public section in header
 // - buildable, but requires UDP end-to-end)
-#include "EAVManager/EAVManager.h"
+#include "WiFiManager/WiFiManager.h"
 #endif
 
 // WORK IN PROGRESS: Send a registration post request with current MAC, Firmware descriptor, commit ID; sha and version if known (with all other useful params like expected device owner).
@@ -42,7 +44,7 @@ const char* autoconf_pwd   = "PASSWORD"; // fallback to default password, howeve
 
 // Requires API v126+
 char thx_api_key[40];
-EAVManagerParameter api_key_param("apikey", "API Key", thx_api_key, 40);
+WiFiManagerParameter api_key_param("apikey", "API Key", thx_api_key, 40);
 
 // WiFiClient is required by PubSubClient and HTTP POST
 WiFiClient thx_wifi_client;
@@ -58,7 +60,7 @@ void setup() {
   Serial.begin(115200);
   while (!Serial);
 
-  THiNX_initWithAPIKey("4ae7fa8276e4cd6e61e8a3ba133f2c237176e8d5"); // init with API key
+  THiNX_initWithAPIKey(thinx_api_key); // init with unique API key you obtain from web and paste to in Thinx.h
 }
 
 /* Should be moved to library constructor */
@@ -451,13 +453,13 @@ void thinx_mqtt_callback(char* topic, byte* payload, unsigned int length) {
 /* Optional methods */
 
 //
-// EAVManager Setup Callbacks
+// WiFiManager Setup Callbacks
 //
 
-void configModeCallback (EAVManager *myEAVManager) {
+void configModeCallback (WiFiManager *myWiFiManager) {
   Serial.println("Entered config mode");
   Serial.println(WiFi.softAPIP());
-  Serial.println(myEAVManager->getConfigPortalSSID());
+  Serial.println(myWiFiManager->getConfigPortalSSID());
 }
 
 //callback notifying us of the need to save config
@@ -479,16 +481,16 @@ void saveConfigCallback () {
 
 void connect() { // should return status bool
   #ifdef __USE_WIFI_MANAGER__
-  EAVManager EAVManager;
+  WiFiManager WiFiManager;
 
   // id/name, placeholder/prompt, default, length
 
 
-  EAVManager.addParameter(&api_key_param);
+  WiFiManager.addParameter(&api_key_param);
 
-  EAVManager.setAPCallback(configModeCallback);
-  EAVManager.setTimeout(10000);
-  EAVManager.autoConnect(autoconf_ssid,autoconf_pwd);
+  WiFiManager.setAPCallback(configModeCallback);
+  WiFiManager.setTimeout(10000);
+  WiFiManager.autoConnect(autoconf_ssid,autoconf_pwd);
   #else
   status = WiFi.begin(ssid, pass);
   #endif
@@ -496,7 +498,7 @@ void connect() { // should return status bool
   // attempt to connect to Wifi network:
   while ( !connected ) {
     #ifdef __USE_WIFI_MANAGER__
-    status = EAVManager.autoConnect(autoconf_ssid,autoconf_pwd);
+    status = WiFiManager.autoConnect(autoconf_ssid,autoconf_pwd);
     if (status == true) {
       connected = true;
       return;
