@@ -8,8 +8,8 @@ static const String thinx_mqtt_url = "rtm.thinx.cloud";
 static const String thinx_firmware_version = "thinx-firmware-esp8266-1.3.17:2017-04-16";
 static const String thinx_firmware_version_short = "1.3.17";
 String thinx_owner = "test";
-String thinx_alias = "vanilla";
-String thinx_api_key = "VANILLA_API_KEY";
+String thinx_alias = "hardwired";
+String thinx_api_key = "5bc28df3a1d092ffe56bf36a6990533d729f1c14";
 String thinx_udid = "unique-device-identifier";
 
 int thinx_mqtt_port = 1883;
