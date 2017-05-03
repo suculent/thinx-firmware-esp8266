@@ -44,6 +44,7 @@ const char* autoconf_pwd   = "PASSWORD"; // fallback to default password, howeve
 
 // Requires API v126+
 char thx_api_key[40];
+char thx_udid[64];
 WiFiManagerParameter api_key_param("apikey", "API Key", thx_api_key, 40);
 
 // WiFiClient is required by PubSubClient and HTTP POST
@@ -212,7 +213,7 @@ void thinx_parse(String payload) {
 
       String udid = registration["device_id"];
       if ( udid.length() > 0 ) {
-        Serial.println(String("device_id: ") + udid);
+        Serial.println(String("assigning device_id: ") + udid);
         thinx_udid = udid;
       }
 
@@ -555,6 +556,12 @@ bool restoreDeviceInfo() {
        sprintf(thx_api_key, "%s", saved_apikey); // 40 max
       }
 
+      const char* saved_udid= config["udid"];
+      if (strlen(saved_udid) > 0) {
+       thinx_udid = String(saved_udid);
+       sprintf(thx_udid, "%s", saved_udid); // 40 max
+      }
+
       // TODO: device_id
     }
   }
@@ -604,6 +611,7 @@ String deviceInfo() {
   root["alias"] = thinx_alias;
   root["owner"] = thinx_owner;
   root["apikey"] = thx_api_key;
+  root["udid"] = thinx_udid;
 
   String jsonString;
   root.printTo(jsonString);
