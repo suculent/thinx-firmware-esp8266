@@ -1,5 +1,7 @@
 /* OTA enabled firmware for Wemos D1 (ESP 8266, Arduino) */
 
+// version 1.3.x
+
 #include "Arduino.h"
 
 #define __DEBUG__
@@ -559,7 +561,7 @@ bool restoreDeviceInfo() {
       const char* saved_udid= config["udid"];
       if (strlen(saved_udid) > 0) {
        thinx_udid = String(saved_udid);
-       sprintf(thx_udid, "%s", saved_udid); // 40 max
+       sprintf(thx_udid, "%s", saved_udid); // 64 max
       }
 
       // TODO: device_id
@@ -577,20 +579,12 @@ bool restoreDeviceInfo() {
     Serial.println(thx_api_key);
     Serial.print("     Firmware: ");
     Serial.println(thinx_firmware_version);
-
-    //Serial.print("*TH: DEBUG Build-time Owner: ");
-    //Serial.println(thinx_owner);
-    //Serial.print("*TH: DEBUG Build-time Device Alias: ");
-    //Serial.println(thinx_alias);
   #endif
 }
 
 /* Stores mutable device data (alias, owner) retrieved from API */
 bool saveDeviceInfo() {
   Serial.println("*TH: Opening/creating config file...");
-  //Serial.println("Mounting SPIFFS...");
-  //bool result = SPIFFS.begin();
-  //Serial.println("SPIFFS re-mounted: " + result);
   File f = SPIFFS.open("/thinx.cfg", "w");
   if (!f) {
     Serial.println("*TH: Cannot save configuration, formatting SPIFFS...");
