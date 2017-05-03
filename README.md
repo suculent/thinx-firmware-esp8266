@@ -24,10 +24,11 @@ Run prerelease.sh to bake your commit ID into the Thinx.h file.
 1. Create account on the [http://rtm.thinx.cloud/](http://rtm.thinx.cloud/) site
 2. Create an API Key
 3. Clone [vanilla NodeMCU app repository](https://github.com/suculent/thinx-firmware-esp8266) 
-4. You can store API Key in Thinx.h file in case your project is not stored in public repository.
-5. Build and upload the code to your device.
-6. After restart, connect with some device to WiFi AP 'AP-THiNX' with password 'PASSWORD' and enter the API Key
-7. Device will connect to WiFi and register itself. Check your thinx.cloud dashboard for new device.
+4. Run the bash ./prerelease.sh to create Thinx.h file; you can edit this with your custom information but the file will be overwritten when building on the server
+5. You can store API Key in Thinx.h file in case your project is not stored in public repository.
+6. Build and upload the code to your device.
+7. After restart, connect with some device to WiFi AP 'AP-THiNX' with password 'PASSWORD' and enter the API Key
+8. Device will connect to WiFi and register itself. Check your thinx.cloud dashboard for new device.
 
 ... Then you can theoretically add own git source, add ssh-keys to access those sources if not public, attach the source to device to dashboard and click the last icon in row to build/update the device. But that's not tested at time of updating this readme.
 
