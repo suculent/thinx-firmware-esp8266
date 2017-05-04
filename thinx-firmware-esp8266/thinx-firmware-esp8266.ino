@@ -96,7 +96,7 @@ void THiNX_initWithAPIKey(String api_key) {
   mqtt();
 
   delay(5000);
-  checkin(); // crashes so far in HTTP POST
+  checkin(thinx_udid); // crashes so far in HTTP POST
 
 #ifdef __DEBUG__
   // test == our tenant name from THINX platform
@@ -285,7 +285,7 @@ String thinx_mac() {
 
 /* Private library method */
 
-void checkin() {
+void checkin(String udid) {
 
   Serial.println("*TH: Starting API checkin...");
 
@@ -301,7 +301,12 @@ void checkin() {
 
   Serial.println("*TH: Building JSON...");
 
-  StaticJsonBuffer<512> jsonBuffer;
+  Serial.print("*TH: thinx_udid: ");
+  Serial.println(thinx_udid);
+  Serial.print("*TH: udid: ");
+  Serial.println(udid);
+
+  StaticJsonBuffer<1024> jsonBuffer;
   JsonObject& root = jsonBuffer.createObject();
   root["mac"] = thinx_mac();
   root["firmware"] = thinx_firmware_version;
@@ -309,9 +314,9 @@ void checkin() {
   root["hash"] = thinx_commit_id;
   root["owner"] = thinx_owner;
   root["alias"] = thinx_alias;
-  root["device_id"] = thinx_udid;
+  root["device_id"] = udid;
 
-  StaticJsonBuffer<512> wrapperBuffer;
+  StaticJsonBuffer<2048> wrapperBuffer;
   JsonObject& wrapper = wrapperBuffer.createObject();
   wrapper["registration"] = root;
 
@@ -340,7 +345,7 @@ void senddata(String body) {
   Serial.print("*TH: Sending to ");
   Serial.println(shorthost);
   Serial.println(body);
-  Serial.println(ESP.getFreeHeap());
+  //Serial.println(ESP.getFreeHeap());
 #endif
 
   Serial.print("*TH: thx_api_key API KEY "); Serial.println(thx_api_key);
@@ -375,14 +380,15 @@ void senddata(String body) {
     while ( thx_wifi_client.connected() ) {
       if ( thx_wifi_client.available() ) {
         char str = thx_wifi_client.read();
-        Serial.print(str);
         payload = payload + String(str);
       }
     }
 
-    Serial.println();
+    Serial.println(payload);
 
     thx_wifi_client.stop();
+
+    Serial.println("*TH: Parsing payload...");
 
     thinx_parse(payload);
 
@@ -544,27 +550,34 @@ bool restoreDeviceInfo() {
 
       const char* saved_alias = config["alias"];
       if (strlen(saved_alias) > 0) {
+        Serial.println("Loading alias...");
         thinx_alias = String(saved_alias);
+        Serial.println(thinx_alias);
       }
 
       const char* saved_owner = config["owner"];
       if (strlen(saved_owner) > 0) {
+        Serial.println("Loading owner...");
         thinx_owner = String(saved_owner);
+        Serial.println(thinx_owner);
       }
 
       const char* saved_apikey = config["apikey"];
       if (strlen(saved_apikey) > 0) {
        thinx_api_key = String(saved_apikey);
+       Serial.println("Loading apikey...");
        sprintf(thx_api_key, "%s", saved_apikey); // 40 max
+       Serial.println(thinx_api_key);
       }
 
-      const char* saved_udid= config["udid"];
+      const char* saved_udid = config["udid"];
       if (strlen(saved_udid) > 0) {
        thinx_udid = String(saved_udid);
+       Serial.println("Loading udid...");
        sprintf(thx_udid, "%s", saved_udid); // 64 max
+       Serial.println(thinx_udid);
       }
 
-      // TODO: device_id
     }
   }
 
@@ -579,13 +592,15 @@ bool restoreDeviceInfo() {
     Serial.println(thx_api_key);
     Serial.print("     Firmware: ");
     Serial.println(thinx_firmware_version);
+    Serial.print("     Device_ID: ");
+    Serial.println(thinx_udid);
   #endif
 }
 
 /* Stores mutable device data (alias, owner) retrieved from API */
 bool saveDeviceInfo() {
   Serial.println("*TH: Opening/creating config file...");
-  File f = SPIFFS.open("/thinx.cfg", "w");
+  File f = SPIFFS.open("/thinx.cfg", "w+");
   if (!f) {
     Serial.println("*TH: Cannot save configuration, formatting SPIFFS...");
     SPIFFS.format();
@@ -600,7 +615,7 @@ bool saveDeviceInfo() {
 }
 
 String deviceInfo() {
-  StaticJsonBuffer<256> jsonBuffer;
+  StaticJsonBuffer<512> jsonBuffer;
   JsonObject& root = jsonBuffer.createObject();
   root["alias"] = thinx_alias;
   root["owner"] = thinx_owner;
