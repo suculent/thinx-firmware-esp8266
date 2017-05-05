@@ -1,5 +1,7 @@
 /* OTA enabled firmware for Wemos D1 (ESP 8266, Arduino) */
 
+// version 1.3.28
+
 #include "Arduino.h"
 
 #define __DEBUG__
@@ -76,9 +78,12 @@ void THiNX_initWithAPIKey(String api_key) {
 
   Serial.println("Mounting SPIFFS...");
   bool result = SPIFFS.begin();
+  delay(10);
   Serial.println("SPIFFS mounted: " + result);
 
   restoreDeviceInfo();
+
+  sprintf(thx_udid, "%s", thinx_udid.c_str());
 
   connect();
 
@@ -217,7 +222,7 @@ void thinx_parse(String payload) {
         thinx_udid = udid;
       }
 
-      bool result = saveDeviceInfo(); // saves owner, alias and apikey (not device_id at the moment)
+      saveDeviceInfo();
 
     } else if (status == "FIRMWARE_UPDATE") {
 
@@ -307,7 +312,7 @@ void checkin() {
   root["hash"] = thinx_commit_id;
   root["owner"] = thinx_owner;
   root["alias"] = thinx_alias;
-  root["device_id"] = thinx_udid;
+  root["device_id"] = String(thx_udid);
 
   StaticJsonBuffer<512> wrapperBuffer;
   JsonObject& wrapper = wrapperBuffer.createObject();
@@ -347,7 +352,7 @@ void senddata(String body) {
     thx_wifi_client.println("POST /device/register HTTP/1.1");
     thx_wifi_client.println("Host: thinx.cloud");
     thx_wifi_client.print("Authentication: "); thx_wifi_client.println(thx_api_key);
-    thx_wifi_client.println("Accept: */*"); // application/json
+    thx_wifi_client.println("Accept: application/json"); // application/json
     thx_wifi_client.println("Origin: device");
     thx_wifi_client.println("Content-Type: application/json");
     thx_wifi_client.println("User-Agent: THiNX-Client");
@@ -470,7 +475,7 @@ void saveConfigCallback () {
   thinx_api_key = String(thx_api_key);
   Serial.print("Saving thinx_api_key: ");
   Serial.println(thinx_api_key);
-  bool result = saveDeviceInfo();
+  saveDeviceInfo();
 }
 
 /* Private library method */
@@ -575,6 +580,9 @@ bool restoreDeviceInfo() {
     Serial.println(thinx_owner);
     Serial.print("     API Key: ");
     Serial.println(thx_api_key);
+    Serial.print("     UDID: ");
+    Serial.println(thx_udid);
+
     Serial.print("     Firmware: ");
     Serial.println(thinx_firmware_version);
 
@@ -586,12 +594,16 @@ bool restoreDeviceInfo() {
 }
 
 /* Stores mutable device data (alias, owner) retrieved from API */
-bool saveDeviceInfo() {
+void saveDeviceInfo() {
   Serial.println("*TH: Opening/creating config file...");
-  //Serial.println("Mounting SPIFFS...");
-  //bool result = SPIFFS.begin();
-  //Serial.println("SPIFFS re-mounted: " + result);
-  File f = SPIFFS.open("/thinx.cfg", "w");
+
+  if (result == true) {
+    Serial.println("SPIFFS re-mounted: " + result);
+  } else {
+    Serial.println("SPIFFS has issues!");
+  }
+
+  File f = SPIFFS.open("/thinx.cfg", "w+");
   if (!f) {
     Serial.println("*TH: Cannot save configuration, formatting SPIFFS...");
     SPIFFS.format();
@@ -629,8 +641,8 @@ String deviceInfo() {
 // should exit by calling`thinx_parse(c_payload);`
 
 void loop() {
-  delay(10000); // supposed to help processing currently not-incoming MQTT callbacks
-  if (thx_mqtt_client.connected() == false) {
-    thinx_mqtt_reconnect();
-  }
+  //delay(10000); // supposed to help processing currently not-incoming MQTT callbacks
+  //if (thx_mqtt_client.connected() == false) {
+  //  thinx_mqtt_reconnect();
+  //}
 }
