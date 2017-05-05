@@ -64,6 +64,7 @@ void setup() {
   while (!Serial);
 
   THiNX_initWithAPIKey(thinx_api_key); // init with unique API key you obtain from web and paste to in Thinx.h
+  Serial.println("Init completed.");
 }
 
 /* Should be moved to library constructor */
@@ -217,6 +218,7 @@ void thinx_parse(String payload) {
         thinx_udid = udid;
       }
 
+      Serial.println("SAVE:1");
       saveDeviceInfo();
       return;
 
@@ -308,7 +310,7 @@ void checkin() {
   root["hash"] = String(thinx_commit_id);
   root["owner"] = String(thinx_owner);
   root["alias"] = String(thinx_alias);
-  root["device_id"] = String(thx_udid);
+  root["device_id"] = thinx_mac(); // should be thx_udid bud that is not always valid so far
 
   StaticJsonBuffer<512> wrapperBuffer;
   JsonObject& wrapper = wrapperBuffer.createObject();
@@ -471,6 +473,8 @@ void saveConfigCallback() {
     thinx_api_key = String(thx_api_key);
     Serial.print("Saving thinx_api_key: ");
     Serial.println(thinx_api_key);
+    //Will be saved on checkin? NO! Will be lost on reset!
+    Serial.println("SAVE:2");
     saveDeviceInfo();
   }
 }
@@ -598,7 +602,7 @@ bool restoreDeviceInfo() {
 /* Stores mutable device data (alias, owner) retrieved from API */
 void saveDeviceInfo()
 {
-  Serial.println("Skipping saveDeviceInfo, depending on Thinx.h and in-memory so far...");
+  Serial.println("Skipping saveDeviceInfo, depending on Thinx.h and in-memory so far... (seems to crash even though)");
 
   return;
 
@@ -637,16 +641,29 @@ void saveDeviceInfo()
   }
   Serial.println("*TH: saveDeviceInfo() completed.");
   SPIFFS.end();
+  Serial.println("*TH: SPIFFS.end();");
 }
 
 String deviceInfo()
 {
+  Serial.println("*TH: building device info: ");
   StaticJsonBuffer<480> jsonBuffer;
   JsonObject& root = jsonBuffer.createObject();
   root["alias"] = thinx_alias;
+  Serial.print("*TH: thinx_alias: ");
+  Serial.println(thinx_alias);
+
   root["owner"] = thinx_owner;
+  Serial.print("*TH: thinx_owner: ");
+  Serial.println(thinx_owner);
+
   root["apikey"] = thx_api_key;
+  Serial.print("*TH: thx_api_key: ");
+  Serial.println(thx_api_key);
+
   root["udid"] = thinx_udid;
+  Serial.print("*TH: thinx_udid: ");
+  Serial.println(thinx_udid);
 
   String jsonString;
   root.printTo(jsonString);
@@ -656,7 +673,8 @@ String deviceInfo()
 
 void loop()
 {
-
-  delay(1000);
   Serial.println(".");
+  delay(1000);
+  // what to do?
+  Serial.println(ESP.getFreeHeap());
 }
