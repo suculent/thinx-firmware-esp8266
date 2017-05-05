@@ -1,13 +1,16 @@
-/* OTA enabled firmware for Wemos D1 (ESP 8266, Arduino) */
+# 1 "/var/folders/yp/2l8w2hpd08199zstwqnxnvs80000gn/T/tmpZQj1Sp"
+#include <Arduino.h>
+# 1 "/Users/sychram/Repositories/thinx-firmware-esp8266/thinx-firmware-esp8266/thinx-firmware-esp8266.ino"
 
-// version 1.3.28
+
+
 
 #include "Arduino.h"
 
-#define __DEBUG__
-// #define __DEBUG_JSON__
+#define __DEBUG__ 
 
-#define __USE_WIFI_MANAGER__
+
+#define __USE_WIFI_MANAGER__ 
 
 #include <stdio.h>
 #include <Arduino.h>
@@ -16,40 +19,40 @@
 #include "Thinx.h"
 #include "FS.h"
 
-// Inject SSID and Password from 'Settings.h' for testing where we do not use EAVManager
+
 #ifndef __USE_WIFI_MANAGER__
 #include "Settings.h"
 #else
-// Custom clone of EAVManager (we shall revert back to OpenSource if this won't be needed)
-// Purpose: SSID/password injection in AP mode
-// Solution: re-implement from UDP in mobile application
-//
-// Changes so far: `int connectWifi()` moved to public section in header
-// - buildable, but requires UDP end-to-end)
+
+
+
+
+
+
 #include "EAVManager/EAVManager.h"
 #endif
 
-// WORK IN PROGRESS: Send a registration post request with current MAC, Firmware descriptor, commit ID; sha and version if known (with all other useful params like expected device owner).
 
-// TODO: Add UDP AT&U= responder like in EAV? Considered unsafe. Device will notify available update and download/install it on its own (possibly throught THiNX Security Gateway (THiNX )
-// IN PROGRESS: Add MQTT client (target IP defined using Thinx.h) and forced firmware update responder (will update on force or save in-memory state from new or retained mqtt notification)
-// TODO: Add UDP responder AT&U only to update to next available firmware (from save in-memory state)
+
+
+
+
 
 #include <ESP8266WiFi.h>
 #include <ESP8266HTTPClient.h>
 #include <ESP8266httpUpdate.h>
 #include <PubSubClient.h>
 
-// Default OTA login
-const char* autoconf_ssid  = "AP-THiNX"; // SSID in AP mode
-const char* autoconf_pwd   = "PASSWORD"; // fallback to default password, however this should be generated uniquely as it is logged to console
 
-// Requires API v126+
+const char* autoconf_ssid = "AP-THiNX";
+const char* autoconf_pwd = "PASSWORD";
+
+
 char thx_api_key[40];
 char thx_udid[64] = {0};
 EAVManagerParameter api_key_param("apikey", "API Key", thx_api_key, 40);
 
-// WiFiClient is required by PubSubClient and HTTP POST
+
 WiFiClient thx_wifi_client;
 int status = WL_IDLE_STATUS;
 
@@ -58,22 +61,40 @@ int last_mqtt_reconnect;
 
 bool shouldSaveConfig = false;
 bool connected = false;
-
+void setup();
+void THiNX_initWithAPIKey(String api_key);
+void esp_update(String url);
+void thinx_parse(String payload);
+String thinx_mqtt_channel();
+String thinx_mac();
+void checkin();
+void senddata(String body);
+void mqtt();
+bool thinx_mqtt_reconnect();
+void thinx_mqtt_callback(char* topic, byte* payload, unsigned int length);
+void configModeCallback (EAVManager *myEAVManager);
+void saveConfigCallback();
+void connect();
+bool restoreDeviceInfo();
+void saveDeviceInfo();
+String deviceInfo();
+void loop();
+#line 62 "/Users/sychram/Repositories/thinx-firmware-esp8266/thinx-firmware-esp8266/thinx-firmware-esp8266.ino"
 void setup() {
   Serial.begin(115200);
   while (!Serial);
 
-  THiNX_initWithAPIKey(thinx_api_key); // init with unique API key you obtain from web and paste to in Thinx.h
+  THiNX_initWithAPIKey(thinx_api_key);
 }
 
-/* Should be moved to library constructor */
 
-// Designated initialized
+
+
 void THiNX_initWithAPIKey(String api_key) {
 
   if (api_key != "") {
     thinx_api_key = api_key;
-    sprintf(thx_api_key, "%s", thinx_api_key.c_str()); // 40 max
+    sprintf(thx_api_key, "%s", thinx_api_key.c_str());
   }
 
   sprintf(thx_udid, "%s", thinx_udid.c_str());
@@ -94,16 +115,16 @@ void THiNX_initWithAPIKey(String api_key) {
   mqtt();
 
   delay(5000);
-  checkin(); // crashes so far in HTTP POST
+  checkin();
 
 #ifdef __DEBUG__
-  // test == our tenant name from THINX platform
-  // Serial.println("[update] Trying direct update...");
-  // esp_update("/bin/test/firmware.elf");
+
+
+
 #endif
 }
 
-/* Should be moved to private library method */
+
 
 void esp_update(String url) {
 
@@ -121,7 +142,7 @@ void esp_update(String url) {
     Serial.println("[update] Update no Update.");
     break;
     case HTTP_UPDATE_OK:
-    Serial.println("[update] Update ok."); // may not called we reboot the ESP
+    Serial.println("[update] Update ok.");
     delay(1000);
     break;
   }
@@ -138,25 +159,25 @@ void esp_update(String url) {
       Serial.println("[update] Update no Update.");
       break;
       case HTTP_UPDATE_OK:
-      Serial.println("[update] Update ok."); // may not called we reboot the ESP
+      Serial.println("[update] Update ok.");
       break;
     }
   }
 }
 
-/* Private library definitions */
+
 
 static const String thx_connected_response = "{ \"status\" : \"connected\" }";
 static const String thx_disconnected_response = "{ \"status\" : \"disconnected\" }";
 
-/* Private library method */
+
 
 void thinx_parse(String payload) {
 
-  // TODO: Should parse response only for this device_id (which must be internal and not a mac)
-  // TODO: store device_id, alias and owner using SPIFFS in thinx.json
-  // TODO: status can be OK or FIRMWARE_UPDATE; ignore rest
-  // {"registration":{"success":true,"status":"OK","alias":"","owner":"","device_id":"5CCF7FF09C39"}}
+
+
+
+
 
 #ifdef __DEBUG__
   Serial.print("Parsing response: ");
@@ -224,12 +245,12 @@ void thinx_parse(String payload) {
 
       String mac = registration["mac"];
       Serial.println(String("mac: ") + mac);
-      // TODO: must be this or ANY
+
 
       String commit = registration["commit"];
       Serial.println(String("commit: ") + commit);
 
-      // should not be this
+
       if (commit == thinx_commit_id) {
         Serial.println("*TH: Warning: new firmware has same commit_id as current.");
       }
@@ -244,7 +265,7 @@ void thinx_parse(String payload) {
 #ifdef __DEBUG__
         Serial.println("*TH: SKIPPING force update with URL:" + url);
 #else
-        // TODO: must not contain HTTP, extend with http://thinx.cloud/" // could use node.js as a secure provider instead of Apache!
+
         esp_update(url);
 #endif
       }
@@ -252,29 +273,22 @@ void thinx_parse(String payload) {
       Serial.println(String("Unhandled status: ") + status);
     }
 }
-
-/* Private library method */
-
-/*
-* Designated MQTT channel for each device. In case devices know their channels, they can talk together.
-* Update must be skipped unless forced and matching MAC, even though a lot should be validated to prevent overwrite.
-*/
-
+# 263 "/Users/sychram/Repositories/thinx-firmware-esp8266/thinx-firmware-esp8266/thinx-firmware-esp8266.ino"
 String thinx_mqtt_channel() {
   return String("/thinx/device/") + thinx_mac();
 }
 
-/* Private library method */
 
-/*
-* May return hash only in future.
-*/
+
+
+
+
 
 String thinx_mac() {
 
   byte mac[] = {
     0xDE, 0xFA, 0x01, 0x70, 0x32, 0x42
-  }; // 0x5C, 0xCF, 0x7F, 0xF0, 0x9C, 0x39
+  };
 
   WiFi.macAddress(mac);
   char macString[16] = {0};
@@ -282,7 +296,7 @@ String thinx_mac() {
   return String(macString);
 }
 
-/* Private library method */
+
 
 void checkin() {
 
@@ -293,7 +307,7 @@ void checkin() {
     return;
   }
 
-  // Default MAC address for AP controller
+
   byte mac[] = {
     0xDE, 0xFA, 0xDE, 0xFA, 0xDE, 0xFA
   };
@@ -325,14 +339,14 @@ void checkin() {
   senddata(body);
 }
 
-/* Private library method */
+
 
 void senddata(String body) {
 
   char shorthost[256] = {0};
   sprintf(shorthost, "%s", thinx_cloud_url.c_str());
 
-  // Response payload placeholder
+
   String payload = "{}";
 
 #ifdef __DEBUG__
@@ -347,7 +361,7 @@ void senddata(String body) {
     thx_wifi_client.println("POST /device/register HTTP/1.1");
     thx_wifi_client.println("Host: thinx.cloud");
     thx_wifi_client.print("Authentication: "); thx_wifi_client.println(thx_api_key);
-    thx_wifi_client.println("Accept: application/json"); // application/json
+    thx_wifi_client.println("Accept: application/json");
     thx_wifi_client.println("Origin: device");
     thx_wifi_client.println("Content-Type: application/json");
     thx_wifi_client.println("User-Agent: THiNX-Client");
@@ -390,11 +404,11 @@ void senddata(String body) {
   }
 }
 
-/* Private library method */
 
-//
-// MQTT Connection
-//
+
+
+
+
 
 void mqtt() {
   Serial.print("*TH: Contacting MQTT server ");
@@ -407,7 +421,7 @@ void mqtt() {
   last_mqtt_reconnect = 0;
 }
 
-/* Private library method */
+
 
 bool thinx_mqtt_reconnect() {
 
@@ -431,7 +445,7 @@ bool thinx_mqtt_reconnect() {
   return thx_mqtt_client.connected();
 }
 
-/* Private library method */
+
 
 void thinx_mqtt_callback(char* topic, byte* payload, unsigned int length) {
 
@@ -451,11 +465,11 @@ void thinx_mqtt_callback(char* topic, byte* payload, unsigned int length) {
   }
 }
 
-/* Optional methods */
 
-//
-// EAVManager Setup Callbacks
-//
+
+
+
+
 
 void configModeCallback (EAVManager *myEAVManager) {
   Serial.println("Entered config mode");
@@ -463,7 +477,7 @@ void configModeCallback (EAVManager *myEAVManager) {
   Serial.println(myEAVManager->getConfigPortalSSID());
 }
 
-// `api_key_param` should have its value set when this gets called
+
 void saveConfigCallback() {
   Serial.println("Save config callback:");
   strcpy(thx_api_key, api_key_param.getValue());
@@ -475,13 +489,13 @@ void saveConfigCallback() {
   }
 }
 
-/* Private library method */
 
-//
-// WiFi Connection
-//
 
-void connect() { // should return status bool
+
+
+
+
+void connect() {
   #ifdef __USE_WIFI_MANAGER__
   EAVManager EAVManager;
 
@@ -494,7 +508,7 @@ void connect() { // should return status bool
   status = WiFi.begin(ssid, pass);
   #endif
 
-  // attempt to connect to Wifi network:
+
   while ( !connected ) {
     #ifdef __USE_WIFI_MANAGER__
     status = EAVManager.autoConnect(autoconf_ssid,autoconf_pwd);
@@ -520,9 +534,9 @@ void connect() { // should return status bool
   }
 }
 
-//
-// PERSISTENCE
-//
+
+
+
 
 bool restoreDeviceInfo() {
 
@@ -556,17 +570,17 @@ bool restoreDeviceInfo() {
       const char* saved_apikey = config["apikey"];
       if (strlen(saved_apikey) > 8) {
        thinx_api_key = String(saved_apikey);
-       sprintf(thx_api_key, "%s", saved_apikey); // 40 max
+       sprintf(thx_api_key, "%s", saved_apikey);
       }
 
       const char* saved_udid = config["udid"];
       Serial.print("Saved udid: "); Serial.println(saved_udid);
-      if ((strlen(saved_udid) == 12) || (strlen(saved_udid) == 40)) { // warning: fix me
+      if ((strlen(saved_udid) == 12) || (strlen(saved_udid) == 40)) {
        thinx_udid = String(saved_udid);
-       sprintf(thx_udid, "%s", saved_udid); // 40 max
+       sprintf(thx_udid, "%s", saved_udid);
      } else {
        thinx_udid = thinx_mac();
-       sprintf(thx_udid, "%s", saved_udid); // 40 max
+       sprintf(thx_udid, "%s", saved_udid);
      }
     }
   }
@@ -586,16 +600,16 @@ bool restoreDeviceInfo() {
     Serial.print("     Firmware: ");
     Serial.println(thinx_firmware_version);
 
-    //Serial.print("*TH: DEBUG Build-time Owner: ");
-    //Serial.println(thinx_owner);
-    //Serial.print("*TH: DEBUG Build-time Device Alias: ");
-    //Serial.println(thinx_alias);
+
+
+
+
   #endif
 
   SPIFFS.end();
 }
 
-/* Stores mutable device data (alias, owner) retrieved from API */
+
 void saveDeviceInfo()
 {
   Serial.println("Skipping saveDeviceInfo, depending on Thinx.h and in-memory so far...");
@@ -611,13 +625,13 @@ void saveDeviceInfo()
 
   Serial.println("*TH: Opening/creating config file...");
 
-  // if exists remove?
+
 
   File f = SPIFFS.open("/thinx.cfg", "w+");
   if (!f) {
     Serial.println("*TH: Cannot save configuration, formatting SPIFFS...");
     SPIFFS.format();
-    Serial.println("*TH: Trying to save again..."); // TODO: visual feedback
+    Serial.println("*TH: Trying to save again...");
     f = SPIFFS.open("/thinx.cfg", "w+");
     if (f) {
       saveDeviceInfo();
@@ -628,11 +642,11 @@ void saveDeviceInfo()
     Serial.print("*TH: saving configuration: ");
     String config = deviceInfo();
     Serial.println(config);
-    //Serial.println("*TH: saveConfiguration completed. (warning: CRASH FOLLOWS) >>>");
+
     f.println(config.c_str());
 
     Serial.println("*TH: closing file crashes here...");
-    delay(100); // let the file close
+    delay(100);
     f.close();
   }
   Serial.println("*TH: saveDeviceInfo() completed.");

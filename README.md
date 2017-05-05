@@ -3,7 +3,7 @@
 # Requirements
 
 - Arduino IDE or Platform.io
-- Arduino libraries: ArduinoJSON, WiFiManager, ESP8266httpUpdate (to be replaced)
+- Arduino libraries: ArduinoJSON, EAVManager, ESP8266httpUpdate (to be replaced)
 
 # Work in progress!
 
