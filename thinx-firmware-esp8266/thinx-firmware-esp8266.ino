@@ -206,13 +206,13 @@ void thinx_parse(String payload) {
 
       String alias = registration["alias"];
       if ( alias.length() > 0 ) {
-        Serial.println(String("alias: ") + alias);
+        Serial.println(String("assigning alias: ") + alias);
         thinx_alias = alias;
       }
 
       String owner = registration["owner"];
       if ( owner.length() > 0 ) {
-        Serial.println(String("owner: ") + owner);
+        Serial.println(String("assigning owner: ") + owner);
         thinx_owner = owner;
       }
 
@@ -307,11 +307,11 @@ void checkin() {
   StaticJsonBuffer<512> jsonBuffer;
   JsonObject& root = jsonBuffer.createObject();
   root["mac"] = thinx_mac();
-  root["firmware"] = thinx_firmware_version;
-  root["version"] = thinx_firmware_version_short;
-  root["hash"] = thinx_commit_id;
-  root["owner"] = thinx_owner;
-  root["alias"] = thinx_alias;
+  root["firmware"] = String(thinx_firmware_version);
+  root["version"] = String(thinx_firmware_version_short);
+  root["hash"] = String(thinx_commit_id);
+  root["owner"] = String(thinx_owner);
+  root["alias"] = String(thinx_alias);
   root["device_id"] = String(thx_udid);
 
   StaticJsonBuffer<512> wrapperBuffer;
@@ -595,7 +595,7 @@ bool restoreDeviceInfo() {
 void saveDeviceInfo()
 {
   Serial.println("*TH: Opening/creating config file...");
-  File f = SPIFFS.open("/thinx.cfg", "w+");
+  File f = SPIFFS.open("/thinx.cfg", "w");
   if (!f) {
     Serial.println("*TH: Cannot save configuration, formatting SPIFFS...");
     SPIFFS.format();
