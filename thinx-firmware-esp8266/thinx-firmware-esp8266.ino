@@ -609,6 +609,7 @@ void saveDeviceInfo()
     f.println(config);
     Serial.println("*TH: closing file...");
     f.close();
+    delay(100); // let the file close
   }
   Serial.println("*TH: saveDeviceInfo() completed.");
 }
