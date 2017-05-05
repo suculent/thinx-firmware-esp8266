@@ -223,6 +223,7 @@ void thinx_parse(String payload) {
       }
 
       saveDeviceInfo();
+      return;
 
     } else if (status == "FIRMWARE_UPDATE") {
 
@@ -343,7 +344,6 @@ void senddata(String body) {
   Serial.print("*TH: Sending to ");
   Serial.println(shorthost);
   Serial.println(body);
-  Serial.println(ESP.getFreeHeap());
 #endif
 
   Serial.print("*TH: thx_api_key API KEY "); Serial.println(thx_api_key);
@@ -603,10 +603,14 @@ void saveDeviceInfo()
     saveDeviceInfo();
   } else {
     Serial.print("*TH: saving configuration:");
-    f.println(deviceInfo());
-    f.close();
+    String config = deviceInfo();
+    Serial.println(config);
     Serial.println("*TH: saveConfiguration completed. (warning: CRASH FOLLOWS) >>>");
+    f.println(config);
+    Serial.println("*TH: closing file...");
+    f.close();
   }
+  Serial.println("*TH: saveDeviceInfo() completed.");
 }
 
 String deviceInfo()
@@ -621,15 +625,12 @@ String deviceInfo()
   String jsonString;
   root.printTo(jsonString);
 
-#ifdef __DEBUG__
-  Serial.print("deviceInfo(): ");
-  Serial.println(jsonString);
-#endif
-
   return jsonString;
 }
 
 void loop()
 {
-  //
+
+  delay(1000);
+  Serial.println(".");
 }
