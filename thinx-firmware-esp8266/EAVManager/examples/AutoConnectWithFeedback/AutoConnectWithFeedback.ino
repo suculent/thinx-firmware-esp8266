@@ -6,16 +6,17 @@
 #include "EAVManager.h"          //https://github.com/tzapu/EAVManager
 
 void configModeCallback (EAVManager *myEAVManager) {
-  Serial.println("Entered config mode");
-  Serial.println(WiFi.softAPIP());
-  //if you used auto generated SSID, print it
-  Serial.println(myEAVManager->getConfigPortalSSID());
+  Serial.println("*TH: Entered Configuration Mode.");
+  //Serial.print("     IP: ");
+  //Serial.println(WiFi.softAPIP());
+  //Serial.print("     SSID: ");
+  //Serial.println(myEAVManager->getConfigPortalSSID());
 }
 
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(115200);
-  
+
   //EAVManager
   //Local intialization. Once its business is done, there is no need to keep it around
   EAVManager EAVManager;
@@ -34,11 +35,11 @@ void setup() {
     //reset and try again, or maybe put it to deep sleep
     ESP.reset();
     delay(1000);
-  } 
+  }
 
   //if you get here you have connected to the WiFi
   Serial.println("connected...yeey :)");
- 
+
 }
 
 void loop() {

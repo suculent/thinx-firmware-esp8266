@@ -227,7 +227,7 @@ int WiFiManager::connectWifi(String ssid, String pass) {
   }
   //fix for auto connect racing issue
   if (WiFi.status() == WL_CONNECTED) {
-    DEBUG_WM("Already connected. Bailing out.");
+    DEBUG_WM("Already connected.");
     return WL_CONNECTED;
   }
   //check if we have ssid and pass and force those, if not, try with last saved values
@@ -235,7 +235,7 @@ int WiFiManager::connectWifi(String ssid, String pass) {
     WiFi.begin(ssid.c_str(), pass.c_str());
   } else {
     if (WiFi.SSID()) {
-      DEBUG_WM("Using last saved values, should be faster");
+      DEBUG_WM("Using credentials stored to EEPROM");
       //trying to fix connection in progress hanging
       ETS_UART_INTR_DISABLE();
       wifi_station_disconnect();
@@ -373,7 +373,7 @@ void WiFiManager::handleRoot() {
   page += F("<h3>WiFiManager</h3>");
   page += FPSTR(HTTP_PORTAL_OPTIONS);
   page += FPSTR(HTTP_END);
-    
+
     server->sendHeader("Content-Length", String(page.length()));
   server->send(200, "text/html", page);
 
