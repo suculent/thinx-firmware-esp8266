@@ -1,33 +1,32 @@
 /* OTA enabled firmware for Wemos D1 (ESP 8266, Arduino) */
 
-// version 1.3.x
+// version 1.3.28
 
 #include "Arduino.h"
 
 #define __DEBUG__
-#define __DEBUG_JSON__
+// #define __DEBUG_JSON__
 
 #define __USE_WIFI_MANAGER__
 
 #include <stdio.h>
 #include <Arduino.h>
 #include "ArduinoJson/ArduinoJson.h"
- #include <ArduinoHttpClient.h>
 
 #include "Thinx.h"
 #include "FS.h"
 
-// Inject SSID and Password from 'Settings.h' for testing where we do not use EAVManager
+// Inject SSID and Password from 'Settings.h' for testing where we do not use WiFiManager
 #ifndef __USE_WIFI_MANAGER__
 #include "Settings.h"
 #else
-// Custom clone of EAVManager (we shall revert back to OpenSource if this won't be needed)
+// Custom clone of WiFiManager (we shall revert back to OpenSource if this won't be needed)
 // Purpose: SSID/password injection in AP mode
 // Solution: re-implement from UDP in mobile application
 //
 // Changes so far: `int connectWifi()` moved to public section in header
 // - buildable, but requires UDP end-to-end)
-#include "EAVManager/EAVManager.h"
+#include "WiFiManager/WiFiManager.h"
 #endif
 
 // WORK IN PROGRESS: Send a registration post request with current MAC, Firmware descriptor, commit ID; sha and version if known (with all other useful params like expected device owner).
@@ -48,7 +47,7 @@ const char* autoconf_pwd   = "PASSWORD"; // fallback to default password, howeve
 // Requires API v126+
 char thx_api_key[40];
 char thx_udid[64];
-EAVManagerParameter api_key_param("apikey", "API Key", thx_api_key, 40);
+WiFiManagerParameter api_key_param("apikey", "API Key", thx_api_key, 40);
 
 // WiFiClient is required by PubSubClient and HTTP POST
 WiFiClient thx_wifi_client;
@@ -64,11 +63,6 @@ void setup() {
   Serial.begin(115200);
   while (!Serial);
 
-  //
-  // WARNING! In case you have issues with device having wrong WiFi preset, there are two ways to fix this:
-  // 1. Connect to device using AP mode
-  // 2. Configure using wifi.sta.connect(ssid, password);
-
   THiNX_initWithAPIKey(thinx_api_key); // init with unique API key you obtain from web and paste to in Thinx.h
 }
 
@@ -77,37 +71,21 @@ void setup() {
 // Designated initialized
 void THiNX_initWithAPIKey(String api_key) {
 
-  printConfiguration();
-
-  thinx_udid = thinx_mac(); // this is a hack only, must be read from spiffs and/or header
-  //udid = thinx_Mac();
-
-  sprintf(thx_udid, "%s", thinx_udid.c_str());
-
-  // use api key from header if not given otherwise
   if (api_key != "") {
     thinx_api_key = api_key;
     sprintf(thx_api_key, "%s", thinx_api_key.c_str()); // 40 max
   }
 
-  Serial.println(".");
-  Serial.println(".");
-  Serial.println(".");
-  Serial.println("*TH: Mounting SPIFFS...");
+  Serial.println("Mounting SPIFFS...");
   bool result = SPIFFS.begin();
-  Serial.println("");
-  delay(10); // there's missing first character from next serial print, does this solve it?
+  delay(10);
+  Serial.println("SPIFFS mounted: " + result);
 
+  restoreDeviceInfo();
 
-  if (result == true) {
-    Serial.println("*TH: SPIFFS mounted.");
-    result = restoreDeviceInfo();
-  } else {
-    Serial.println("*TH: SPIFFS mount FAILED!");
-    Serial.println("Skipping device info restore from SPIFFS.");
-  }
+  sprintf(thx_udid, "%s", thinx_udid.c_str());
 
-  connected = connect();
+  connect();
 
 #ifdef __DEBUG__
   if (connected) {
@@ -117,11 +95,11 @@ void THiNX_initWithAPIKey(String api_key) {
   }
 #endif
 
-  delay(5000);
-  checkin();
+  delay(500);
+  mqtt();
 
   delay(5000);
-  mqtt();
+  checkin(); // crashes so far in HTTP POST
 
 #ifdef __DEBUG__
   // test == our tenant name from THINX platform
@@ -180,8 +158,8 @@ static const String thx_disconnected_response = "{ \"status\" : \"disconnected\"
 
 void thinx_parse(String payload) {
 
-  // TODO: Should parse response only for this device_id (which must be given and not a mac)
-  // DONE: stores device_id, alias and owner using SPIFFS in thinx.json
+  // TODO: Should parse response only for this device_id (which must be internal and not a mac)
+  // TODO: store device_id, alias and owner using SPIFFS in thinx.json
   // TODO: status can be OK or FIRMWARE_UPDATE; ignore rest
   // {"registration":{"success":true,"status":"OK","alias":"","owner":"","device_id":"5CCF7FF09C39"}}
 
@@ -228,13 +206,13 @@ void thinx_parse(String payload) {
 
       String alias = registration["alias"];
       if ( alias.length() > 0 ) {
-        Serial.println(String("alias: ") + alias);
+        Serial.println(String("assigning alias: ") + alias);
         thinx_alias = alias;
       }
 
       String owner = registration["owner"];
       if ( owner.length() > 0 ) {
-        Serial.println(String("owner: ") + owner);
+        Serial.println(String("assigning owner: ") + owner);
         thinx_owner = owner;
       }
 
@@ -244,7 +222,8 @@ void thinx_parse(String payload) {
         thinx_udid = udid;
       }
 
-      bool result = saveDeviceInfo(); // saves owner, alias and apikey and udid
+      saveDeviceInfo();
+      return;
 
     } else if (status == "FIRMWARE_UPDATE") {
 
@@ -310,129 +289,6 @@ String thinx_mac() {
 
 /* Private library method */
 
-void senddata(String body) {
-
-  char shorthost[256] = {0};
-  sprintf(shorthost, "%s", thinx_cloud_url.c_str());
-
-  // Response payload placeholder
-  String payload = "{}";
-
-#ifdef __DEBUG__
-  Serial.print("*TH:DEBUG heap = ");
-  Serial.println(ESP.getFreeHeap());
-
-  Serial.print("*TH: Sending to ");
-  Serial.println(String(shorthost));
-  Serial.print("*TH: With API Key: ");
-  Serial.println(thx_api_key);
-  //Serial.println(body);
-#endif
-  // HttpClient poster = HttpClient(thx_wifi_client, thinx_cloud_url, thinx_api_port);
-  HttpClient poster = HttpClient(thx_wifi_client, "207.154.230.212", thinx_api_port);
-  String contentType = "application/json";
-  poster.post("/device/register");
-  poster.sendHeader("Authentication", thx_api_key);
-  poster.sendHeader("Accept", contentType);
-  poster.sendHeader("Origin", "device");
-  poster.sendHeader("User-Agent", "THiNX-Client");
-  poster.write((const byte*)body.c_str(), body.length());
-  printf("Trace   : ResponseCode : %d\n", poster.responseStatusCode());
-  printf("Trace   : Incoming Body : %s\n", poster.responseBody().c_str());
-
-  // read the status code and body of the response
-  int statusCode = poster.responseStatusCode();
-  String response = poster.responseBody();
-
-  Serial.print("POST Status code: ");
-  Serial.println(statusCode);
-  Serial.print("POST Response: ");
-  Serial.println(response);
-
-  return;
-
-  WiFiClient client = thx_wifi_client;
-
-  if (!client.available()) {
-    Serial.println("*TH: client NOT available...");
-  }
-
-  Serial.println("*TH: Connecting to API...");
-
-  if (!client.connect(shorthost, thinx_api_port)) {
-   Serial.println("*TH: THiNX API connection failed.");
-   return;
-  } else  {
-
-    Serial.print("*TH: POST with API Key: "); Serial.println(thx_api_key);
-
-    Serial.println("*TH: POST 1");
-    client.println("POST /device/register HTTP/1.1");
-
-    Serial.println("*TH: POST 2");
-    client.println("Host: thinx.cloud");
-
-    Serial.println("*TH: POST 3");
-    client.print("Authentication: "); thx_wifi_client.println(thx_api_key);
-
-    Serial.println("*TH: POST 4");
-    client.println("Accept: */*"); // application/json
-
-    Serial.println("*TH: POST 5");
-    client.println("Origin: device");
-
-    Serial.println("*TH: POST 6");
-    client.println("Content-Type: application/json");
-
-    Serial.println("*TH: POST 7");
-    client.println("User-Agent: THiNX-Client");
-
-    Serial.println("*TH: POST 8");
-    client.print("Content-Length: ");
-
-    Serial.println("*TH: POST 9");
-    client.println(body.length());
-
-    Serial.println("*TH: POST 10");
-    client.println();
-
-    Serial.println("Headers set...");
-    Serial.println("*TH: POST 11");
-    client.println(body);
-    Serial.println("Body sent...");
-
-    long interval = 2000;
-    unsigned long currentMillis = millis(), previousMillis = millis();
-
-    while(!client.available()){
-      if( (currentMillis - previousMillis) > interval ){
-        Serial.println("Response Timeout. TODO: Should retry later.");
-        client.stop();
-        return;
-      }
-      currentMillis = millis();
-    }
-
-    while ( client.connected() ) {
-      if ( client.available() ) {
-        char str = client.read();
-        //Serial.print(str);
-        payload = payload + String(str);
-      }
-    }
-
-    Serial.println("*TH: Payload:");
-    Serial.println(payload);
-
-    client.stop();
-
-    Serial.println("*TH: Parsing payload...");
-
-    thinx_parse(payload);
-
-  }
-}
-
 void checkin() {
 
   Serial.println("*TH: Starting API checkin...");
@@ -442,22 +298,24 @@ void checkin() {
     return;
   }
 
+  // Default MAC address for AP controller
+  byte mac[] = {
+    0xDE, 0xFA, 0xDE, 0xFA, 0xDE, 0xFA
+  };
+
   Serial.println("*TH: Building JSON...");
 
-  Serial.print("*TH: thx_udid: ");
-  Serial.println(thx_udid);
-
-  StaticJsonBuffer<1024> jsonBuffer;
+  StaticJsonBuffer<512> jsonBuffer;
   JsonObject& root = jsonBuffer.createObject();
   root["mac"] = thinx_mac();
-  root["firmware"] = thinx_firmware_version;
-  root["version"] = thinx_firmware_version_short;
-  root["hash"] = thinx_commit_id;
-  root["owner"] = thinx_owner;
-  root["alias"] = thinx_alias;
-  root["device_id"] = thx_udid; // should be thinx_udid but that is empty here!
+  root["firmware"] = String(thinx_firmware_version);
+  root["version"] = String(thinx_firmware_version_short);
+  root["hash"] = String(thinx_commit_id);
+  root["owner"] = String(thinx_owner);
+  root["alias"] = String(thinx_alias);
+  root["device_id"] = String(thx_udid);
 
-  StaticJsonBuffer<2048> wrapperBuffer;
+  StaticJsonBuffer<512> wrapperBuffer;
   JsonObject& wrapper = wrapperBuffer.createObject();
   wrapper["registration"] = root;
 
@@ -474,7 +332,68 @@ void checkin() {
 
 /* Private library method */
 
+void senddata(String body) {
 
+  char shorthost[256] = {0};
+  sprintf(shorthost, "%s", thinx_cloud_url.c_str());
+
+  // Response payload placeholder
+  String payload = "{}";
+
+#ifdef __DEBUG__
+  Serial.print("*TH: Sending to ");
+  Serial.println(shorthost);
+  Serial.println(body);
+#endif
+
+  Serial.print("*TH: thx_api_key API KEY "); Serial.println(thx_api_key);
+
+  if (thx_wifi_client.connect(shorthost, 7442)) {
+    thx_wifi_client.println("POST /device/register HTTP/1.1");
+    thx_wifi_client.println("Host: thinx.cloud");
+    thx_wifi_client.print("Authentication: "); thx_wifi_client.println(thx_api_key);
+    thx_wifi_client.println("Accept: application/json"); // application/json
+    thx_wifi_client.println("Origin: device");
+    thx_wifi_client.println("Content-Type: application/json");
+    thx_wifi_client.println("User-Agent: THiNX-Client");
+    thx_wifi_client.print("Content-Length: ");
+    thx_wifi_client.println(body.length());
+    thx_wifi_client.println();
+    Serial.println("Headers set...");
+    thx_wifi_client.println(body);
+    Serial.println("Body sent...");
+
+    long interval = 2000;
+    unsigned long currentMillis = millis(), previousMillis = millis();
+
+    while(!thx_wifi_client.available()){
+      if( (currentMillis - previousMillis) > interval ){
+        Serial.println("Response Timeout. TODO: Should retry later.");
+        thx_wifi_client.stop();
+        return;
+      }
+      currentMillis = millis();
+    }
+
+    while ( thx_wifi_client.connected() ) {
+      if ( thx_wifi_client.available() ) {
+        char str = thx_wifi_client.read();
+        Serial.print(str);
+        payload = payload + String(str);
+      }
+    }
+
+    Serial.println();
+
+    thx_wifi_client.stop();
+
+    thinx_parse(payload);
+
+  } else {
+    Serial.println("*TH: API connection failed.");
+    return;
+  }
+}
 
 /* Private library method */
 
@@ -540,23 +459,25 @@ void thinx_mqtt_callback(char* topic, byte* payload, unsigned int length) {
 /* Optional methods */
 
 //
-// EAVManager Setup Callbacks
+// WiFiManager Setup Callbacks
 //
 
-void configModeCallback (EAVManager *myEAVManager) {
+void configModeCallback (WiFiManager *myWiFiManager) {
   Serial.println("Entered config mode");
   Serial.println(WiFi.softAPIP());
-  Serial.println(myEAVManager->getConfigPortalSSID());
+  Serial.println(myWiFiManager->getConfigPortalSSID());
 }
 
-//callback notifying us of the need to save config
-void saveConfigCallback () {
+// `api_key_param` should have its value set when this gets called
+void saveConfigCallback() {
   Serial.println("Save config callback:");
   strcpy(thx_api_key, api_key_param.getValue());
-  thinx_api_key = String(thx_api_key);
-  Serial.print("Saving thinx_api_key: ");
-  Serial.println(thinx_api_key);
-  bool result = saveDeviceInfo();
+  if (String(thx_api_key).length() > 0) {
+    thinx_api_key = String(thx_api_key);
+    Serial.print("Saving thinx_api_key: ");
+    Serial.println(thinx_api_key);
+    saveDeviceInfo();
+  }
 }
 
 /* Private library method */
@@ -565,19 +486,15 @@ void saveConfigCallback () {
 // WiFi Connection
 //
 
-
-bool connect() { // should return status bool
+void connect() { // should return status bool
   #ifdef __USE_WIFI_MANAGER__
-  EAVManager EAVManager;
+  WiFiManager WiFiManager;
 
-  // id/name, placeholder/prompt, default, length
+  WiFiManager.addParameter(&api_key_param);
 
-
-  EAVManager.addParameter(&api_key_param);
-
-  EAVManager.setAPCallback(configModeCallback);
-  EAVManager.setTimeout(10000);
-  EAVManager.autoConnect(autoconf_ssid,autoconf_pwd);
+  WiFiManager.setAPCallback(configModeCallback);
+  WiFiManager.setTimeout(10000);
+  WiFiManager.autoConnect(autoconf_ssid,autoconf_pwd);
   #else
   status = WiFi.begin(ssid, pass);
   #endif
@@ -585,10 +502,10 @@ bool connect() { // should return status bool
   // attempt to connect to Wifi network:
   while ( !connected ) {
     #ifdef __USE_WIFI_MANAGER__
-    status = EAVManager.autoConnect(autoconf_ssid,autoconf_pwd);
+    status = WiFiManager.autoConnect(autoconf_ssid,autoconf_pwd);
     if (status == true) {
       connected = true;
-      return connected;
+      return;
     } else {
       Serial.print("*TH: Connection Status: false!");
       delay(3000);
@@ -606,7 +523,6 @@ bool connect() { // should return status bool
     }
     #endif
   }
-  return connected;
 }
 
 //
@@ -617,11 +533,11 @@ bool restoreDeviceInfo() {
 
   File f = SPIFFS.open("/thinx.cfg", "r");
   if (!f) {
-      Serial.println("*TH: SPIFFS: no custom configuration found yet.");
+      Serial.println("*TH: Cannot restore configuration.");
       return false;
   } else {
     String data = f.readStringUntil('\n');
-    StaticJsonBuffer<1024> jsonBuffer;
+    StaticJsonBuffer<256> jsonBuffer;
     JsonObject& config = jsonBuffer.parseObject(data.c_str());
     if (!config.success()) {
       Serial.println("*TH: parseObject() failed");
@@ -629,34 +545,27 @@ bool restoreDeviceInfo() {
 
       const char* saved_alias = config["alias"];
       if (strlen(saved_alias) > 0) {
-        Serial.println("Loading alias...");
         thinx_alias = String(saved_alias);
-        Serial.println(thinx_alias);
       }
 
       const char* saved_owner = config["owner"];
       if (strlen(saved_owner) > 0) {
-        Serial.println("Loading owner...");
         thinx_owner = String(saved_owner);
-        Serial.println(thinx_owner);
       }
 
       const char* saved_apikey = config["apikey"];
       if (strlen(saved_apikey) > 0) {
        thinx_api_key = String(saved_apikey);
-       Serial.println("Loading apikey...");
        sprintf(thx_api_key, "%s", saved_apikey); // 40 max
-       Serial.println(thinx_api_key);
       }
 
-      const char* saved_udid = config["udid"];
+      const char* saved_udid= config["udid"];
       if (strlen(saved_udid) > 0) {
        thinx_udid = String(saved_udid);
-       Serial.println("Loading udid...");
-       sprintf(thx_udid, "%s", saved_udid); // 64 max
-       Serial.println(thinx_udid);
+       sprintf(thx_udid, "%s", saved_udid); // 40 max
       }
 
+      // TODO: device_id
     }
   }
 
@@ -669,32 +578,45 @@ bool restoreDeviceInfo() {
     Serial.println(thinx_owner);
     Serial.print("     API Key: ");
     Serial.println(thx_api_key);
+    Serial.print("     UDID: ");
+    Serial.println(thx_udid);
+
     Serial.print("     Firmware: ");
     Serial.println(thinx_firmware_version);
-    Serial.print("     Device_ID: ");
-    Serial.println(thinx_udid);
+
+    //Serial.print("*TH: DEBUG Build-time Owner: ");
+    //Serial.println(thinx_owner);
+    //Serial.print("*TH: DEBUG Build-time Device Alias: ");
+    //Serial.println(thinx_alias);
   #endif
 }
 
 /* Stores mutable device data (alias, owner) retrieved from API */
-bool saveDeviceInfo() {
+void saveDeviceInfo()
+{
   Serial.println("*TH: Opening/creating config file...");
-  File f = SPIFFS.open("/thinx.cfg", "w+");
+  File f = SPIFFS.open("/thinx.cfg", "w");
   if (!f) {
     Serial.println("*TH: Cannot save configuration, formatting SPIFFS...");
     SPIFFS.format();
-    return false;
+    Serial.println("*TH: Trying to save again..."); // TODO: visual feedback
+    saveDeviceInfo();
   } else {
-    Serial.print("*TH: saving configuration: (crashes)");
-    f.println(deviceInfo());
+    Serial.print("*TH: saving configuration:");
+    String config = deviceInfo();
+    Serial.println(config);
+    Serial.println("*TH: saveConfiguration completed. (warning: CRASH FOLLOWS) >>>");
+    f.println(config);
+    Serial.println("*TH: closing file...");
     f.close();
-    Serial.println("*TH: saveConfiguration completed.");
-    return true;
+    delay(100); // let the file close
   }
+  Serial.println("*TH: saveDeviceInfo() completed.");
 }
 
-String deviceInfo() {
-  StaticJsonBuffer<1024> jsonBuffer;
+String deviceInfo()
+{
+  StaticJsonBuffer<256> jsonBuffer;
   JsonObject& root = jsonBuffer.createObject();
   root["alias"] = thinx_alias;
   root["owner"] = thinx_owner;
@@ -704,53 +626,12 @@ String deviceInfo() {
   String jsonString;
   root.printTo(jsonString);
 
-#ifdef __DEBUG__
-  Serial.print("deviceInfo(): ");
-  Serial.println(jsonString);
-#endif
-
   return jsonString;
 }
 
-// TODO: Add client receive data to fetch update info on registration.
-// Optional for forced updates, not required at the moment;
-// should exit by calling`thinx_parse(c_payload);`
+void loop()
+{
 
-void loop() {
-  //delay(10000); // supposed to help processing currently not-incoming MQTT callbacks
-  //if (thx_mqtt_client.connected() == false) {
-  //  thinx_mqtt_reconnect();
-  //}
-}
-
-void printConfiguration() {
-
-  Serial.print("*TH: thinx_commit_id: ");
-  Serial.println(thinx_commit_id);
-
-  Serial.print("*TH: thinx_cloud_url: ");
-  Serial.println(thinx_cloud_url);
-
-  Serial.print("*TH: thinx_commit_id: ");
-  Serial.println(thinx_commit_id);
-
-  Serial.print("*TH: thinx_mqtt_url: ");
-  Serial.println(thinx_mqtt_url);
-
-  Serial.print("*TH: thinx_firmware_version: ");
-  Serial.println(thinx_firmware_version);
-
-  Serial.print("*TH: thinx_owner: ");
-  Serial.println(thinx_owner);
-
-  Serial.print("*TH: thinx_alias: ");
-  Serial.println(thinx_alias);
-
-  Serial.print("*TH: thinx_api_key: ");
-  Serial.println(thinx_api_key);
-
-  Serial.print("*TH: thinx_udid: ");
-  Serial.println(thinx_udid);
-  Serial.println("*TH: ---");
-
+  delay(1000);
+  Serial.println(".");
 }
