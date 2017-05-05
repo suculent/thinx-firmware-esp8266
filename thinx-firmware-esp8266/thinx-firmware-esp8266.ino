@@ -674,7 +674,8 @@ String deviceInfo()
 void loop()
 {
   Serial.println(".");
-  delay(1000);
-  // what to do?
-  Serial.println(ESP.getFreeHeap());
+  Serial.println(".");
+  Serial.println(".");
+  Serial.println(".");
+  delay(1);
 }
