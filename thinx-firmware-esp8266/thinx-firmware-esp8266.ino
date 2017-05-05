@@ -468,14 +468,16 @@ void configModeCallback (WiFiManager *myWiFiManager) {
   Serial.println(myWiFiManager->getConfigPortalSSID());
 }
 
-//callback notifying us of the need to save config
-void saveConfigCallback () {
+// `api_key_param` should have its value set when this gets called
+void saveConfigCallback() {
   Serial.println("Save config callback:");
   strcpy(thx_api_key, api_key_param.getValue());
-  thinx_api_key = String(thx_api_key);
-  Serial.print("Saving thinx_api_key: ");
-  Serial.println(thinx_api_key);
-  saveDeviceInfo();
+  if (String(thx_api_key).length() > 0) {
+    thinx_api_key = String(thx_api_key);
+    Serial.print("Saving thinx_api_key: ");
+    Serial.println(thinx_api_key);
+    saveDeviceInfo();
+  }
 }
 
 /* Private library method */
@@ -484,13 +486,9 @@ void saveConfigCallback () {
 // WiFi Connection
 //
 
-
 void connect() { // should return status bool
   #ifdef __USE_WIFI_MANAGER__
   WiFiManager WiFiManager;
-
-  // id/name, placeholder/prompt, default, length
-
 
   WiFiManager.addParameter(&api_key_param);
 
@@ -594,15 +592,9 @@ bool restoreDeviceInfo() {
 }
 
 /* Stores mutable device data (alias, owner) retrieved from API */
-void saveDeviceInfo() {
+void saveDeviceInfo()
+{
   Serial.println("*TH: Opening/creating config file...");
-
-  if (result == true) {
-    Serial.println("SPIFFS re-mounted: " + result);
-  } else {
-    Serial.println("SPIFFS has issues!");
-  }
-
   File f = SPIFFS.open("/thinx.cfg", "w+");
   if (!f) {
     Serial.println("*TH: Cannot save configuration, formatting SPIFFS...");
@@ -617,7 +609,8 @@ void saveDeviceInfo() {
   }
 }
 
-String deviceInfo() {
+String deviceInfo()
+{
   StaticJsonBuffer<256> jsonBuffer;
   JsonObject& root = jsonBuffer.createObject();
   root["alias"] = thinx_alias;
@@ -636,13 +629,7 @@ String deviceInfo() {
   return jsonString;
 }
 
-// TODO: Add client receive data to fetch update info on registration.
-// Optional for forced updates, not required at the moment;
-// should exit by calling`thinx_parse(c_payload);`
-
-void loop() {
-  //delay(10000); // supposed to help processing currently not-incoming MQTT callbacks
-  //if (thx_mqtt_client.connected() == false) {
-  //  thinx_mqtt_reconnect();
-  //}
+void loop()
+{
+  //
 }
