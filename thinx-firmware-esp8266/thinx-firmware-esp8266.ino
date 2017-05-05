@@ -607,13 +607,13 @@ void saveDeviceInfo() {
   if (!f) {
     Serial.println("*TH: Cannot save configuration, formatting SPIFFS...");
     SPIFFS.format();
-    return false;
+    Serial.println("*TH: Trying to save again..."); // TODO: visual feedback
+    saveDeviceInfo();
   } else {
-    Serial.print("*TH: saving configuration: (crashes)");
+    Serial.print("*TH: saving configuration:");
     f.println(deviceInfo());
     f.close();
-    Serial.println("*TH: saveConfiguration completed.");
-    return true;
+    Serial.println("*TH: saveConfiguration completed. (warning: CRASH FOLLOWS) >>>");
   }
 }
 
