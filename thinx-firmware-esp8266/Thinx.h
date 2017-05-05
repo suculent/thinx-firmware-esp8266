@@ -3,7 +3,7 @@
 //
 
 static const String thinx_commit_id = "67c4782ee1da156b224944c74d25b04a0cb2d2e2";
-static const String thinx_cloud_url = "thinx.cloud";
+static const String thinx_cloud_url = "207.154.230.212";
 static const String thinx_mqtt_url = "thinx.cloud";
 static const String thinx_firmware_version = "thinx-firmware-esp8266-1.3.31:2017-05-05";
 static const String thinx_firmware_version_short = "1.3.31";

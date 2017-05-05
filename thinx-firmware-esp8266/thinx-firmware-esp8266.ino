@@ -12,21 +12,22 @@
 #include <stdio.h>
 #include <Arduino.h>
 #include "ArduinoJson/ArduinoJson.h"
+ #include <ArduinoHttpClient.h>
 
 #include "Thinx.h"
 #include "FS.h"
 
-// Inject SSID and Password from 'Settings.h' for testing where we do not use WiFiManager
+// Inject SSID and Password from 'Settings.h' for testing where we do not use EAVManager
 #ifndef __USE_WIFI_MANAGER__
 #include "Settings.h"
 #else
-// Custom clone of WiFiManager (we shall revert back to OpenSource if this won't be needed)
+// Custom clone of EAVManager (we shall revert back to OpenSource if this won't be needed)
 // Purpose: SSID/password injection in AP mode
 // Solution: re-implement from UDP in mobile application
 //
 // Changes so far: `int connectWifi()` moved to public section in header
 // - buildable, but requires UDP end-to-end)
-#include "WiFiManager/WiFiManager.h"
+#include "EAVManager/EAVManager.h"
 #endif
 
 // WORK IN PROGRESS: Send a registration post request with current MAC, Firmware descriptor, commit ID; sha and version if known (with all other useful params like expected device owner).
@@ -47,7 +48,7 @@ const char* autoconf_pwd   = "PASSWORD"; // fallback to default password, howeve
 // Requires API v126+
 char thx_api_key[40];
 char thx_udid[64];
-WiFiManagerParameter api_key_param("apikey", "API Key", thx_api_key, 40);
+EAVManagerParameter api_key_param("apikey", "API Key", thx_api_key, 40);
 
 // WiFiClient is required by PubSubClient and HTTP POST
 WiFiClient thx_wifi_client;
@@ -116,11 +117,11 @@ void THiNX_initWithAPIKey(String api_key) {
   }
 #endif
 
-  delay(500);
-  mqtt();
+  delay(5000);
+  checkin();
 
   delay(5000);
-  checkin(String(thx_udid));
+  mqtt();
 
 #ifdef __DEBUG__
   // test == our tenant name from THINX platform
@@ -309,47 +310,6 @@ String thinx_mac() {
 
 /* Private library method */
 
-void checkin(String udid) {
-
-  Serial.println("*TH: Starting API checkin...");
-
-  if(!connected) {
-    Serial.println("*TH: Cannot checkin while not connected, exiting.");
-    return;
-  }
-
-  Serial.println("*TH: Building JSON...");
-
-  Serial.print("*TH: thx_udid: ");
-  Serial.println(thx_udid);
-
-  StaticJsonBuffer<1024> jsonBuffer;
-  JsonObject& root = jsonBuffer.createObject();
-  root["mac"] = thinx_mac();
-  root["firmware"] = thinx_firmware_version;
-  root["version"] = thinx_firmware_version_short;
-  root["hash"] = thinx_commit_id;
-  root["owner"] = thinx_owner;
-  root["alias"] = thinx_alias;
-  root["device_id"] = thx_udid; // should be thinx_udid but that is empty here!
-
-  StaticJsonBuffer<2048> wrapperBuffer;
-  JsonObject& wrapper = wrapperBuffer.createObject();
-  wrapper["registration"] = root;
-
-#ifdef __DEBUG_JSON__
-  wrapper.printTo(Serial);
-  Serial.println();
-#endif
-
-  String body;
-  wrapper.printTo(body);
-
-  senddata(body);
-}
-
-/* Private library method */
-
 void senddata(String body) {
 
   char shorthost[256] = {0};
@@ -359,7 +319,7 @@ void senddata(String body) {
   String payload = "{}";
 
 #ifdef __DEBUG__
-  Serial.print("heap: ");
+  Serial.print("*TH:DEBUG heap = ");
   Serial.println(ESP.getFreeHeap());
 
   Serial.print("*TH: Sending to ");
@@ -368,8 +328,30 @@ void senddata(String body) {
   Serial.println(thx_api_key);
   //Serial.println(body);
 #endif
+  // HttpClient poster = HttpClient(thx_wifi_client, thinx_cloud_url, thinx_api_port);
+  HttpClient poster = HttpClient(thx_wifi_client, "207.154.230.212", thinx_api_port);
+  String contentType = "application/json";
+  poster.post("/device/register");
+  poster.sendHeader("Authentication", thx_api_key);
+  poster.sendHeader("Accept", contentType);
+  poster.sendHeader("Origin", "device");
+  poster.sendHeader("User-Agent", "THiNX-Client");
+  poster.write((const byte*)body.c_str(), body.length());
+  printf("Trace   : ResponseCode : %d\n", poster.responseStatusCode());
+  printf("Trace   : Incoming Body : %s\n", poster.responseBody().c_str());
 
-  WiFiClient client;
+  // read the status code and body of the response
+  int statusCode = poster.responseStatusCode();
+  String response = poster.responseBody();
+
+  Serial.print("POST Status code: ");
+  Serial.println(statusCode);
+  Serial.print("POST Response: ");
+  Serial.println(response);
+
+  return;
+
+  WiFiClient client = thx_wifi_client;
 
   if (!client.available()) {
     Serial.println("*TH: client NOT available...");
@@ -451,6 +433,49 @@ void senddata(String body) {
   }
 }
 
+void checkin() {
+
+  Serial.println("*TH: Starting API checkin...");
+
+  if(!connected) {
+    Serial.println("*TH: Cannot checkin while not connected, exiting.");
+    return;
+  }
+
+  Serial.println("*TH: Building JSON...");
+
+  Serial.print("*TH: thx_udid: ");
+  Serial.println(thx_udid);
+
+  StaticJsonBuffer<1024> jsonBuffer;
+  JsonObject& root = jsonBuffer.createObject();
+  root["mac"] = thinx_mac();
+  root["firmware"] = thinx_firmware_version;
+  root["version"] = thinx_firmware_version_short;
+  root["hash"] = thinx_commit_id;
+  root["owner"] = thinx_owner;
+  root["alias"] = thinx_alias;
+  root["device_id"] = thx_udid; // should be thinx_udid but that is empty here!
+
+  StaticJsonBuffer<2048> wrapperBuffer;
+  JsonObject& wrapper = wrapperBuffer.createObject();
+  wrapper["registration"] = root;
+
+#ifdef __DEBUG_JSON__
+  wrapper.printTo(Serial);
+  Serial.println();
+#endif
+
+  String body;
+  wrapper.printTo(body);
+
+  senddata(body);
+}
+
+/* Private library method */
+
+
+
 /* Private library method */
 
 //
@@ -515,13 +540,13 @@ void thinx_mqtt_callback(char* topic, byte* payload, unsigned int length) {
 /* Optional methods */
 
 //
-// WiFiManager Setup Callbacks
+// EAVManager Setup Callbacks
 //
 
-void configModeCallback (WiFiManager *myWiFiManager) {
+void configModeCallback (EAVManager *myEAVManager) {
   Serial.println("Entered config mode");
   Serial.println(WiFi.softAPIP());
-  Serial.println(myWiFiManager->getConfigPortalSSID());
+  Serial.println(myEAVManager->getConfigPortalSSID());
 }
 
 //callback notifying us of the need to save config
@@ -543,16 +568,16 @@ void saveConfigCallback () {
 
 bool connect() { // should return status bool
   #ifdef __USE_WIFI_MANAGER__
-  WiFiManager WiFiManager;
+  EAVManager EAVManager;
 
   // id/name, placeholder/prompt, default, length
 
 
-  WiFiManager.addParameter(&api_key_param);
+  EAVManager.addParameter(&api_key_param);
 
-  WiFiManager.setAPCallback(configModeCallback);
-  WiFiManager.setTimeout(10000);
-  WiFiManager.autoConnect(autoconf_ssid,autoconf_pwd);
+  EAVManager.setAPCallback(configModeCallback);
+  EAVManager.setTimeout(10000);
+  EAVManager.autoConnect(autoconf_ssid,autoconf_pwd);
   #else
   status = WiFi.begin(ssid, pass);
   #endif
@@ -560,7 +585,7 @@ bool connect() { // should return status bool
   // attempt to connect to Wifi network:
   while ( !connected ) {
     #ifdef __USE_WIFI_MANAGER__
-    status = WiFiManager.autoConnect(autoconf_ssid,autoconf_pwd);
+    status = EAVManager.autoConnect(autoconf_ssid,autoconf_pwd);
     if (status == true) {
       connected = true;
       return connected;
@@ -592,7 +617,7 @@ bool restoreDeviceInfo() {
 
   File f = SPIFFS.open("/thinx.cfg", "r");
   if (!f) {
-      Serial.println("*TH: no custom configuration stored.");
+      Serial.println("*TH: SPIFFS: no custom configuration found yet.");
       return false;
   } else {
     String data = f.readStringUntil('\n');
