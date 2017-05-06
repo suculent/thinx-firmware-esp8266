@@ -220,7 +220,6 @@ void thinx_parse(String payload) {
 
       Serial.println("SAVE:1");
       saveDeviceInfo();
-      return;
 
     } else if (status == "FIRMWARE_UPDATE") {
 
@@ -346,6 +345,9 @@ void senddata(String body) {
   Serial.print("*TH: thx_api_key API KEY "); Serial.println(thx_api_key);
 
   if (thx_wifi_client.connect(shorthost, 7442)) {
+
+    // Standard public THiNX-Client device registration request
+    // (same request can be called in order to add matching mobile application push token)
     thx_wifi_client.println("POST /device/register HTTP/1.1");
     thx_wifi_client.println("Host: thinx.cloud");
     thx_wifi_client.print("Authentication: "); thx_wifi_client.println(thx_api_key);
@@ -602,17 +604,15 @@ bool restoreDeviceInfo() {
 /* Stores mutable device data (alias, owner) retrieved from API */
 void saveDeviceInfo()
 {
-  Serial.println("Skipping saveDeviceInfo, depending on Thinx.h and in-memory so far... (seems to crash even though)");
+  Serial.println("NOT Skipping saveDeviceInfo, depending on Thinx.h and in-memory so far... (seems to crash even though)");
 
-  return;
+  //return;
 
   Serial.setDebugOutput(true);
 
   Serial.println("Mounting SPIFFS for writing...");
-  bool result = SPIFFS.begin();
-  delay(10);
+  bool result = SPIFFS.begin(); // crashes here...
   Serial.println("SPIFFS mounted: " + result);
-
   Serial.println("*TH: Opening/creating config file...");
 
   // if exists remove?
@@ -646,7 +646,7 @@ void saveDeviceInfo()
 
 String deviceInfo()
 {
-  Serial.println("*TH: building device info: ");
+  Serial.println("*TH: building device info:");
   StaticJsonBuffer<480> jsonBuffer;
   JsonObject& root = jsonBuffer.createObject();
   root["alias"] = thinx_alias;
