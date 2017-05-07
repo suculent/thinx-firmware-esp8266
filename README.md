@@ -1,23 +1,26 @@
 # thinx-esp8266-firmware
 
+Firmware for automatic device registration and OTA updates.
+
+Provides example implementations in Arduino C, LUA and Micropython.
+
+* This is a work in progress.
+* 100% functionality is not guaranteed for all the time.
+* Contents of thinx-lib-esp is not working yet.
+
 # Requirements
+
+### Arduino C development
 
 - Arduino IDE or Platform.io
 - Arduino libraries: ArduinoJSON, EAVManager, ESP8266httpUpdate (to be replaced)
+- Open this folder using Atom with installed Platform.io or thinx-firmware-esp8266/thinx-firmware-esp8266.ino using Arduino IDE.
+- Run prerelease.sh to bake your commit ID into the Thinx.h file.
 
-# Work in progress!
+### Micropython/LUA development
 
-### TODOs:
-
-* THX-48: Upgrade ESP866HTTPUpdate to fetch firmware from unique generated URL (or with API Key)
-
-### WARNING!
-
-Open this folder using Atom with installed Platform.io or thinx-firmware-esp8266/thinx-firmware-esp8266.ino using Arduino IDE.
-
-Contents of thinx-lib-esp is not working yet.
-
-Run prerelease.sh to bake your commit ID into the Thinx.h file.
+- ESPlorer
+- ESPTool
 
 # Usage
 
@@ -34,5 +37,3 @@ Run prerelease.sh to bake your commit ID into the Thinx.h file.
 
 
 Note: In case you'll build/upload your project (e.g. the library) using thinx.cloud, API key will be injected automatically and you should not need to set it up anymore.
-
-TODO: Prevent adding apikey parameter to Captive Portal when aready exists? Really? Ask users.
