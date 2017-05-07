@@ -17,7 +17,7 @@ import os
 
 # build-time constants
 THINX_COMMIT_ID="micropython"
-THINX_FIRMWARE_VERSION_SHORT = os.uname().release
+THINX_FIRMWARE_VERSION_SHORT = os.uname().release.split("(")[0] # remove non-semantic part
 THINX_FIRMWARE_VERSION = os.uname().version # inject THINX_FIRMWARE_VERSION_SHORT
 THINX_UDID="" # each build is specific only for given udid to prevent data leak
 
@@ -95,6 +95,7 @@ def thinx_register():
                     'version': THINX_FIRMWARE_VERSION_SHORT,
                     'hash': THINX_COMMIT_ID,
                     'alias': THINX_DEVICE_ALIAS,
+                    'owner': THINX_DEVICE_OWNER,
                     'udid': THINX_UDID}}
     data = ujson.dumps(registration_request)
     print(data)
@@ -125,6 +126,7 @@ def thinx_update(data):
                        'checksum': data.checksum,
                        'commit': data.commit,
                        'alias': data.alias,
+                       'owner': data.owner,
                        'udid': THINX_UDID }}
 
     data = ujson.dumps(update_request)
@@ -141,30 +143,47 @@ def thinx_update(data):
 
     resp.close()
 
-def process_thinx_response(response):
-    print("THiNX: response:")
-    print(response)
+def process_thinx_response(response_json):
+    print("THiNX: response_json:")
+    print(response_json)
 
-    success = response['success']
-    if success==False:
-        print("THiNX: Failure.")
-        return
+    response = ujson.loads(response_json)
 
-    # if response['registration'] as given by protocol
-    reg = response['registration']
-    if reg:
-        THINX_DEVICE_ALIAS = reg['alias']
-        THINX_DEVICE_OWNER = reg['owner']
-        THINX_API_KEY = reg['apikey']
-        THINX_UDID = reg['device_id']
-        save_device_info()
+    try:
+        success = response['success']
+        if success==False:
+            print("THiNX: Failure.")
+            return
+    except Exception:
+        print("THINX: No primary success key found.")
+    
+    try:
+        reg = response.registration
+        if reg:
+            try:
+                success = reg['success']
+                if success==False:
+                    print("THiNX: Registration failure.")
+                    return                               
+            except Exception:
+                print("THINX: No registration success key...")
 
-    # if response['update'] as given by protocol
-    upd = response['update']
-    if upd:
-        if thinx_update():
-            if THINX_AUTO_UPDATE:
-                print("TODO: Update firmware") # https://github.com/pfalcon/yaota8266 - ota_server: step 4 only...
+            THINX_DEVICE_ALIAS = reg['alias']
+            THINX_DEVICE_OWNER = reg['owner']
+            THINX_API_KEY = reg['apikey']
+            THINX_UDID = reg['device_id']
+            save_device_info()
+
+        try:
+            upd = response['update']
+            if upd:
+                if thinx_update():
+                    if THINX_AUTO_UPDATE:
+                        print("TODO: Update firmware") # https://github.com/pfalcon/yaota8266 - ota_server: step 4 only...
+        except Exception:
+            print("THINX: No update key found.")
+    except Exception:
+            print("THINX: No registration key found.")
 
 # provides only current status as JSON so it can be loaded/saved independently
 def get_device_info():
@@ -184,6 +203,7 @@ def set_device_info(info):
 
 # Used by response parser
 def save_device_info():
+    print("THINX: Saving device info")
     f = open('thinx.cfg', 'w')
     if f:
         f.write(get_device_info())
@@ -196,6 +216,7 @@ def restore_device_info():
     try:
         f = open('thinx.cfg', 'r')
         if f:
+            print("THINX: Restoring device info")
             info = f.read('\n')
             f.close()
             set_device_info(info)
