@@ -6,7 +6,6 @@
 # Note: platformio uses .py files as custom scripts so we cannot simply match for .py to decide the project is micropython-based!
 # We'll default to main.my then.
 
-################################################################################
 # --- beginning of machine-generated header
 
 #
@@ -16,7 +15,7 @@
 import os
 
 # build-time constants
-THINX_COMMIT_ID="micropython"
+THINX_COMMIT_ID="micropython-test"
 THINX_FIRMWARE_VERSION_SHORT = os.uname().release.split("(")[0] # remove non-semantic part
 THINX_FIRMWARE_VERSION = os.uname().version # inject THINX_FIRMWARE_VERSION_SHORT
 THINX_UDID="" # each build is specific only for given udid to prevent data leak
@@ -25,34 +24,27 @@ THINX_UDID="" # each build is specific only for given udid to prevent data leak
 THINX_CLOUD_URL="thinx.cloud" # can change to proxy (?)
 THINX_MQTT_URL="thinx.cloud" # should try thinx.local first for proxy
 THINX_API_KEY="b63f960e3a05b513661ea8ee001e3a17e14228ba" # will change in future to support rolling api-keys
-THINX_DEVICE_ALIAS="hardwired"
+THINX_DEVICE_ALIAS="micropython-test"
 THINX_DEVICE_OWNER="test"
 THINX_AUTO_UPDATE=True
+THINX_PROXY="thinx.local"
 
 THINX_MQTT_PORT = 1883
 THINX_API_PORT = 7442
 
 # --- end of machine-generated code
-################################################################################
 
-# --- BEGINNING OF USER FILE ---
-
-################################################################################
 # THiNX Example device application
-################################################################################
-
-# TODO: THX-69: Pure registration request.
 
 # Roadmap:
-# TODO: Perform update request and replace boot.py OVER-THE-AIR (may fail)
+# TODO: Perform update request and replace boot.py OVER-THE-AIR
 # TODO: Support MQTT
 # TODO: HTTPS proxy support
-# TODO: MDNS Resolver
 # TODO: convert to thinx module
 
 # Required parameters
-SSID = '<ssid>'
-PASSWORD = '<password>'
+SSID = '6RA'
+PASSWORD = 'quarantine'
 TIMEOUT = 180
 
 import urequests
@@ -60,6 +52,8 @@ import ubinascii
 import network
 import time
 import ujson
+import machine
+import os
 
 # Prerequisite: WiFi connection
 def connect(ssid, password):
@@ -111,10 +105,8 @@ def thinx_register():
     resp.close()
 
 # Example step 2: device update
-# TODO: Perform update request and flash firmware over-the-air
-# API expects: mac, hash (?), checksum, commit, owner
 def thinx_update(data):
-    url = 'http://thinx.cloud:7442/device/firmware' # firmware update retrieval by device mac
+    url = 'http://thinx.cloud:7442/device/firmware'
     headers = {'Authentication': THINX_API_KEY,
                'Accept': 'application/json',
                'Origin': 'device',
@@ -137,11 +129,21 @@ def thinx_update(data):
     if resp:
         print("THiNX: Server replied...")
         print(resp.json())
-        process_thinx_response(resp.json())
+        process_thinx_update(resp)
     else:
         print("THiNX: No response.")
 
     resp.close()
+
+def process_thinx_update(response):
+    file = open('boot.py', 'w')
+    if file!=False:
+        file.write(response)
+        file.close()
+        machine.reset()
+    else:
+        print("THINX: failed to open boot.py for writing")
+
 
 def process_thinx_response(response):
 
@@ -210,7 +212,6 @@ def process_thinx_response(response):
     except Exception:
         print("THiNX: No update key found.")
 
-
     print("THiNX: Parser completed.")
 
 # provides only current status as JSON so it can be loaded/saved independently
@@ -236,29 +237,19 @@ def save_device_info():
     if f:
         f.write(get_device_info())
         f.close()
-    else:
-        print("THINX: failed to open config file for writing")
 
 # Restores incoming data from filesystem overriding build-time-constants
 def restore_device_info():
-    try:
-        f = open('thinx.cfg', 'r')
-        if f:
-            print("THINX: Restoring device info")
-            info = f.read('\n')
-            f.close()
-            set_device_info(ujson.loads(info))
-        else:
-            print("THINX: No config file found")
-    except Exception:
-        print("THINX: No config file found...")
-
-def thinx_mdns():
-    print("TODO: MDNS resolver")
-    # Basic firmware does not support resolver
+    f = open('thinx.cfg', 'r')
+    if f:
+        print("THINX: Restoring device info")
+        info = f.read('\n')
+        f.close()
+        set_device_info(ujson.loads(info))
+    else:
+        print("THINX: No config file found")    
 
 def thinx_mqtt():
-    # not in basic micropython firmware
     print("THINX: MQTT: To be implemented later")
 
 def process_mqtt(response):
@@ -276,15 +267,12 @@ def thinx_mac():
 
 def thinx():
     global THINX_UDID
-
     restore_device_info()
 
     if THINX_UDID=="":
-        THINX_UDID=thinx_mac() # until given by API
+        THINX_UDID=thinx_mac()
 
-    connect(SSID, PASSWORD) # calls register and mqtt
-
-# sample app
+    connect(SSID, PASSWORD)
 
 def main():
 
