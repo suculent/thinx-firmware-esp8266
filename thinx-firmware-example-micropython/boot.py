@@ -51,8 +51,8 @@ THINX_API_PORT = 7442
 # TODO: convert to thinx module
 
 # Required parameters
-SSID = '6RA'
-PASSWORD = 'quarantine'
+SSID = '<ssid>'
+PASSWORD = '<password>'
 TIMEOUT = 180
 
 import urequests
@@ -145,7 +145,7 @@ def thinx_update(data):
 
 def process_thinx_response(response):
 
-    #print("THINX: Parsing response:")    
+    #print("THINX: Parsing response:")
     #print(response)
 
     try:
@@ -157,7 +157,7 @@ def process_thinx_response(response):
             return
     except Exception:
         print("THINX: No primary success key found.")
-    
+
     try:
         reg = response['registration']
         print("THINX: Parsing registration response:")
@@ -170,31 +170,46 @@ def process_thinx_response(response):
             success = reg['success']
             if success==False:
                 print("THiNX: Registration failure.")
-                return                               
+                return
         except Exception:
-                print("THINX: No registration success key...")            
+                print("THINX: No registration success key...")
 
-        #THINX_DEVICE_ALIAS = reg['alias']
-        #THINX_DEVICE_OWNER = reg['owner']
-        #THINX_API_KEY = reg['apikey']
-        
+        try:
+            THINX_DEVICE_OWNER = reg['owner']
+            print("THINX: Overriding owner from API: " + THINX_DEVICE_OWNER)
+        except Exception:
+            pass
+
+        try:
+            THINX_DEVICE_ALIAS = reg['alias']
+            print("THINX: Overriding alias from API: " + THINX_DEVICE_ALIAS)
+        except Exception:
+            pass
+
+        try:
+            THINX_API_KEY = reg['apikey']
+            print("THINX: Overriding apikey from API: " + THINX_API_KEY)
+        except Exception:
+            pass
+
         try:
             THINX_UDID = reg['device_id']
-            print("THINX: Overriding device_id: " + THINX_UDID)            
-        except Exception:            
+            print("THINX: Overriding device_id from API: " + THINX_UDID)
+        except Exception:
             pass
-        
-        save_device_info()     
-               
+
+        save_device_info()
+
     try:
         upd = response['update']
         if upd:
             if thinx_update():
                 if THINX_AUTO_UPDATE:
-                    print("TODO: Update firmware") # https://github.com/pfalcon/yaota8266 - ota_server: step 4 only...
+                    print("TODO: Update boot.py") # https://github.com/pfalcon/yaota8266 - ota_server: step 4 only...
+
     except Exception:
         print("THiNX: No update key found.")
-    
+
 
     print("THiNX: Parser completed.")
 
