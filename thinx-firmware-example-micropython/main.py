@@ -18,7 +18,7 @@
 THINX_COMMIT_ID="869fae3fc7d3a1f148e02bfa3da482f4d0ccfc4a"
 THINX_FIRMWARE_VERSION_SHORT = "0.0.1"
 THINX_FIRMWARE_VERSION = "thinx-firmware-esp8266-py-0.0.1:2017-05-06" # inject THINX_FIRMWARE_VERSION_SHORT
-THINX_UDID='' # each build is specific only for given udid to prevent data leak
+THINX_UDID="" # each build is specific only for given udid to prevent data leak
 
 # dynamic variables (adjustable by user but overridden from API)
 THINX_CLOUD_URL="thinx.cloud" # can change to proxy (?)
@@ -26,7 +26,7 @@ THINX_MQTT_URL="thinx.cloud" # should try thinx.local first for proxy
 THINX_API_KEY="d0759aed29dcf1e9a1895e327a9e280039ce5784" # will change in future to support rolling api-keys
 THINX_DEVICE_ALIAS="hardwired"
 THINX_DEVICE_OWNER="test"
-THINX_AUTO_UPDATE=true
+THINX_AUTO_UPDATE=True
 
 THINX_MQTT_PORT = 1883
 THINX_API_PORT = 7442
@@ -50,10 +50,9 @@ THINX_API_PORT = 7442
 # TODO: convert to thinx module
 
 # Required parameters
-THINX_API_KEY='ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890' # optional, this is just an override
-SSID = 'SSID'
-PASSWORD = 'PASSWORD'
-TIMEOUT = 30
+SSID = 'HAVANA'
+PASSWORD = '1234567890'
+TIMEOUT = 60
 
 import urequests
 import network
@@ -101,7 +100,7 @@ def thinx_update():
                'User-Agent': 'THiNX-Client'}
 
     # API expects: mac, hash (?), checksum, commit, owner
-    data = '{"registration": {"mac":"' += thinx_mac() += '", "firmware": "' += THINX_FIRMWARE_VERSION += '"", "version": "' += THINX_FIRMWARE_VERSION_SHORT += '", "hash": "' += THINX_COMMIT_ID += '", "alias": "' += THINX_DEVICE_ALIAS += '", "udid" : "' += thinx_mac() += '" }}'
+    data = '{"registration": {"mac":"' + thinx_mac() + '", "firmware": "' + THINX_FIRMWARE_VERSION + '", "version": "' + THINX_FIRMWARE_VERSION_SHORT + '", "hash": "' + THINX_COMMIT_ID + '", "alias": "' + THINX_DEVICE_ALIAS + '", "udid" : "' + thinx_mac() + '" }}'
 
     resp = urequests.post(url, data=data, headers=headers)
     print(resp.json()) # return resp.json()['state']
@@ -127,8 +126,7 @@ def process_thinx_response(response):
     if upd:
         if thinx_update():
             if THINX_AUTO_UPDATE:
-                # TODO: Update firmware with something like:
-                # https://github.com/pfalcon/yaota8266 - ota_server: step 4 only...
+                print("TODO: Update firmware") # https://github.com/pfalcon/yaota8266 - ota_server: step 4 only...
 
 # provides only current status as JSON so it can be loaded/saved independently
 def get_device_info():
@@ -148,7 +146,8 @@ def set_device_info(info):
 
 # Used by response parser
 def save_device_info():
-    if f = open('thinx.cfg', 'w'):
+    f = open('thinx.cfg', 'w')
+    if f:
         f.write(get_device_info())
         f.close()
     else:
@@ -156,7 +155,8 @@ def save_device_info():
 
 # Restores incoming data from filesystem overriding build-time-constants
 def restore_device_info():
-    if f = open('thinx.cfg', 'r'): # can fail!
+    f = open('thinx.cfg', 'r')
+    if f:
         info = f.read('\n')
         f.close()
         set_device_info(info)
@@ -165,6 +165,7 @@ def restore_device_info():
 
 # TODO: start MDNS resolver and attach to proxy if found
 def do_mdns():
+    print("TODO: MDNS resolver")
     # Basic firmware does not support resolver
 
 # TODO: connect to mqtt and listen for updates or messages
@@ -191,11 +192,10 @@ def thinx():
 # sample app
 
 def main():
-    thinx()
 
     while True:
         try:
-            # done by connect : thinx_register()
+            thinx()
         except TypeError:
             pass
         time.sleep(TIMEOUT)
