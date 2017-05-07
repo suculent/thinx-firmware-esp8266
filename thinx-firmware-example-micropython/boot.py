@@ -44,7 +44,7 @@ THINX_API_PORT = 7442
 # TODO: THX-69: Pure registration request.
 
 # Roadmap:
-# TODO: Perform update request and flash firmware over-the-air
+# TODO: Perform update request and replace boot.py OVER-THE-AIR (may fail)
 # TODO: Support MQTT
 # TODO: HTTPS proxy support
 # TODO: MDNS Resolver
@@ -53,7 +53,7 @@ THINX_API_PORT = 7442
 # Required parameters
 SSID = '6RA'
 PASSWORD = 'quarantine'
-TIMEOUT = 60
+TIMEOUT = 180
 
 import urequests
 import ubinascii
@@ -143,14 +143,15 @@ def thinx_update(data):
 
     resp.close()
 
-def process_thinx_response(response_json):
-    print("THiNX: response_json:")
-    print(response_json)
+def process_thinx_response(response):
 
-    response = ujson.loads(response_json)
+    #print("THINX: Parsing response:")    
+    #print(response)
 
     try:
         success = response['success']
+        print("THINX: Parsing success response:")
+        print(response)
         if success==False:
             print("THiNX: Failure.")
             return
@@ -158,32 +159,44 @@ def process_thinx_response(response_json):
         print("THINX: No primary success key found.")
     
     try:
-        reg = response.registration
-        if reg:
-            try:
-                success = reg['success']
-                if success==False:
-                    print("THiNX: Registration failure.")
-                    return                               
-            except Exception:
-                print("THINX: No registration success key...")
-
-            THINX_DEVICE_ALIAS = reg['alias']
-            THINX_DEVICE_OWNER = reg['owner']
-            THINX_API_KEY = reg['apikey']
-            THINX_UDID = reg['device_id']
-            save_device_info()
-
-        try:
-            upd = response['update']
-            if upd:
-                if thinx_update():
-                    if THINX_AUTO_UPDATE:
-                        print("TODO: Update firmware") # https://github.com/pfalcon/yaota8266 - ota_server: step 4 only...
-        except Exception:
-            print("THINX: No update key found.")
+        reg = response['registration']
+        print("THINX: Parsing registration response:")
+        print(reg)
     except Exception:
-            print("THINX: No registration key found.")
+        print("THiNX: No registration key found.")
+
+    if reg:
+        try:
+            success = reg['success']
+            if success==False:
+                print("THiNX: Registration failure.")
+                return                               
+        except Exception:
+                print("THINX: No registration success key...")            
+
+        #THINX_DEVICE_ALIAS = reg['alias']
+        #THINX_DEVICE_OWNER = reg['owner']
+        #THINX_API_KEY = reg['apikey']
+        
+        try:
+            THINX_UDID = reg['device_id']
+            print("THINX: Overriding device_id: " + THINX_UDID)            
+        except Exception:            
+            pass
+        
+        save_device_info()     
+               
+    try:
+        upd = response['update']
+        if upd:
+            if thinx_update():
+                if THINX_AUTO_UPDATE:
+                    print("TODO: Update firmware") # https://github.com/pfalcon/yaota8266 - ota_server: step 4 only...
+    except Exception:
+        print("THiNX: No update key found.")
+    
+
+    print("THiNX: Parser completed.")
 
 # provides only current status as JSON so it can be loaded/saved independently
 def get_device_info():
@@ -192,7 +205,7 @@ def get_device_info():
                    'apikey': THINX_API_KEY,
                    'udid': THINX_UDID
                    }
-    return json_object.json()
+    return ujson.dumps(json_object)
 
 # apply given device info to current runtime environment
 def set_device_info(info):
@@ -219,7 +232,7 @@ def restore_device_info():
             print("THINX: Restoring device info")
             info = f.read('\n')
             f.close()
-            set_device_info(info)
+            set_device_info(ujson.loads(info))
         else:
             print("THINX: No config file found")
     except Exception:
