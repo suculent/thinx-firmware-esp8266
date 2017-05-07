@@ -1,8 +1,7 @@
 # --- DEVELOPER NOTES ---
 
-# Let's try it simplier without any Thinx.h in this case:
 # In case of Micropython and LUA-based firmwares, there's always main file to
-# be executed. Let's write our static variables to beginning of that file.
+# be executed. Builder will write our static variables to beginning of that file.
 
 # Note: platformio uses .py files as custom scripts so we cannot simply match for .py to decide the project is micropython-based!
 # We'll default to main.my then.
@@ -14,16 +13,18 @@
 # This is an auto-generated stub, it will be pre-pended by THiNX on cloud build.
 #
 
+import os
+
 # build-time constants
-THINX_COMMIT_ID="869fae3fc7d3a1f148e02bfa3da482f4d0ccfc4a"
-THINX_FIRMWARE_VERSION_SHORT = "0.0.1"
-THINX_FIRMWARE_VERSION = "thinx-firmware-esp8266-py-0.0.1:2017-05-06" # inject THINX_FIRMWARE_VERSION_SHORT
+THINX_COMMIT_ID="micropython"
+THINX_FIRMWARE_VERSION_SHORT = os.uname().release
+THINX_FIRMWARE_VERSION = os.uname().version # inject THINX_FIRMWARE_VERSION_SHORT
 THINX_UDID="" # each build is specific only for given udid to prevent data leak
 
 # dynamic variables (adjustable by user but overridden from API)
 THINX_CLOUD_URL="thinx.cloud" # can change to proxy (?)
 THINX_MQTT_URL="thinx.cloud" # should try thinx.local first for proxy
-THINX_API_KEY="d0759aed29dcf1e9a1895e327a9e280039ce5784" # will change in future to support rolling api-keys
+THINX_API_KEY="b63f960e3a05b513661ea8ee001e3a17e14228ba" # will change in future to support rolling api-keys
 THINX_DEVICE_ALIAS="hardwired"
 THINX_DEVICE_OWNER="test"
 THINX_AUTO_UPDATE=True
@@ -50,13 +51,15 @@ THINX_API_PORT = 7442
 # TODO: convert to thinx module
 
 # Required parameters
-SSID = 'HAVANA'
-PASSWORD = '1234567890'
+SSID = '6RA'
+PASSWORD = 'quarantine'
 TIMEOUT = 60
 
 import urequests
+import ubinascii
 import network
 import time
+import ujson
 
 # Prerequisite: WiFi connection
 def connect(ssid, password):
@@ -71,6 +74,7 @@ def connect(ssid, password):
         while not sta_if.isconnected():
             pass
     else:
+        THINX_UDID=sta_if.config('mac')
         thinx_register()
         thinx_mqtt()
 
@@ -78,47 +82,81 @@ def connect(ssid, password):
 
 # Example step 1: registration (device check-in)
 def thinx_register():
+    print('THiNX: Device registration...')
     url = 'http://thinx.cloud:7442/device/register' # register/check-in device
     headers = {'Authentication': THINX_API_KEY,
                'Accept': 'application/json',
                'Origin': 'device',
                'Content-Type': 'application/json',
                'User-Agent': 'THiNX-Client'}
-    data = '{"registration": {"mac": __DEVICE_MAC__, "firmware": THINX_FIRMWARE_VERSION, "version": THINX_FIRMWARE_VERSION_SHORT, "hash": "", "alias": "", "udid" : __DEVICE_MAC__ }}'
+    print(headers)
+    registration_request = { 'registration': {'mac': thinx_mac(),
+                    'firmware': THINX_FIRMWARE_VERSION,
+                    'version': THINX_FIRMWARE_VERSION_SHORT,
+                    'hash': THINX_COMMIT_ID,
+                    'alias': THINX_DEVICE_ALIAS,
+                    'udid': THINX_UDID}}
+    data = ujson.dumps(registration_request)
+    print(data)
     resp = urequests.post(url, data=data, headers=headers)
-    print(resp.json()) # return resp.json()['state']
-    process_thinx_response(resp.json())
+
+    if resp:
+        print("THiNX: Server replied...")
+        print(resp.json())
+        process_thinx_response(resp.json())
+    else:
+        print("THiNX: No response.")
+
+    resp.close()
 
 # Example step 2: device update
 # TODO: Perform update request and flash firmware over-the-air
-def thinx_update():
+# API expects: mac, hash (?), checksum, commit, owner
+def thinx_update(data):
     url = 'http://thinx.cloud:7442/device/firmware' # firmware update retrieval by device mac
     headers = {'Authentication': THINX_API_KEY,
-               'Accept': '*/*',
+               'Accept': 'application/json',
                'Origin': 'device',
                'Content-Type': 'application/json',
                'User-Agent': 'THiNX-Client'}
+    print(headers)
+    update_request = { 'update': {'mac': thinx_mac(),
+                       'hash': data.hash,
+                       'checksum': data.checksum,
+                       'commit': data.commit,
+                       'alias': data.alias,
+                       'udid': THINX_UDID }}
 
-    # API expects: mac, hash (?), checksum, commit, owner
-    data = '{"registration": {"mac":"' + thinx_mac() + '", "firmware": "' + THINX_FIRMWARE_VERSION + '", "version": "' + THINX_FIRMWARE_VERSION_SHORT + '", "hash": "' + THINX_COMMIT_ID + '", "alias": "' + THINX_DEVICE_ALIAS + '", "udid" : "' + thinx_mac() + '" }}'
+    data = ujson.dumps(update_request)
+    print(data)
 
     resp = urequests.post(url, data=data, headers=headers)
-    print(resp.json()) # return resp.json()['state']
-    process_thinx_response(resp.json())
 
-# TODO: process incoming JSON response (both MQTT/HTTP) for register/force-update/update and forward others to client app)
+    if resp:
+        print("THiNX: Server replied...")
+        print(resp.json())
+        process_thinx_response(resp.json())
+    else:
+        print("THiNX: No response.")
+
+    resp.close()
+
 def process_thinx_response(response):
     print("THiNX: response:")
     print(response)
+
+    success = response['success']
+    if success==False:
+        print("THiNX: Failure.")
+        return
+
     # if response['registration'] as given by protocol
     reg = response['registration']
     if reg:
-        # TODO: update device_info (global object in future, now just THINX_DEVICE_ALIAS, THINX_DEVICE_OWNER, THINX_API_KEY and THINX_UDID)
         THINX_DEVICE_ALIAS = reg['alias']
         THINX_DEVICE_OWNER = reg['owner']
         THINX_API_KEY = reg['apikey']
         THINX_UDID = reg['device_id']
-        # TODO: save device info
         save_device_info()
 
     # if response['update'] as given by protocol
@@ -141,8 +179,8 @@ def get_device_info():
 def set_device_info(info):
     THINX_DEVICE_ALIAS=info['alias']
     THINX_DEVICE_OWNER=info['owner']
-    THINX_API_KEY=['apikey']
-    THINX_UDID=['device_id']
+    THINX_API_KEY=info['apikey']
+    THINX_UDID=info['device_id']
 
 # Used by response parser
 def save_device_info():
@@ -155,21 +193,22 @@ def save_device_info():
 
 # Restores incoming data from filesystem overriding build-time-constants
 def restore_device_info():
-    f = open('thinx.cfg', 'r')
-    if f:
-        info = f.read('\n')
-        f.close()
-        set_device_info(info)
-    else:
-        print("THINX: No config file found")
+    try:
+        f = open('thinx.cfg', 'r')
+        if f:
+            info = f.read('\n')
+            f.close()
+            set_device_info(info)
+        else:
+            print("THINX: No config file found")
+    except Exception:
+        print("THINX: No config file found...")
 
-# TODO: start MDNS resolver and attach to proxy if found
-def do_mdns():
+def thinx_mdns():
     print("TODO: MDNS resolver")
     # Basic firmware does not support resolver
 
-# TODO: connect to mqtt and listen for updates or messages
-def do_mqtt():
+def thinx_mqtt():
     # not in basic micropython firmware
     print("THINX: MQTT: To be implemented later")
 
@@ -181,12 +220,19 @@ def process_mqtt(response):
 
 def thinx_mac():
     wlan = network.WLAN(network.STA_IF)
-    return wlan.config('mac')
+    mac = wlan.config('mac')
+    return ubinascii.hexlify(mac) # todo: convert to string, returs binary!
 
 # main library function
 
 def thinx():
+    global THINX_UDID
+
     restore_device_info()
+
+    if THINX_UDID=="":
+        THINX_UDID=thinx_mac() # until given by API
+
     connect(SSID, PASSWORD) # calls register and mqtt
 
 # sample app
