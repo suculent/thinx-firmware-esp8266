@@ -12,6 +12,8 @@
 
 dofile("config.lua")
 
+mqtt_client = null
+
 -- Prerequisite: WiFi connection
 function connect(ssid, password)
     wifi.setmode(wifi.STATION)
@@ -38,16 +40,17 @@ function thinx_register()
             'User-Agent: THiNX-Client\r\n'
   data = '{"registration": {"mac": "'..thinx_device_mac()..'", "firmware": "'..THINX_FIRMWARE_VERSION..'", "version": "'..THINX_FIRMWARE_VERSION_SHORT..'", "hash": "' .. THINX_COMMIT_ID .. '", "alias": "' .. THINX_DEVICE_ALIAS .. '", "udid" :"' ..THINX_UDID..'" }}'
   http.post(url, headers, data,
-  function(code, data)
-    if (code < 0) then
-      print("HTTP request failed")
-    else
-      print(code, data)
-      if code == 200 then
-        process_thinx_response(data)
+    function(code, data)
+      if (code < 0) then
+        print("HTTP request failed")
+      else
+        print(code, data)
+        if code == 200 then
+          process_thinx_response(data)
+      end
     end
   end)
-end)
+end
 
 function thinx_update()
   url = 'http://thinx.cloud:7442/device/firmware' --  register/check-in device
@@ -61,14 +64,15 @@ function thinx_update()
   body = '{"registration": {"mac": "'..thinx_device_mac()..'", "firmware": "'..THINX_FIRMWARE_VERSION..'", "version": "'..THINX_FIRMWARE_VERSION_SHORT..'", "hash": "' .. THINX_COMMIT_ID .. '", "alias": "' .. THINX_DEVICE_ALIAS .. '", "udid" :"' ..THINX_UDID..'" }}'
 
   http.post(url, headers, body,
-  function(code, data)
-    if (code < 0) then
-      print("HTTP request failed")
-    else
-      print(code, data)
-      if code == 200 then
-        -- TODO: install OTA udate
-        process_thinx_response(data)
+    function(code, data)
+      if (code < 0) then
+        print("HTTP request failed")
+      else
+        print(code, data)
+        if code == 200 then
+          -- TODO: install OTA udate
+          process_thinx_response(data)
+      end
     end
   end)
 end
@@ -88,31 +92,29 @@ function process_thinx_response(response_json)
       THINX_API_KEY = reg['apikey']
       THINX_UDID = reg['device_id']
       save_device_info()
-
-    end)
+    end
 
     -- if response['registration'] as given by protocol
     local upd = response['update']
     if upd then
-      -- TODO: Update firmware with LUA? Is it possible? TODO: Find out.
-    end)
+      print("TODO: Fetch data, write to temp file and swap with init.lua")
+    end
 end
 
 -- provides only current status as JSON so it can be loaded/saved independently
 function get_device_info()
   -- TODO: save arbitrary data if secure
-  device_info = {
-    "alias" : THINX_DEVICE_ALIAS,
-    "owner" : THINX_DEVICE_OWNER,
-    "apikey" : THINX_API_KEY,
-    "device_id" : THINX_UDID,
-    "udid" : THINX_UDID
-  }
+  device_info = {}
+  device_info['alias'] = THINX_DEVICE_ALIAS
+  device_info['owner'] = THINX_DEVICE_OWNER
+  device_info['apikey'] = THINX_API_KEY
+  device_info['device_id'] = THINX_UDID
+  device_info['udid'] = THINX_UDID
   return device_info
 end
 
 -- apply given device info to current runtime environment
-function set_device_info(info)
+function apply_device_info(info)
     -- TODO: import arbitrary data if secure
     THINX_DEVICE_ALIAS = info['alias']
     THINX_DEVICE_OWNER = info['owner']
@@ -134,33 +136,26 @@ end
 -- Restores incoming data from filesystem overriding build-time-constants
 function restore_device_info()
   if file.open("thinx.cfg", "r") then
-    data = file.read('\n'))
+    data = file.read('\n')
     file.close()
     info = ujson.loads(data)
-    set_device_info(info)
+    apply_device_info(info)
   else
     print("No config file found")
   end
 end
 
--- TODO: MDNS resolver
-function do_mdns():
-  -- does not work on NodeMCU LUA, requires static proxy assignment
-  -- TODO: if THINX_PROXY is reachable, redirect all requests...; redirect back on failed
-  -- TODO: override THINX_CLOUD_URL with proxy
-end
-
--- TODO: just a copy of different app code, not a real implementation, not revised yet!!!!!
 function do_mqtt()
-    local m = mqtt.Client(node.chipid(), 120, THINX_UDID, THINX_API_KEY)
-    m:lwt("/lwt", "{ \"connected\":false }", 0, 0)
-    m:on("connect", function(client)
+    mqtt_client = mqtt.Client(node.chipid(), 120, "username", "password") -- should be udid/apikey
+    mqtt_client:lwt("/lwt", "{ \"connected\":false }", 0, 0)
+
+    mqtt_client:on("connect", function(client)
         print ("connected")
     end)
-    m:on("offline", function(client)
+
+    mqtt_client:on("offline", function(client)
         print ("offline")
         m:close();
-        connect(wifi_ssid, wifi_password)
     end)
 
     m:on("message", function(client, topic, data)
@@ -170,9 +165,8 @@ function do_mqtt()
     end)
 
     print("Connecting to MQTT to " .. target .. "...")
-    m:connect(THINX_MQTT_URL, THINX_MQTT_PORT, 0,
+    mqtt_client:connect(THINX_MQTT_URL, THINX_MQTT_PORT, 0,
     function(client)
-        -- todo: store m as global for possible async messaging
         print(":mconnected")
         m:subscribe("/device/"..THINX_UDID,0, function(client) print("subscribe success") end)
         m:publish("/device/"..THINX_UDID,"HELO",0,0)
@@ -186,6 +180,7 @@ end
 function process_mqtt(response)
   print(response)
   process_thinx_response(response)
+end
 
 -- local platform helpers
 

@@ -1,17 +1,19 @@
 -- beginning of machine-generated header
 -- This is an auto-generated stub, it will be pre-pended by THiNX on cloud build.
 
+majorVer, minorVer, devVer, chipid, flashid, flashsize, flashmode, flashspeed = node.info()
+
 -- build-time constants
 THINX_COMMIT_ID="869fae3fc7d3a1f148e02bfa3da482f4d0ccfc4a"
-THINX_FIRMWARE_VERSION_SHORT = "0.0.1"
-THINX_FIRMWARE_VERSION = "thinx-firmware-esp8266-py-0.0.1:2017-05-06" # inject THINX_FIRMWARE_VERSION_SHORT
-THINX_UDID="MAC!" # each build is specific only for given udid to prevent data leak
+THINX_FIRMWARE_VERSION_SHORT = majorVer.."."..minorVer.."."..devVer
+THINX_FIRMWARE_VERSION = "nodemcu-esp8266-lua-"..THINX_FIRMWARE_VERSION_SHORT
+THINX_UDID=node.chipid() -- each build is specific only for given udid to prevent data leak
 
 -- dynamic variables (adjustable by user but overridden from API)
 THINX_CLOUD_URL="thinx.cloud" -- can change to proxy (?)
 THINX_MQTT_URL="thinx.cloud" -- should try thinx.local first for proxy
 THINX_API_KEY="d0759aed29dcf1e9a1895e327a9e280039ce5784" -- will change in future to support rolling api-keys
-THINX_DEVICE_ALIAS="hardwired"
+THINX_DEVICE_ALIAS="nodemcu-lua-test"
 THINX_DEVICE_OWNER="test"
 THINX_AUTO_UPDATE=true
 
