@@ -30,6 +30,16 @@ Provides example implementations in Arduino C, LUA and Micropython.
 
 Requires following modules: wifi,websocket,uart,tmr,node,net,mqtt,http,file,cjson
 
+### Manual installation
+
+• Edit config.lua, set your WiFi SSID and password
+• Upload config.lua, thinx.lua and init.lua 
+• Reboot
+
+### Forced Update
+
+• Not yet implemented, will be possible in future. 
+
 Tested with:
 
     NodeMCU custom build by frightanic.com
