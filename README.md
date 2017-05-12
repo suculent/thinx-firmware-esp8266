@@ -22,6 +22,24 @@ Provides example implementations in Arduino C, LUA and Micropython.
 - ESPlorer
 - ESPTool
 
+## Arduino C
+
+## Micropython
+
+## LUA
+
+Requires following modules: wifi,websocket,uart,tmr,node,net,mqtt,http,file,cjson
+
+Tested with:
+
+    NodeMCU custom build by frightanic.com
+    	branch: master
+    	commit: ec265a6c21db22640795f190bdcb8a4f014cdced
+    	SSL: false
+    	modules: adc,bit,cjson,coap,crypto,dht,enduser_setup,file,gpio,http,i2c,mdns,mqtt,net,node,ow,pcm,pwm,struct,tmr,u8g,uart,websocket,wifi
+     build 	built on: 2016-12-04 22:54
+     powered by Lua 5.1.4 on SDK 1.5.4.1(39cb9a32)
+
 # Usage
 
 1. Create account on the [http://rtm.thinx.cloud/](http://rtm.thinx.cloud/) site
@@ -37,3 +55,7 @@ Provides example implementations in Arduino C, LUA and Micropython.
 
 
 Note: In case you'll build/upload your project (e.g. the library) using thinx.cloud, API key will be injected automatically and you should not need to set it up anymore.
+
+# Security
+
+Because all the traffic from ESP8266 is usually HTTP-only and not all devices can handle SSL, you can install our side-kick project [THiNX-Connect](https://github.com/suculent/thinx-connect). Install this proxy to your home environment and it will encrypt HTTP traffic to HTTPS and will tunnell your device communication directly to thinx.cloud.

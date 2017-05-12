@@ -1,16 +1,12 @@
--- thinx.lua
 -- THiNX Example device application
 
--- TODO: THX-69: Pure registration request.
-
 -- Roadmap:
--- TODO: Perform update request and flash firmware over-the-air
--- TODO: Support MQTT
+-- TEST: Perform update request and flash firmware over-the-air
+-- FIX: Support MQTT
 -- TODO: HTTPS proxy support
--- TODO: MDNS Resolver
--- TODO: convert to thinx module
+-- TODO: convert to LUA module
 
-dofile("config.lua")
+dofile("config.lua") -- must contain 'ssid', 'password'
 
 mqtt_client = null
 
@@ -33,12 +29,13 @@ end
 
 function thinx_register()
   url = 'http://thinx.cloud:7442/device/register' --  register/check-in device
-  headers = 'Authentication' .. THINX_API_KEY .. '\r\n' ..
+  headers = 'Authentication:' .. THINX_API_KEY .. '\r\n' ..
             'Accept: application/json\r\n' ..
             'Origin: device\r\n' ..
             'Content-Type: application/json\r\n' ..
             'User-Agent: THiNX-Client\r\n'
-  data = '{"registration": {"mac": "'..thinx_device_mac()..'", "firmware": "'..THINX_FIRMWARE_VERSION..'", "version": "'..THINX_FIRMWARE_VERSION_SHORT..'", "hash": "' .. THINX_COMMIT_ID .. '", "alias": "' .. THINX_DEVICE_ALIAS .. '", "udid" :"' ..THINX_UDID..'" }}'
+  data = '{"registration": {"mac": "'..thinx_device_mac()..'", "firmware": "'..THINX_FIRMWARE_VERSION..'", "version": "'..THINX_FIRMWARE_VERSION_SHORT..'", "checksum": "' .. THINX_COMMIT_ID .. '", "alias": "' .. THINX_DEVICE_ALIAS .. '", "udid" :"' ..THINX_UDID..'" }}'
+  print(data)
   http.post(url, headers, data,
     function(code, data)
       if (code < 0) then
@@ -52,17 +49,17 @@ function thinx_register()
   end)
 end
 
-function thinx_update()
+function thinx_update(commit, checksum)
   url = 'http://thinx.cloud:7442/device/firmware' --  register/check-in device
-  headers = 'Authentication' .. THINX_API_KEY .. '\r\n' ..
+  headers = 'Authentication: ' .. THINX_API_KEY .. '\r\n' ..
             'Accept: */*\r\n' ..
             'Origin: device\r\n' ..
             'Content-Type: application/json\r\n' ..
             'User-Agent: THiNX-Client\r\n'
 
-  -- API expects: mac, hash (?), checksum, commit, owner
-  body = '{"registration": {"mac": "'..thinx_device_mac()..'", "firmware": "'..THINX_FIRMWARE_VERSION..'", "version": "'..THINX_FIRMWARE_VERSION_SHORT..'", "hash": "' .. THINX_COMMIT_ID .. '", "alias": "' .. THINX_DEVICE_ALIAS .. '", "udid" :"' ..THINX_UDID..'" }}'
-
+  -- API expects: mac, udid, commit, owner, checksum (should be optional)
+  data = '{"update": {"mac": "'..thinx_device_mac()..'", "udid": "'..THINX_UDID..'", "checksum": "' .. checksum .. '", "commit": "' .. commit .. '", "owner" :"' ..THINX_UDID..'" }}'
+  print(data)
   http.post(url, headers, body,
     function(code, data)
       if (code < 0) then
@@ -70,23 +67,21 @@ function thinx_update()
       else
         print(code, data)
         if code == 200 then
-          -- TODO: install OTA udate
-          process_thinx_response(data)
+          print("THINX: Attempting to install update...");
+          print("THINX: TODO: Calculate data checksum...");
+          update_and_reboot(data)
       end
     end
   end)
 end
 
--- TODO: process incoming JSON response (both MQTT/HTTP) for register/force-update/update and forward others to client app)
+-- process incoming JSON response (both MQTT/HTTP) for register/force-update/update and forward others to client app)
 function process_thinx_response(response_json)
-    local response = ujson.loads(response_json)
-    print("THiNX: response:")
-    print(response)
+    local response = cjson.decode(response_json)
 
-    -- if response['registration'] as given by protocol
     local reg = response['registration']
     if reg then
-      -- TODO: update device_info (global object in future, now just THINX_DEVICE_ALIAS, THINX_DEVICE_OWNER, THINX_API_KEY and THINX_UDID)
+      print(cjson.encode(reg))
       THINX_DEVICE_ALIAS = reg['alias']
       THINX_DEVICE_OWNER = reg['owner']
       THINX_API_KEY = reg['apikey']
@@ -94,10 +89,13 @@ function process_thinx_response(response_json)
       save_device_info()
     end
 
-    -- if response['registration'] as given by protocol
     local upd = response['update']
     if upd then
+      print(cjson.encode(reg))
       print("TODO: Fetch data, write to temp file and swap with init.lua")
+      local checksum = upd['checksum'];
+      local commit = upd['commit'];
+      thinx_update(checksum, commit)
     end
 end
 
@@ -125,11 +123,24 @@ end
 -- Used by response parser
 function save_device_info()
   if file.open("thinx.cfg", "w") then
-    info = ujson.dumps(get_device_info())
+    info = cjson.encode(get_device_info())
     file.write(info .. '\n')
     file.close()
   else
     print("THINX: failed to open config file for writing")
+  end
+end
+
+-- update firmware and reboot
+function update_and_reboot(data)
+  if file.open("thinx.lua", "w") then
+    print("THINX: installing new firmware...")
+    file.write(data)
+    file.close()
+    print("THINX: rebooting...")
+    node.restart()
+  else
+    print("THINX: failed to open thinx.lua for writing!")
   end
 end
 
@@ -138,10 +149,10 @@ function restore_device_info()
   if file.open("thinx.cfg", "r") then
     data = file.read('\n')
     file.close()
-    info = ujson.loads(data)
+    info = cjson.decode(data)
     apply_device_info(info)
   else
-    print("No config file found")
+    print("No custom configuration stored. Using build-time constants.")
   end
 end
 
@@ -155,21 +166,21 @@ function do_mqtt()
 
     mqtt_client:on("offline", function(client)
         print ("offline")
-        m:close();
+        mqtt_client:close();
     end)
 
-    m:on("message", function(client, topic, data)
+    mqtt_client:on("message", function(client, topic, data)
         print(topic .. ":" )
         process_mqtt(data)
         if data ~= nil then print("message: " .. data) end
     end)
 
-    print("Connecting to MQTT to " .. target .. "...")
+    print("Connecting to MQTT to " .. THINX_MQTT_URL .. "...")
     mqtt_client:connect(THINX_MQTT_URL, THINX_MQTT_PORT, 0,
     function(client)
         print(":mconnected")
-        m:subscribe("/device/"..THINX_UDID,0, function(client) print("subscribe success") end)
-        m:publish("/device/"..THINX_UDID,"HELO",0,0)
+        mqtt_client:subscribe("/device/"..THINX_UDID,0, function(client) print("subscribe success") end)
+        mqtt_client:publish("/device/"..THINX_UDID,"HELO",0,0)
     end,
     function(client, reason)
         print("failed reason: "..reason)
@@ -182,19 +193,13 @@ function process_mqtt(response)
   process_thinx_response(response)
 end
 
--- local platform helpers
-
-function thinx_mac()
+function thinx_device_mac()
   return "VENDOR"..node.chipid()
 end
-
--- main library function
 
 function thinx()
     restore_device_info()
     connect(wifi_ssid, wifi_password) -- calls register an mqtt
 end
-
--- saple app
 
 thinx()
