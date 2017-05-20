@@ -80,7 +80,7 @@ void setup() {
 void THiNX_initWithAPIKey(String api_key) {
 
   if (once == true) {
-    once == false;
+    once = false;
   } else {
      return;
   }
@@ -176,8 +176,8 @@ void thinx_parse(String payload) {
   // {"registration":{"success":true,"status":"OK","alias":"","owner":"","device_id":"5CCF7FF09C39"}}
 
 #ifdef __DEBUG__
-  Serial.println("Parsing response: ");
-  Serial.println(payload);
+  //Serial.println("Parsing response: ");
+  //Serial.println(payload);
 #endif
 
   int startIndex = payload.indexOf("\n{");
@@ -234,8 +234,7 @@ void thinx_parse(String payload) {
         thinx_udid = udid;
       }
 
-      Serial.println("SKIPPED:SAVE:1");
-      //saveDeviceInfo();
+      saveDeviceInfo();
 
     } else if (status == "FIRMWARE_UPDATE") {
 
@@ -389,9 +388,9 @@ void senddata(String body) {
         payload = payload + String(str);
       }
     }
-    //thx_wifi_client.stop(); maybe breaks saving/mqtt?
-    Serial.println("*TH: Parsing HTTP response.");
-    thinx_parse(payload);
+    thx_wifi_client.stop(); //maybe breaks saving/mqtt?
+    //Serial.println("*TH: Parsing HTTP response.");
+    //thinx_parse(payload);
   } else {
     Serial.println("*TH: API connection failed.");
     return;
@@ -405,6 +404,7 @@ void senddata(String body) {
 //
 
 void mqtt() {
+  return;
   Serial.print("*TH: Contacting MQTT server ");
   Serial.print(thinx_mqtt_url);
   Serial.print(" on port ");
