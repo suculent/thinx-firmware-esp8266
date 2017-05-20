@@ -1,6 +1,6 @@
 /* OTA enabled firmware for Wemos D1 (ESP 8266, Arduino) */
 
-// version 1.3.28
+// version 1.5.57 (aligned with API build 1015)
 
 #include "Arduino.h"
 
@@ -235,9 +235,9 @@ void thinx_parse(String payload) {
         thinx_owner = owner;
       }
 
-      String udid = registration["device_id"];
+      String udid = registration["udid"];
       if ( udid.length() > 0 ) {
-        Serial.println(String("assigning device_id: ") + udid);
+        Serial.println(String("assigning udid: ") + udid);
         thinx_udid = udid;
       }
 
