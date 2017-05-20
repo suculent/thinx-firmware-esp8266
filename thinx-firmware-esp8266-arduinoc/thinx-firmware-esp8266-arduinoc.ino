@@ -273,7 +273,7 @@ void thinx_parse(String payload) {
 */
 
 String thinx_mqtt_channel() {
-  return String("/thinx/device/") + thinx_mac();
+  return String("/thinx/device/") + thinx_udid;
 }
 
 /* Private library method */
