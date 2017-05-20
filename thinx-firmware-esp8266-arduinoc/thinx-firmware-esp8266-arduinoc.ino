@@ -5,7 +5,8 @@
 #include "Arduino.h"
 
 #define __DEBUG__
-// #define __DEBUG_JSON__
+
+#define __DEBUG_JSON__
 
 #define __USE_WIFI_MANAGER__
 
@@ -64,7 +65,7 @@ void setup() {
   while (!Serial);
 
   THiNX_initWithAPIKey(thinx_api_key); // init with unique API key you obtain from web and paste to in Thinx.h
-  Serial.println("Init completed.");
+  Serial.println("Setup completed.");
 }
 
 /* Should be moved to library constructor */
@@ -78,8 +79,18 @@ void THiNX_initWithAPIKey(String api_key) {
   }
 
   sprintf(thx_udid, "%s", thinx_udid.c_str());
+  Serial.print("thx_udid: ");
+  Serial.println(thx_udid);
 
   restoreDeviceInfo();
+
+  Serial.print("thx_udid: ");
+  Serial.println(thx_udid);
+
+  sprintf(thx_udid, "%s", thinx_udid.c_str());
+
+  Serial.print("thx_udid: ");
+  Serial.println(thx_udid);
 
   connect();
 
@@ -250,7 +261,7 @@ void thinx_parse(String payload) {
 #endif
       }
     } else {
-      Serial.println(String("Unhandled status: ") + status);
+      // Serial.println(String("Unhandled status: ") + status);
     }
 }
 
@@ -306,10 +317,10 @@ void checkin() {
   root["mac"] = thinx_mac();
   root["firmware"] = String(thinx_firmware_version);
   root["version"] = String(thinx_firmware_version_short);
-  root["hash"] = String(thinx_commit_id);
+  root["commit"] = String(thinx_commit_id);
   root["owner"] = String(thinx_owner);
   root["alias"] = String(thinx_alias);
-  root["device_id"] = thinx_mac(); // should be thx_udid bud that is not always valid so far
+  root["device_id"] = String(thinx_udid);
 
   StaticJsonBuffer<512> wrapperBuffer;
   JsonObject& wrapper = wrapperBuffer.createObject();
@@ -418,8 +429,21 @@ bool thinx_mqtt_reconnect() {
   String channel = thinx_mqtt_channel();
   Serial.println("*TH: Connecting to MQTT...");
 
+  Serial.print("*TH: UDID: ");
+  Serial.println(thinx_udid);
+  Serial.print("*TH: AK: ");
+  Serial.println(thinx_api_key);
+
   String mac = thinx_mac();
-  if ( thx_mqtt_client.connect(mac.c_str(),channel.c_str(),0,false,thx_disconnected_response.c_str()) ) {
+
+  const char* id = mac.c_str();
+  const char* user = thinx_udid.c_str();
+  const char* pass = thinx_api_key.c_str();
+  const char* willTopic = thinx_mqtt_channel().c_str();
+  int willQos = 0;
+  bool willRetain = false;
+
+  if ( thx_mqtt_client.connect( id, user, pass, willTopic, willQos, willRetain, thx_disconnected_response.c_str() ) ) {
     Serial.println("*TH: MQTT Connected.");
     if (thx_mqtt_client.subscribe(channel.c_str())) {
       Serial.print("*TH: ");
@@ -673,9 +697,6 @@ String deviceInfo()
 
 void loop()
 {
+  delay(1000);
   Serial.println(".");
-  Serial.println(".");
-  Serial.println(".");
-  Serial.println(".");
-  delay(1);
 }
