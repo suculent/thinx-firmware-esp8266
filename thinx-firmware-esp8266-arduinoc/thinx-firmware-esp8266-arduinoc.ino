@@ -7,7 +7,8 @@
 #define __DEBUG__
 #define __DEBUG_JSON__
 
-// #define __DEBUG_WIFI__ use as fallback when device gets stucked with incorrect WiFi configuration 
+
+#define __DEBUG_WIFI__ use as fallback when device gets stucked with incorrect WiFi configuration
 
 #define __USE_WIFI_MANAGER__
 
@@ -66,7 +67,7 @@ void setup() {
   while (!Serial);
 
 #ifdef __DEBUG_WIFI__
-  WiFi.begin("IOT-LTE", "PASSWORD");
+  WiFi.begin("6RA", "quarantine");
 #endif
 
   THiNX_initWithAPIKey(thinx_api_key); // init with unique API key you obtain from web and paste to in Thinx.h
