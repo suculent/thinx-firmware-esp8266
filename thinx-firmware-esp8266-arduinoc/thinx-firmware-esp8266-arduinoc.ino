@@ -5,8 +5,9 @@
 #include "Arduino.h"
 
 #define __DEBUG__
-
 #define __DEBUG_JSON__
+
+// #define __DEBUG_WIFI__ use as fallback when device gets stucked with incorrect WiFi configuration 
 
 #define __USE_WIFI_MANAGER__
 
@@ -46,7 +47,7 @@ const char* autoconf_ssid  = "AP-THiNX"; // SSID in AP mode
 const char* autoconf_pwd   = "PASSWORD"; // fallback to default password, however this should be generated uniquely as it is logged to console
 
 // Requires API v126+
-char thx_api_key[40];
+char thx_api_key[64];
 char thx_udid[64] = {0};
 EAVManagerParameter api_key_param("apikey", "API Key", thx_api_key, 40);
 
@@ -64,6 +65,10 @@ void setup() {
   Serial.begin(115200);
   while (!Serial);
 
+#ifdef __DEBUG_WIFI__
+  WiFi.begin("IOT-LTE", "PASSWORD");
+#endif
+
   THiNX_initWithAPIKey(thinx_api_key); // init with unique API key you obtain from web and paste to in Thinx.h
   Serial.println("Setup completed.");
 }
@@ -79,17 +84,20 @@ void THiNX_initWithAPIKey(String api_key) {
   }
 
   sprintf(thx_udid, "%s", thinx_udid.c_str());
-  Serial.print("thx_udid: ");
+  Serial.print("initial thx_udid: ");
   Serial.println(thx_udid);
 
   restoreDeviceInfo();
 
-  Serial.print("thx_udid: ");
+  Serial.print("restored thinx_udid: ");
+  Serial.println(thinx_udid);
+
+  Serial.print("restored thx_udid: ");
   Serial.println(thx_udid);
 
-  sprintf(thx_udid, "%s", thinx_udid.c_str());
 
-  Serial.print("thx_udid: ");
+  sprintf(thx_udid, "%s", thinx_udid.c_str());
+  Serial.print("thx_udid from thinx_udid: ");
   Serial.println(thx_udid);
 
   connect();
@@ -321,6 +329,7 @@ void checkin() {
   root["owner"] = String(thinx_owner);
   root["alias"] = String(thinx_alias);
   root["device_id"] = String(thinx_udid);
+  root["udid"] = String(thinx_udid);
 
   StaticJsonBuffer<512> wrapperBuffer;
   JsonObject& wrapper = wrapperBuffer.createObject();
@@ -556,14 +565,14 @@ void connect() { // should return status bool
 
 bool restoreDeviceInfo() {
 
-  Serial.println("Mounting SPIFFS for reading...");
+  Serial.println("*TH: Mounting SPIFFS for reading...");
   bool result = SPIFFS.begin();
-  delay(10);
-  Serial.println("SPIFFS mounted: " + result);
+  delay(50);
+  Serial.println("*TH: SPIFFS mounted: " + result);
 
   File f = SPIFFS.open("/thinx.cfg", "r");
   if (!f) {
-      Serial.println("*TH: Cannot restore configuration.");
+      Serial.println("*TH: No remote configuration found so far...");
       return false;
   } else {
     String data = f.readStringUntil('\n');
@@ -590,7 +599,7 @@ bool restoreDeviceInfo() {
       }
 
       const char* saved_udid = config["udid"];
-      Serial.print("Saved udid: "); Serial.println(saved_udid);
+      Serial.print("*TH: Saved udid: "); Serial.println(saved_udid);
       if ((strlen(saved_udid) == 12) || (strlen(saved_udid) == 40)) { // warning: fix me
        thinx_udid = String(saved_udid);
        sprintf(thx_udid, "%s", saved_udid); // 40 max
@@ -628,15 +637,16 @@ bool restoreDeviceInfo() {
 /* Stores mutable device data (alias, owner) retrieved from API */
 void saveDeviceInfo()
 {
-  Serial.println("NOT Skipping saveDeviceInfo, depending on Thinx.h and in-memory so far... (seems to crash even though)");
+  Serial.println("*TH: NOT Skipping saveDeviceInfo, depending on Thinx.h and in-memory so far... (seems to crash even though)");
 
   //return;
 
   Serial.setDebugOutput(true);
 
-  Serial.println("Mounting SPIFFS for writing...");
+  Serial.println("*TH: Mounting SPIFFS for writing...");
   bool result = SPIFFS.begin(); // crashes here...
-  Serial.println("SPIFFS mounted: " + result);
+  delay(50);
+  Serial.println("*TH: SPIFFS mounted: " + result);
   Serial.println("*TH: Opening/creating config file...");
 
   // if exists remove?
