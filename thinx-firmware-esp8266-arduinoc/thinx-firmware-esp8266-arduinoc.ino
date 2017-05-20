@@ -61,6 +61,8 @@ int last_mqtt_reconnect;
 bool shouldSaveConfig = false;
 bool connected = false;
 
+bool once = true;
+
 void setup() {
   Serial.begin(115200);
   while (!Serial);
@@ -69,7 +71,6 @@ void setup() {
   WiFi.begin("<ssid>", "<password>");
 #endif
 
-  THiNX_initWithAPIKey(thinx_api_key); // init with unique API key you obtain from web and paste to in Thinx.h
   Serial.println("Setup completed.");
 }
 
@@ -78,27 +79,23 @@ void setup() {
 // Designated initialized
 void THiNX_initWithAPIKey(String api_key) {
 
+  if (once == true) {
+    once == false;
+  } else {
+     return;
+  }
+
   if (api_key != "") {
     thinx_api_key = api_key;
     sprintf(thx_api_key, "%s", thinx_api_key.c_str()); // 40 max
   }
 
-  sprintf(thx_udid, "%s", thinx_udid.c_str());
-  Serial.print("initial thx_udid: ");
-  Serial.println(thx_udid);
+  Serial.println("*TH: Mounting SPIFFS...");
+  bool result = SPIFFS.begin();
+  delay(50);
+  Serial.println("*TH: SPIFFS mounted: " + result);
 
   restoreDeviceInfo();
-
-  Serial.print("restored thinx_udid: ");
-  Serial.println(thinx_udid);
-
-  Serial.print("restored thx_udid: ");
-  Serial.println(thx_udid);
-
-
-  sprintf(thx_udid, "%s", thinx_udid.c_str());
-  Serial.print("thx_udid from thinx_udid: ");
-  Serial.println(thx_udid);
 
   connect();
 
@@ -110,14 +107,10 @@ void THiNX_initWithAPIKey(String api_key) {
   }
 #endif
 
-  delay(1000);
-  mqtt(); // requires valid udid and api_key
-
   delay(5000);
   checkin();
 
-  // in case checkin will not crash...
-  delay(5000);
+  delay(15000);
   mqtt(); // requires valid udid and api_key
 
 #ifdef __DEBUG__
@@ -241,8 +234,8 @@ void thinx_parse(String payload) {
         thinx_udid = udid;
       }
 
-      Serial.println("SAVE:1");
-      saveDeviceInfo();
+      Serial.println("SKIPPED:SAVE:1");
+      //saveDeviceInfo();
 
     } else if (status == "FIRMWARE_UPDATE") {
 
@@ -272,8 +265,6 @@ void thinx_parse(String payload) {
         esp_update(url);
 #endif
       }
-    } else {
-      // Serial.println(String("Unhandled status: ") + status);
     }
 }
 
@@ -358,13 +349,7 @@ void senddata(String body) {
   sprintf(shorthost, "%s", thinx_cloud_url.c_str());
 
   // Response payload placeholder
-  String payload = "{}";
-
-#ifdef __DEBUG__
-  Serial.print("*TH: Sending to ");
-  Serial.println(shorthost);
-  Serial.println(body);
-#endif
+  String payload = "";
 
   Serial.print("*TH: thx_api_key API KEY "); Serial.println(thx_api_key);
 
@@ -401,17 +386,12 @@ void senddata(String body) {
     while ( thx_wifi_client.connected() ) {
       if ( thx_wifi_client.available() ) {
         char str = thx_wifi_client.read();
-        Serial.print(str);
         payload = payload + String(str);
       }
     }
-
-    Serial.println();
-
-    thx_wifi_client.stop();
-
+    //thx_wifi_client.stop(); maybe breaks saving/mqtt?
+    Serial.println("*TH: Parsing HTTP response.");
     thinx_parse(payload);
-
   } else {
     Serial.println("*TH: API connection failed.");
     return;
@@ -476,6 +456,7 @@ bool thinx_mqtt_reconnect() {
 
 void thinx_mqtt_callback(char* topic, byte* payload, unsigned int length) {
 
+
   Serial.println("*TH: MQTT Callback:");
 
   char c_payload[length];
@@ -489,6 +470,7 @@ void thinx_mqtt_callback(char* topic, byte* payload, unsigned int length) {
   Serial.println(c_payload);
 
   if ( s_topic == thinx_mqtt_channel() ) {
+    Serial.println("*TH: Parsing MQTT response.");
     thinx_parse(c_payload);
   }
 }
@@ -570,11 +552,6 @@ void connect() { // should return status bool
 
 bool restoreDeviceInfo() {
 
-  Serial.println("*TH: Mounting SPIFFS for reading...");
-  bool result = SPIFFS.begin();
-  delay(50);
-  Serial.println("*TH: SPIFFS mounted: " + result);
-
   File f = SPIFFS.open("/thinx.cfg", "r");
   if (!f) {
       Serial.println("*TH: No remote configuration found so far...");
@@ -612,72 +589,42 @@ bool restoreDeviceInfo() {
        thinx_udid = thinx_mac();
        sprintf(thx_udid, "%s", saved_udid); // 40 max
      }
+     f.close();
     }
   }
-
-  #ifdef __DEBUG__
-    Serial.println("*TH: Restored configuration:");
-
-    Serial.print("     Alias: ");
-    Serial.println(thinx_alias);
-    Serial.print("     Owner: ");
-    Serial.println(thinx_owner);
-    Serial.print("     API Key: ");
-    Serial.println(thx_api_key);
-    Serial.print("     UDID: ");
-    Serial.println(thx_udid);
-
-    Serial.print("     Firmware: ");
-    Serial.println(thinx_firmware_version);
-
-    //Serial.print("*TH: DEBUG Build-time Owner: ");
-    //Serial.println(thinx_owner);
-    //Serial.print("*TH: DEBUG Build-time Device Alias: ");
-    //Serial.println(thinx_alias);
-  #endif
-
-  SPIFFS.end();
 }
 
 /* Stores mutable device data (alias, owner) retrieved from API */
 void saveDeviceInfo()
 {
-  Serial.println("*TH: NOT Skipping saveDeviceInfo, depending on Thinx.h and in-memory so far... (seems to crash even though)");
+  //Serial.setDebugOutput(true);
 
-  //return;
+  //Serial.println("*TH: Opening/creating config file...");
 
-  Serial.setDebugOutput(true);
+  const char *config = deviceInfo().c_str();
+  Serial.println(config);
+  Serial.println("*TH: Crashes even when NOT Writing configuration to file because it would crash, everything stays in memory, api key must be set manually so far...");
 
-  Serial.println("*TH: Mounting SPIFFS for writing...");
-  bool result = SPIFFS.begin(); // crashes here...
-  delay(50);
-  Serial.println("*TH: SPIFFS mounted: " + result);
-  Serial.println("*TH: Opening/creating config file...");
+  File f = SPIFFS.open("/thx.cfg", "w");
+  if (f) {
+    Serial.print("*TH: saving configuration: ");
 
-  // if exists remove?
-
-  File f = SPIFFS.open("/thinx.cfg", "w+");
-  if (!f) {
+    f.println(config);
+    Serial.println("*TH: closing file crashes here... omitted.");
+    //f.close();
+  } else {
     Serial.println("*TH: Cannot save configuration, formatting SPIFFS...");
     SPIFFS.format();
     Serial.println("*TH: Trying to save again..."); // TODO: visual feedback
-    f = SPIFFS.open("/thinx.cfg", "w+");
+    f = SPIFFS.open("/thinx.cfg", "w");
     if (f) {
       saveDeviceInfo();
+      f.close();
     } else {
       Serial.println("*TH: Retry failed...");
     }
-  } else {
-    Serial.print("*TH: saving configuration: ");
-    String config = deviceInfo();
-    Serial.println(config);
-    //Serial.println("*TH: saveConfiguration completed. (warning: CRASH FOLLOWS) >>>");
-    f.println(config.c_str());
-
-    Serial.println("*TH: closing file crashes here...");
-    delay(100); // let the file close
-    f.close();
   }
+
   Serial.println("*TH: saveDeviceInfo() completed.");
   SPIFFS.end();
   Serial.println("*TH: SPIFFS.end();");
@@ -712,6 +659,7 @@ String deviceInfo()
 
 void loop()
 {
+  THiNX_initWithAPIKey(thinx_api_key); // moved to loop because of pubsub/spiffs crash possibility
   delay(1000);
   Serial.println(".");
 }
