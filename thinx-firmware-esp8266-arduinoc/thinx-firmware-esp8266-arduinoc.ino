@@ -110,10 +110,14 @@ void THiNX_initWithAPIKey(String api_key) {
   }
 #endif
 
-  delay(500);
+  delay(1000);
+  mqtt(); // requires valid udid and api_key
+
+  delay(5000);
   checkin();
 
-  delay(10000);
+  // in case checkin will not crash...
+  delay(5000);
   mqtt(); // requires valid udid and api_key
 
 #ifdef __DEBUG__
