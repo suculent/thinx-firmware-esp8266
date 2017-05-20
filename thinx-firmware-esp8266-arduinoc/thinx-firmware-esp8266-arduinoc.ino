@@ -7,8 +7,7 @@
 #define __DEBUG__
 #define __DEBUG_JSON__
 
-
-#define __DEBUG_WIFI__ use as fallback when device gets stucked with incorrect WiFi configuration
+// #define __DEBUG_WIFI__ /* use as fallback when device gets stucked with incorrect WiFi configuration */
 
 #define __USE_WIFI_MANAGER__
 
@@ -67,7 +66,7 @@ void setup() {
   while (!Serial);
 
 #ifdef __DEBUG_WIFI__
-  WiFi.begin("6RA", "quarantine");
+  WiFi.begin("<ssid>", "<password>");
 #endif
 
   THiNX_initWithAPIKey(thinx_api_key); // init with unique API key you obtain from web and paste to in Thinx.h
@@ -112,10 +111,10 @@ void THiNX_initWithAPIKey(String api_key) {
 #endif
 
   delay(500);
-  mqtt();
+  checkin();
 
-  delay(5000);
-  checkin(); // crashes so far in HTTP POST
+  delay(10000);
+  mqtt(); // requires valid udid and api_key
 
 #ifdef __DEBUG__
   // test == our tenant name from THINX platform
@@ -180,7 +179,7 @@ void thinx_parse(String payload) {
   // {"registration":{"success":true,"status":"OK","alias":"","owner":"","device_id":"5CCF7FF09C39"}}
 
 #ifdef __DEBUG__
-  Serial.print("Parsing response: ");
+  Serial.println("Parsing response: ");
   Serial.println(payload);
 #endif
 
@@ -473,6 +472,8 @@ bool thinx_mqtt_reconnect() {
 
 void thinx_mqtt_callback(char* topic, byte* payload, unsigned int length) {
 
+  Serial.println("*TH: MQTT Callback:");
+
   char c_payload[length];
   memcpy(c_payload, payload, length);
   c_payload[length] = '\0';
@@ -480,7 +481,6 @@ void thinx_mqtt_callback(char* topic, byte* payload, unsigned int length) {
   String s_topic = String(topic);
   String s_payload = String(c_payload);
 
-  Serial.println("*TH: MQTT Callback:");
   Serial.println(topic);
   Serial.println(c_payload);
 
