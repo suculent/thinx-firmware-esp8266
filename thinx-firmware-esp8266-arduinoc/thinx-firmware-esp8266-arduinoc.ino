@@ -174,7 +174,7 @@ static const String thx_disconnected_response = "{ \"status\" : \"disconnected\"
 void thinx_parse(String payload) {
 
   // TODO: Should parse response only for this device_id (which must be internal and not a mac)
-  int startIndex = payload.indexOf("{\"") ;
+  int startIndex = payload.indexOf("{\"registration\"") ;
   int endIndex = payload.indexOf("}}") + 2;
 
   String body = payload.substring(startIndex, endIndex);
@@ -661,4 +661,7 @@ void loop()
   THiNX_initWithAPIKey(thinx_api_key); // moved to loop because of pubsub/spiffs crash possibility
   delay(10000);
   Serial.println(".");
+  if (thx_mqtt_client.connected()) {
+    thx_mqtt_client.publish(thinx_mqtt_channel().c_str(), thx_connected_response.c_str());
+  }
 }
