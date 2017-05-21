@@ -238,7 +238,8 @@ void thinx_parse(const char *payload) {
         thinx_udid = udid;
       }
 
-      saveDeviceInfo();
+      // Would be ok without but it will still crash... WTD
+      //saveDeviceInfo();
       return;
 
     } else if (status == "FIRMWARE_UPDATE") {
@@ -394,8 +395,8 @@ void senddata(String body) {
       }
     }
     thx_wifi_client.stop(); //maybe breaks saving/mqtt?
-    //Serial.println("*TH: Parsing HTTP response (causes crash on save).");
-    //thinx_parse(payload.c_str());
+    Serial.println("*TH: Parsing HTTP response (causes crash on save).");
+    thinx_parse(payload.c_str());
   } else {
     Serial.println("*TH: API connection failed.");
     return;
