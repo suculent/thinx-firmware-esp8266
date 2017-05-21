@@ -107,11 +107,11 @@ void THiNX_initWithAPIKey(String api_key) {
   }
 #endif
 
-  delay(5000);
+  //delay(5000);
   checkin();
 
-  delay(15000);
-  mqtt(); // requires valid udid and api_key
+  //delay(15000);
+  bool mqtt_status = mqtt(); // requires valid udid and api_keys
 
 #ifdef __DEBUG__
   // test == our tenant name from THINX platform
@@ -168,7 +168,7 @@ static const String thx_disconnected_response = "{ \"status\" : \"disconnected\"
 
 /* Private library method */
 
-void thinx_parse(String payload) {
+void thinx_parse(const char *payload) {
 
   // TODO: Should parse response only for this device_id (which must be internal and not a mac)
   // TODO: store device_id, alias and owner using SPIFFS in thinx.json
@@ -180,12 +180,16 @@ void thinx_parse(String payload) {
   //Serial.println(payload);
 #endif
 
-  int startIndex = payload.indexOf("\n{");
-  String body = payload.substring(startIndex + 1);
+  String pload = String(payload);
+
+  int startIndex = pload.indexOf("\n{");
+  String body = pload.substring(startIndex + 1);
 
   StaticJsonBuffer<4096> jsonBuffer;
 
   JsonObject& root = jsonBuffer.parseObject(body.c_str());
+
+  body = "";
 
   if ( !root.success() ) {
 #ifdef __DEBUG__
@@ -235,6 +239,7 @@ void thinx_parse(String payload) {
       }
 
       saveDeviceInfo();
+      return;
 
     } else if (status == "FIRMWARE_UPDATE") {
 
@@ -389,8 +394,8 @@ void senddata(String body) {
       }
     }
     thx_wifi_client.stop(); //maybe breaks saving/mqtt?
-    //Serial.println("*TH: Parsing HTTP response.");
-    //thinx_parse(payload);
+    //Serial.println("*TH: Parsing HTTP response (causes crash on save).");
+    //thinx_parse(payload.c_str());
   } else {
     Serial.println("*TH: API connection failed.");
     return;
@@ -403,16 +408,15 @@ void senddata(String body) {
 // MQTT Connection
 //
 
-void mqtt() {
-  return;
+bool mqtt() {
   Serial.print("*TH: Contacting MQTT server ");
   Serial.print(thinx_mqtt_url);
   Serial.print(" on port ");
   Serial.println(thinx_mqtt_port);
   thx_mqtt_client.setServer(thinx_mqtt_url.c_str(), thinx_mqtt_port);
   thx_mqtt_client.setCallback(thinx_mqtt_callback);
-  thinx_mqtt_reconnect();
   last_mqtt_reconnect = 0;
+  return thinx_mqtt_reconnect();
 }
 
 /* Private library method */
@@ -608,10 +612,9 @@ void saveDeviceInfo()
   File f = SPIFFS.open("/thx.cfg", "w");
   if (f) {
     Serial.print("*TH: saving configuration: ");
-
     f.println(config);
-    Serial.println("*TH: closing file crashes here... omitted.");
-    //f.close();
+    Serial.println("*TH: closing file crashes here...");
+    f.close();
   } else {
     Serial.println("*TH: Cannot save configuration, formatting SPIFFS...");
     SPIFFS.format();
