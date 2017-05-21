@@ -7,7 +7,7 @@
 #define __DEBUG__
 #define __DEBUG_JSON__
 
-// #define __DEBUG_WIFI__ /* use as fallback when device gets stucked with incorrect WiFi configuration */
+#define __DEBUG_WIFI__ /* use as fallback when device gets stucked with incorrect WiFi configuration */
 
 #define __USE_WIFI_MANAGER__
 
@@ -55,7 +55,6 @@ EAVManagerParameter api_key_param("apikey", "API Key", thx_api_key, 40);
 WiFiClient thx_wifi_client;
 int status = WL_IDLE_STATUS;
 
-PubSubClient thx_mqtt_client(thx_wifi_client);
 int last_mqtt_reconnect;
 
 bool shouldSaveConfig = false;
@@ -63,12 +62,16 @@ bool connected = false;
 
 bool once = true;
 
+StaticJsonBuffer<1024> jsonBuffer;
+
 void setup() {
   Serial.begin(115200);
   while (!Serial);
 
+  Serial.setDebugOutput(true);
+
 #ifdef __DEBUG_WIFI__
-  WiFi.begin("<ssid>", "<password>");
+  WiFi.begin("HAVANA", "1234567890");
 #endif
 
   Serial.println("Setup completed.");
@@ -110,8 +113,8 @@ void THiNX_initWithAPIKey(String api_key) {
   //delay(5000);
   checkin();
 
-  //delay(15000);
-  bool mqtt_status = mqtt(); // requires valid udid and api_keys
+  delay(1000);
+  start_mqtt(thx_wifi_client); // requires valid udid and api_keys
 
 #ifdef __DEBUG__
   // test == our tenant name from THINX platform
@@ -168,32 +171,25 @@ static const String thx_disconnected_response = "{ \"status\" : \"disconnected\"
 
 /* Private library method */
 
-void thinx_parse(const char *payload) {
+void thinx_parse(String payload) {
 
   // TODO: Should parse response only for this device_id (which must be internal and not a mac)
-  // TODO: store device_id, alias and owner using SPIFFS in thinx.json
-  // TODO: status can be OK or FIRMWARE_UPDATE; ignore rest
-  // {"registration":{"success":true,"status":"OK","alias":"","owner":"","device_id":"5CCF7FF09C39"}}
+  int startIndex = payload.indexOf("{\"") ;
+  int endIndex = payload.indexOf("}}") + 2;
+
+  String body = payload.substring(startIndex, endIndex);
 
 #ifdef __DEBUG__
-  //Serial.println("Parsing response: ");
-  //Serial.println(payload);
+    Serial.print("*TH: Parsing response: '");
+    Serial.print(body);
+    Serial.println("'");
 #endif
-
-  String pload = String(payload);
-
-  int startIndex = pload.indexOf("\n{");
-  String body = pload.substring(startIndex + 1);
-
-  StaticJsonBuffer<4096> jsonBuffer;
 
   JsonObject& root = jsonBuffer.parseObject(body.c_str());
 
-  body = "";
-
   if ( !root.success() ) {
 #ifdef __DEBUG__
-    Serial.println("Failed parsing root node.");
+  Serial.println("Failed parsing root node.");
 #endif
     return;
   }
@@ -207,70 +203,74 @@ void thinx_parse(const char *payload) {
     return;
   }
 
-    bool success = registration["success"];
-    String status = registration["status"];
+  bool success = registration["success"];
+  String status = registration["status"];
 
-    #ifdef __DEBUG__
-      Serial.print("success: ");
-      Serial.println(success);
-
-      Serial.print("status: ");
-      Serial.println(status);
-    #endif
-
-    if (status == "OK") {
-
-      String alias = registration["alias"];
-      if ( alias.length() > 0 ) {
-        Serial.println(String("assigning alias: ") + alias);
-        thinx_alias = alias;
-      }
-
-      String owner = registration["owner"];
-      if ( owner.length() > 0 ) {
-        Serial.println(String("assigning owner: ") + owner);
-        thinx_owner = owner;
-      }
-
-      String udid = registration["udid"];
-      if ( udid.length() > 0 ) {
-        Serial.println(String("assigning udid: ") + udid);
-        thinx_udid = udid;
-      }
-
-      // Would be ok without but it will still crash... WTD
-      //saveDeviceInfo();
-      return;
-
-    } else if (status == "FIRMWARE_UPDATE") {
-
-      String mac = registration["mac"];
-      Serial.println(String("mac: ") + mac);
-      // TODO: must be this or ANY
-
-      String commit = registration["commit"];
-      Serial.println(String("commit: ") + commit);
-
-      // should not be this
-      if (commit == thinx_commit_id) {
-        Serial.println("*TH: Warning: new firmware has same commit_id as current.");
-      }
-
-      String version = registration["version"];
-      Serial.println(String("version: ") + version);
-
-      Serial.println("Starting update...");
-
-      String url = registration["url"];
-      if (url) {
 #ifdef __DEBUG__
-        Serial.println("*TH: SKIPPING force update with URL:" + url);
-#else
-        // TODO: must not contain HTTP, extend with http://thinx.cloud/" // could use node.js as a secure provider instead of Apache!
-        esp_update(url);
+    Serial.print("success: ");
+    Serial.println(success);
+
+    Serial.print("status: ");
+    Serial.println(status);
 #endif
-      }
+
+  if (status == "OK") {
+
+    String alias = registration["alias"];
+    Serial.print("Reading alias: ");
+    Serial.print(alias);
+    if ( alias.length() > 0 ) {
+      Serial.println(String("assigning alias: ") + alias);
+      thinx_alias = alias;
     }
+
+    String owner = registration["owner"];
+    Serial.println("Reading owner: ");
+    if ( owner.length() > 0 ) {
+      Serial.println(String("assigning owner: ") + owner);
+      thinx_owner = owner;
+    }
+
+    Serial.println("Reading udid: ");
+    String udid = registration["udid"];
+    if ( udid.length() > 0 ) {
+      Serial.println(String("assigning udid: ") + udid);
+      thinx_udid = udid;
+    }
+
+    delay(1);
+
+    saveDeviceInfo();
+
+  } else if (status == "FIRMWARE_UPDATE") {
+
+    String mac = registration["mac"];
+    Serial.println(String("mac: ") + mac);
+    // TODO: must be this or ANY
+
+    String commit = registration["commit"];
+    Serial.println(String("commit: ") + commit);
+
+    // should not be this
+    if (commit == thinx_commit_id) {
+      Serial.println("*TH: Warning: new firmware has same commit_id as current.");
+    }
+
+    String version = registration["version"];
+    Serial.println(String("version: ") + version);
+
+    Serial.println("Starting update...");
+
+    String url = registration["url"];
+    if (url) {
+#ifdef __DEBUG__
+      Serial.println("*TH: SKIPPING force update with URL:" + url);
+#else
+      // TODO: must not contain HTTP, extend with http://thinx.cloud/" // could use node.js as a secure provider instead of Apache!
+      esp_update(url);
+#endif
+    }
+  }
 }
 
 /* Private library method */
@@ -320,7 +320,6 @@ void checkin() {
 
   Serial.println("*TH: Building JSON...");
 
-  StaticJsonBuffer<512> jsonBuffer;
   JsonObject& root = jsonBuffer.createObject();
   root["mac"] = thinx_mac();
   root["firmware"] = String(thinx_firmware_version);
@@ -331,7 +330,7 @@ void checkin() {
   root["device_id"] = String(thinx_udid);
   root["udid"] = String(thinx_udid);
 
-  StaticJsonBuffer<512> wrapperBuffer;
+  StaticJsonBuffer<1024> wrapperBuffer;
   JsonObject& wrapper = wrapperBuffer.createObject();
   wrapper["registration"] = root;
 
@@ -380,6 +379,7 @@ void senddata(String body) {
     unsigned long currentMillis = millis(), previousMillis = millis();
 
     while(!thx_wifi_client.available()){
+      delay(1);
       if( (currentMillis - previousMillis) > interval ){
         Serial.println("Response Timeout. TODO: Should retry later.");
         thx_wifi_client.stop();
@@ -389,14 +389,16 @@ void senddata(String body) {
     }
 
     while ( thx_wifi_client.connected() ) {
+      delay(1);
       if ( thx_wifi_client.available() ) {
         char str = thx_wifi_client.read();
         payload = payload + String(str);
+        delay(1);
       }
     }
-    thx_wifi_client.stop(); //maybe breaks saving/mqtt?
-    Serial.println("*TH: Parsing HTTP response (causes crash on save).");
-    thinx_parse(payload.c_str());
+
+    thinx_parse(payload);
+
   } else {
     Serial.println("*TH: API connection failed.");
     return;
@@ -409,7 +411,9 @@ void senddata(String body) {
 // MQTT Connection
 //
 
-bool mqtt() {
+PubSubClient thx_mqtt_client(thx_wifi_client);
+
+bool start_mqtt(WiFiClient thx_wifi_client) {
   Serial.print("*TH: Contacting MQTT server ");
   Serial.print(thinx_mqtt_url);
   Serial.print(" on port ");
@@ -417,12 +421,6 @@ bool mqtt() {
   thx_mqtt_client.setServer(thinx_mqtt_url.c_str(), thinx_mqtt_port);
   thx_mqtt_client.setCallback(thinx_mqtt_callback);
   last_mqtt_reconnect = 0;
-  return thinx_mqtt_reconnect();
-}
-
-/* Private library method */
-
-bool thinx_mqtt_reconnect() {
 
   String channel = thinx_mqtt_channel();
   Serial.println("*TH: Connecting to MQTT...");
@@ -431,6 +429,8 @@ bool thinx_mqtt_reconnect() {
   Serial.println(thinx_udid);
   Serial.print("*TH: AK: ");
   Serial.println(thinx_api_key);
+  Serial.print("*TH: CH: ");
+  Serial.println(channel);
 
   String mac = thinx_mac();
 
@@ -454,13 +454,11 @@ bool thinx_mqtt_reconnect() {
   } else {
     Serial.println("*TH: MQTT Not connected.");
   }
-  return thx_mqtt_client.connected();
 }
 
 /* Private library method */
 
-void thinx_mqtt_callback(char* topic, byte* payload, unsigned int length) {
-
+void ICACHE_FLASH_ATTR thinx_mqtt_callback(char* topic, byte* payload, unsigned int length) {
 
   Serial.println("*TH: MQTT Callback:");
 
@@ -475,8 +473,8 @@ void thinx_mqtt_callback(char* topic, byte* payload, unsigned int length) {
   Serial.println(c_payload);
 
   if ( s_topic == thinx_mqtt_channel() ) {
-    Serial.println("*TH: Parsing MQTT response.");
-    thinx_parse(c_payload);
+    Serial.println("*TH: NOT Parsing MQTT response.");
+    thinx_parse(s_payload);
   }
 }
 
@@ -563,7 +561,6 @@ bool restoreDeviceInfo() {
       return false;
   } else {
     String data = f.readStringUntil('\n');
-    StaticJsonBuffer<256> jsonBuffer;
     JsonObject& config = jsonBuffer.parseObject(data.c_str());
     if (!config.success()) {
       Serial.println("*TH: parseObject() failed");
@@ -602,7 +599,6 @@ bool restoreDeviceInfo() {
 /* Stores mutable device data (alias, owner) retrieved from API */
 void saveDeviceInfo()
 {
-  //Serial.setDebugOutput(true);
 
   //Serial.println("*TH: Opening/creating config file...");
 
@@ -636,24 +632,23 @@ void saveDeviceInfo()
 
 String deviceInfo()
 {
-  Serial.println("*TH: building device info:");
-  StaticJsonBuffer<480> jsonBuffer;
+  //Serial.println("*TH: building device info:");
   JsonObject& root = jsonBuffer.createObject();
   root["alias"] = thinx_alias;
-  Serial.print("*TH: thinx_alias: ");
-  Serial.println(thinx_alias);
+  //Serial.print("*TH: thinx_alias: ");
+  //Serial.println(thinx_alias);
 
   root["owner"] = thinx_owner;
-  Serial.print("*TH: thinx_owner: ");
-  Serial.println(thinx_owner);
+  //Serial.print("*TH: thinx_owner: ");
+  //Serial.println(thinx_owner);
 
   root["apikey"] = thx_api_key;
-  Serial.print("*TH: thx_api_key: ");
-  Serial.println(thx_api_key);
+  //Serial.print("*TH: thx_api_key: ");
+  //Serial.println(thx_api_key);
 
   root["udid"] = thinx_udid;
-  Serial.print("*TH: thinx_udid: ");
-  Serial.println(thinx_udid);
+  //Serial.print("*TH: thinx_udid: ");
+  //Serial.println(thinx_udid);
 
   String jsonString;
   root.printTo(jsonString);
@@ -664,6 +659,6 @@ String deviceInfo()
 void loop()
 {
   THiNX_initWithAPIKey(thinx_api_key); // moved to loop because of pubsub/spiffs crash possibility
-  delay(1000);
+  delay(10000);
   Serial.println(".");
 }
