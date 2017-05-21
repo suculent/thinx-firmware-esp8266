@@ -12,6 +12,9 @@ static const String thinx_firmware_version = "thinx-firmware-esp8266-1.5.63:2017
 String thinx_cloud_url = "rtm.thinx.cloud"; // will change to proxy!
 String thinx_alias = "esp8266-eav-shield";
 String thinx_api_key = "310c20ed9dcd4663551bd04cc53a58a52c8d9f1b";
+static const String thinx_commit_id = "3f5880d37ac2d7fa4aaac7b14fa427a859035c1a";
+static const String thinx_firmware_version = "thinx-firmware-esp8266-1.3.68:2017-05-21";
+static const String thinx_firmware_version_short = "1.3.68";
 String thinx_owner = "test";
 String thinx_udid = "93f91060-3980-11e7-a58d-81e4acfbeb86";
 
