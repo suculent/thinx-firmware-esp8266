@@ -29,7 +29,12 @@
 // Changes so far: `int connectWifi()` moved to public section in header
 // - buildable, but requires UDP end-to-end)
 #include "EAVManager/EAVManager.h"
+#include <EAVManager.h>
 #endif
+
+// Using better than Arduino-bundled version of MQTT https://github.com/Imroy/pubsubclient
+//#include "PubSubClient/PubSubClient.h" // Local checkout
+#include <PubSubClient.h> // Arduino Library
 
 // WORK IN PROGRESS: Send a registration post request with current MAC, Firmware descriptor, commit ID; sha and version if known (with all other useful params like expected device owner).
 
@@ -40,7 +45,6 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266HTTPClient.h>
 #include <ESP8266httpUpdate.h>
-#include <PubSubClient.h>
 
 // Default OTA login
 const char* autoconf_ssid  = "AP-THiNX"; // SSID in AP mode
@@ -411,15 +415,32 @@ void senddata(String body) {
 // MQTT Connection
 //
 
-PubSubClient thx_mqtt_client(thx_wifi_client);
+// FIXME: Update to DNS record 'mqtt.thinx.cloud'
+#define BUFFER_SIZE 512
+IPAddress mqtt_server(207, 154, 230, 212);
+PubSubClient thx_mqtt_client(thx_wifi_client, mqtt_server);
+
+void mqtt_callback(const MQTT::Publish& pub) {
+  Serial.print(pub.topic());
+  Serial.print(" => ");
+  if (pub.has_stream()) {
+    uint8_t buf[BUFFER_SIZE];
+    int read;
+    while (read = pub.payload_stream()->read(buf, BUFFER_SIZE)) {
+      Serial.write(buf, read);
+    }
+    pub.payload_stream()->stop();
+    Serial.println("");
+  } else
+    Serial.println(pub.payload_string());
+}
 
 bool start_mqtt(WiFiClient thx_wifi_client) {
   Serial.print("*TH: Contacting MQTT server ");
   Serial.print(thinx_mqtt_url);
   Serial.print(" on port ");
   Serial.println(thinx_mqtt_port);
-  thx_mqtt_client.setServer(thinx_mqtt_url.c_str(), thinx_mqtt_port);
-  thx_mqtt_client.setCallback(thinx_mqtt_callback);
+
   last_mqtt_reconnect = 0;
 
   String channel = thinx_mqtt_channel();
@@ -441,7 +462,12 @@ bool start_mqtt(WiFiClient thx_wifi_client) {
   int willQos = 0;
   bool willRetain = false;
 
-  if ( thx_mqtt_client.connect( id, user, pass, willTopic, willQos, willRetain, thx_disconnected_response.c_str() ) ) {
+  //if ( thx_mqtt_client.connect( id, user, pass, willTopic, willQos, willRetain, thx_disconnected_response.c_str() ) ) {
+
+  if (thx_mqtt_client.connect(MQTT::Connect(id).set_auth(user, pass))) {
+
+    thx_mqtt_client.set_callback(mqtt_callback);
+
     Serial.println("*TH: MQTT Connected.");
     if (thx_mqtt_client.subscribe(channel.c_str())) {
       Serial.print("*TH: ");
