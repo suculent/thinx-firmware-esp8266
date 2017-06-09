@@ -280,12 +280,16 @@ void thinx_parse(String payload) {
 /* Private library method */
 
 /*
-* Designated MQTT channel for each device. In case devices know their channels, they can talk together.
-* Update must be skipped unless forced and matching MAC, even though a lot should be validated to prevent overwrite.
+* Designated MQTT channel for each device. Devices can talk to each other
+* through /thinx/owner_id/shared/ channels.
 */
 
 String thinx_mqtt_channel() {
-  return String("/thinx/device/") + thinx_udid;
+  return String("/thinx/") + thinx_owner + "/" + thinx_udid;
+}
+
+String thinx_mqtt_shared_channel() {
+  return String("/thinx/") + thinx_owner + "/shared";
 }
 
 /* Private library method */
@@ -295,11 +299,9 @@ String thinx_mqtt_channel() {
 */
 
 String thinx_mac() {
-
   byte mac[] = {
-    0xDE, 0xFA, 0x01, 0x70, 0x32, 0x42
-  }; // 0x5C, 0xCF, 0x7F, 0xF0, 0x9C, 0x39
-
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+  };
   WiFi.macAddress(mac);
   char macString[16] = {0};
   sprintf(macString, "5CCF7F%6X", ESP.getChipId());
@@ -334,7 +336,9 @@ void checkin() {
   root["device_id"] = String(thinx_udid);
   root["udid"] = String(thinx_udid);
 
-  StaticJsonBuffer<1024> wrapperBuffer;
+  Serial.println("*TH: Wrapping JSON...");
+
+  StaticJsonBuffer<2048> wrapperBuffer;
   JsonObject& wrapper = wrapperBuffer.createObject();
   wrapper["registration"] = root;
 
@@ -468,8 +472,19 @@ bool start_mqtt(WiFiClient thx_wifi_client) {
 
     thx_mqtt_client.set_callback(mqtt_callback);
 
-    Serial.println("*TH: MQTT Connected.");
-    if (thx_mqtt_client.subscribe(channel.c_str())) {
+    Serial.println("*TH: MQTT Subscribing shared channel...");
+
+    if (thx_mqtt_client.subscribe(thinx_mqtt_shared_channel().c_str())) {
+      Serial.print("*TH: ");
+      Serial.print(channel);
+      Serial.println(" successfully subscribed.");
+    } else {
+      Serial.println("*TH: Not subscribed.");
+    }
+
+    Serial.println("*TH: MQTT Subscribing device channel...");
+
+    if (thx_mqtt_client.subscribe(thinx_mqtt_channel().c_str())) {
       Serial.print("*TH: ");
       Serial.print(channel);
       Serial.println(" successfully subscribed.");

@@ -23,9 +23,9 @@ THINX_UDID="" # each build is specific only for given udid to prevent data leak
 # dynamic variables (adjustable by user but overridden from API)
 THINX_CLOUD_URL="thinx.cloud" # can change to proxy (?)
 THINX_MQTT_URL="thinx.cloud" # should try thinx.local first for proxy
-THINX_API_KEY="b63f960e3a05b513661ea8ee001e3a17e14228ba" # will change in future to support rolling api-keys
+THINX_API_KEY="88eb20839c1d8bf43819818b75a25cef3244c28e77817386b7b73b043193cef4" # will change in future to support rolling api-keys
 THINX_DEVICE_ALIAS="micropython-test"
-THINX_DEVICE_OWNER="test"
+THINX_DEVICE_OWNER="eaabae0d5165c5db4c46c3cb6f062938802f58d9b88a1b46ed69421809f0bf7f"
 THINX_AUTO_UPDATE=True
 THINX_PROXY="thinx.local"
 
@@ -247,7 +247,7 @@ def restore_device_info():
         f.close()
         set_device_info(ujson.loads(info))
     else:
-        print("THINX: No config file found")    
+        print("THINX: No config file found")
 
 def thinx_mqtt():
     print("THINX: MQTT: To be implemented later")
