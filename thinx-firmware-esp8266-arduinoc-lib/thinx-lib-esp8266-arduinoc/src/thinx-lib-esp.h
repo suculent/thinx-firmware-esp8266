@@ -72,7 +72,7 @@ class THiNX {
 
     friend class EAVManager;
 
-    EAVManagerParameter api_key_param; //(const char*, const char*, const char*, int, const char*);
+    //EAVManagerParameter api_key_param; //(const char*, const char*, const char*, int, const char*);
     //friend class PubSubClient;
 
     private:

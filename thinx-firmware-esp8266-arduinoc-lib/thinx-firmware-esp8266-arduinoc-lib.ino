@@ -24,8 +24,7 @@ void setup() {
 
 void loop()
 {
-  //thx->
-  //THiNX(thinx_api_key); // safely re-entrant
+  THiNX->THiNX(thinx_api_key); // must be safely re-entrant
   delay(10000);
   Serial.println(".");
   //if (thx_mqtt_client.connected()) {
