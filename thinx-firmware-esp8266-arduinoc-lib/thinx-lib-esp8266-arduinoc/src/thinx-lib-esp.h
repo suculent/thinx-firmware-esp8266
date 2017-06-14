@@ -72,14 +72,10 @@ class THiNX {
 
     friend class EAVManager;
 
-    //EAVManagerParameter api_key_param(); //(const char*, const char*, const char*, int, const char*);
+    EAVManagerParameter api_key_param; //(const char*, const char*, const char*, int, const char*);
     //friend class PubSubClient;
 
-
-
     private:
-
-
 
       const char* autoconf_ssid; // SSID in AP mode
       const char* autoconf_pwd; // fallback to default password, however this should be generated uniquely as it is logged to console
