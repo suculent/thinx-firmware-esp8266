@@ -1,92 +1,37 @@
-/* OTA enabled firmware for Wemos D1 (ESP 8266, Arduino) */
+#include "thinx-lib-esp.h"
 
-// version 1.5.57 (aligned with API build 1015)
+// FIXME: Update to DNS record 'mqtt.thinx.cloud'
+#define BUFFER_SIZE 512
 
-#include "Arduino.h"
+IPAddress mqtt_server(207, 154, 230, 212);
+PubSubClient thx_mqtt_client(thx_wifi_client, mqtt_server);
 
-#include "thinx-lib-esp8266-arduinoc/src/thinx-lib-esp.h"
-
-#define __DEBUG__
-#define __DEBUG_JSON__
-
-#define __DEBUG_WIFI__ /* use as fallback when device gets stucked with incorrect WiFi configuration */
-
-#define __USE_WIFI_MANAGER__
-
-#include <stdio.h>
-#include <Arduino.h>
-#include "ArduinoJson/ArduinoJson.h"
-
-#include "Thinx.h"
-#include "FS.h"
-
-// Inject SSID and Password from 'Settings.h' for testing where we do not use EAVManager
-#ifndef __USE_WIFI_MANAGER__
-#include "Settings.h"
-#else
-// Custom clone of EAVManager (we shall revert back to OpenSource if this won't be needed)
-// Purpose: SSID/password injection in AP mode
-// Solution: re-implement from UDP in mobile application
-//
-// Changes so far: `int connectWifi()` moved to public section in header
-// - buildable, but requires UDP end-to-end)
-#include "EAVManager/EAVManager.h"
-#include <EAVManager.h>
-#endif
-
-// Using better than Arduino-bundled version of MQTT https://github.com/Imroy/pubsubclient
-//#include "PubSubClient/PubSubClient.h" // Local checkout
-#include <PubSubClient.h> // Arduino Library
-
-// WORK IN PROGRESS: Send a registration post request with current MAC, Firmware descriptor, commit ID; sha and version if known (with all other useful params like expected device owner).
-
-// TODO: Add UDP AT&U= responder like in EAV? Considered unsafe. Device will notify available update and download/install it on its own (possibly throught THiNX Security Gateway (THiNX )
-// IN PROGRESS: Add MQTT client (target IP defined using Thinx.h) and forced firmware update responder (will update on force or save in-memory state from new or retained mqtt notification)
-// TODO: Add UDP responder AT&U only to update to next available firmware (from save in-memory state)
-
-#include <ESP8266WiFi.h>
-#include <ESP8266HTTPClient.h>
-#include <ESP8266httpUpdate.h>
-
-// Default OTA login
-const char* autoconf_ssid  = "AP-THiNX"; // SSID in AP mode
-const char* autoconf_pwd   = "PASSWORD"; // fallback to default password, however this should be generated uniquely as it is logged to console
-
-// Requires API v126+
-char thx_api_key[64];
-char thx_udid[64] = {0};
-EAVManagerParameter api_key_param("apikey", "API Key", thx_api_key, 64);
-
-// WiFiClient is required by PubSubClient and HTTP POST
-WiFiClient thx_wifi_client;
-int status = WL_IDLE_STATUS;
-
-int last_mqtt_reconnect;
-
-bool shouldSaveConfig = false;
-bool connected = false;
-
-bool once = true;
-
-StaticJsonBuffer<1024> jsonBuffer;
-
-void setup() {
-  Serial.begin(115200);
-  while (!Serial);
-
-  Serial.setDebugOutput(true);
-
-#ifdef __DEBUG_WIFI__
-  WiFi.begin("page42.showflake.czf", "quarantine");
-#endif
-
-  Serial.println("Setup completed.");
+THiNX::THiNX() {
 }
 
-/* Should be moved to library constructor */
+THiNX::THiNX(String __apikey) {
 
-// Designated initialized
-void THiNX_initWithAPIKey(String api_key) {
+  thinx_api_key = __apikey;
+
+  initWithAPIKey(thinx_api_key);
+
+  autoconf_ssid  = "AP-THiNX"; // SSID in AP mode
+  autoconf_pwd   = "PASSWORD"; // fallback to default password, however this should be generated uniquely as it is logged to console
+
+  thx_udid[64] = {0};
+
+  status = WL_IDLE_STATUS;
+  shouldSaveConfig = false;
+  connected = false;
+  once = true;
+}
+
+///
+/// Low level library logic
+///
+
+// Designated initializer
+void THiNX::initWithAPIKey(String api_key) {
 
   if (once == true) {
     once = false;
@@ -131,7 +76,7 @@ void THiNX_initWithAPIKey(String api_key) {
 
 /* Should be moved to private library method */
 
-void esp_update(String url) {
+void THiNX::esp_update(String url) {
 
 #ifdef __DEBUG__
   Serial.println("[update] Starting update...");
@@ -177,7 +122,7 @@ static const String thx_disconnected_response = "{ \"status\" : \"disconnected\"
 
 /* Private library method */
 
-void thinx_parse(String payload) {
+void THiNX::thinx_parse(String payload) {
 
   // TODO: Should parse response only for this device_id (which must be internal and not a mac)
   int startIndex = payload.indexOf("{\"registration\"") ;
@@ -286,11 +231,11 @@ void thinx_parse(String payload) {
 * through /thinx/owner_id/shared/ channels.
 */
 
-String thinx_mqtt_channel() {
+String THiNX::thinx_mqtt_channel() {
   return String("/thinx/") + thinx_owner + "/" + thinx_udid;
 }
 
-String thinx_mqtt_shared_channel() {
+String THiNX::thinx_mqtt_shared_channel() {
   return String("/thinx/") + thinx_owner + "/shared";
 }
 
@@ -300,7 +245,7 @@ String thinx_mqtt_shared_channel() {
 * May return hash only in future.
 */
 
-String thinx_mac() {
+String THiNX::thinx_mac() {
   byte mac[] = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00
   };
@@ -312,7 +257,7 @@ String thinx_mac() {
 
 /* Private library method */
 
-void checkin() {
+void THiNX::checkin() {
 
   Serial.println("*TH: Starting API checkin...");
 
@@ -357,7 +302,7 @@ void checkin() {
 
 /* Private library method */
 
-void senddata(String body) {
+void THiNX::senddata(String body) {
 
   char shorthost[256] = {0};
   sprintf(shorthost, "%s", thinx_cloud_url.c_str());
@@ -421,12 +366,7 @@ void senddata(String body) {
 // MQTT Connection
 //
 
-// FIXME: Update to DNS record 'mqtt.thinx.cloud'
-#define BUFFER_SIZE 512
-IPAddress mqtt_server(207, 154, 230, 212);
-PubSubClient thx_mqtt_client(thx_wifi_client, mqtt_server);
-
-void mqtt_callback(const MQTT::Publish& pub) {
+void THiNX::mqtt_callback(const MQTT::Publish& pub) {
   Serial.print(pub.topic());
   Serial.print(" => ");
   if (pub.has_stream()) {
@@ -441,7 +381,18 @@ void mqtt_callback(const MQTT::Publish& pub) {
     Serial.println(pub.payload_string());
 }
 
-bool start_mqtt(WiFiClient thx_wifi_client) {
+void recv_payload(const MQTT::Publish& pub) {
+  if (pub.has_stream()) {
+    uint8_t buffer[64];
+    int read;
+    while (read = pub.payload_stream()->read(buffer, 64)) {
+      // Do something with data in buffer
+    }
+    pub.payload_stream()->stop();
+  }
+}
+
+bool THiNX::start_mqtt(WiFiClient thx_wifi_client) {
   Serial.print("*TH: Contacting MQTT server ");
   Serial.print(thinx_mqtt_url);
   Serial.print(" on port ");
@@ -472,7 +423,8 @@ bool start_mqtt(WiFiClient thx_wifi_client) {
 
   if (thx_mqtt_client.connect(MQTT::Connect(id).set_auth(user, pass))) {
 
-    thx_mqtt_client.set_callback(mqtt_callback);
+    //thx_mqtt_client.set_callback(mqtt_callback);
+    thx_mqtt_client.set_callback(recv_payload);
 
     Serial.println("*TH: MQTT Subscribing shared channel...");
 
@@ -501,7 +453,7 @@ bool start_mqtt(WiFiClient thx_wifi_client) {
 
 /* Private library method */
 
-void ICACHE_FLASH_ATTR thinx_mqtt_callback(char* topic, byte* payload, unsigned int length) {
+void ICACHE_FLASH_ATTR THiNX::thinx_mqtt_callback(char* topic, byte* payload, unsigned int length) {
 
   Serial.println("*TH: MQTT Callback:");
 
@@ -527,14 +479,14 @@ void ICACHE_FLASH_ATTR thinx_mqtt_callback(char* topic, byte* payload, unsigned 
 // EAVManager Setup Callbacks
 //
 
-void configModeCallback (EAVManager *myEAVManager) {
+void THiNX::configModeCallback (EAVManager *myEAVManager) {
   Serial.println("Entered config mode");
   Serial.println(WiFi.softAPIP());
   Serial.println(myEAVManager->getConfigPortalSSID());
 }
 
 // `api_key_param` should have its value set when this gets called
-void saveConfigCallback() {
+void THiNX::saveConfigCallback() {
   Serial.println("Save config callback:");
   strcpy(thx_api_key, api_key_param.getValue());
   if (String(thx_api_key).length() > 0) {
@@ -553,23 +505,24 @@ void saveConfigCallback() {
 // WiFi Connection
 //
 
-void connect() { // should return status bool
-  #ifdef __USE_WIFI_MANAGER__
-  EAVManager EAVManager;
+void THiNX::connect() { // should return status bool
 
-  EAVManager.addParameter(&api_key_param);
+#ifdef __USE_WIFI_MANAGER__
+  EAVManagerParameter api_key_param("apikey", "API Key", thx_api_key, 64);
+  manager.addParameter(&api_key_param);
 
-  EAVManager.setAPCallback(configModeCallback);
-  EAVManager.setTimeout(10000);
-  EAVManager.autoConnect(autoconf_ssid,autoconf_pwd);
-  #else
+  // TODO: FIXME: Does not work!
+  //manager.setAPCallback(configModeCallback);
+  manager.setTimeout(10000);
+  manager.autoConnect(autoconf_ssid,autoconf_pwd);
+#else
   status = WiFi.begin(ssid, pass);
-  #endif
+#endif
 
   // attempt to connect to Wifi network:
   while ( !connected ) {
     #ifdef __USE_WIFI_MANAGER__
-    status = EAVManager.autoConnect(autoconf_ssid,autoconf_pwd);
+    status = manager.autoConnect(autoconf_ssid,autoconf_pwd);
     if (status == true) {
       connected = true;
       return;
@@ -596,7 +549,7 @@ void connect() { // should return status bool
 // PERSISTENCE
 //
 
-bool restoreDeviceInfo() {
+bool THiNX::restoreDeviceInfo() {
 
   File f = SPIFFS.open("/thinx.cfg", "r");
   if (!f) {
@@ -640,7 +593,7 @@ bool restoreDeviceInfo() {
 }
 
 /* Stores mutable device data (alias, owner) retrieved from API */
-void saveDeviceInfo()
+void THiNX::saveDeviceInfo()
 {
 
   //Serial.println("*TH: Opening/creating config file...");
@@ -673,7 +626,7 @@ void saveDeviceInfo()
   Serial.println("*TH: SPIFFS.end();");
 }
 
-String deviceInfo()
+String THiNX::deviceInfo()
 {
   //Serial.println("*TH: building device info:");
   JsonObject& root = jsonBuffer.createObject();
@@ -697,14 +650,4 @@ String deviceInfo()
   root.printTo(jsonString);
 
   return jsonString;
-}
-
-void loop()
-{
-  THiNX_initWithAPIKey(thinx_api_key); // moved to loop because of pubsub/spiffs crash possibility
-  delay(10000);
-  Serial.println(".");
-  if (thx_mqtt_client.connected()) {
-    thx_mqtt_client.publish(thinx_mqtt_channel().c_str(), thx_connected_response.c_str());
-  }
 }
