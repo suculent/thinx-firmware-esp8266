@@ -1,5 +1,5 @@
 projectKey=thinx-firmware-esp8266:thinx
 serverUrl=http://192.168.166.234:9000
 dashboardUrl=http://192.168.166.234:9000/dashboard/index/thinx-firmware-esp8266:thinx
-ceTaskId=AVyt2blj7o-tqXtTzhg7
-ceTaskUrl=http://192.168.166.234:9000/api/ce/task?id=AVyt2blj7o-tqXtTzhg7
+ceTaskId=AVyt4Og17o-tqXtTzhg-
+ceTaskUrl=http://192.168.166.234:9000/api/ce/task?id=AVyt4Og17o-tqXtTzhg-
