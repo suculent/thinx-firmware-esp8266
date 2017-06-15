@@ -1,31 +1,22 @@
 #include "thinx-lib-esp.h"
 
-// FIXME: Update to DNS record 'mqtt.thinx.cloud'
-IPAddress mqtt_server(207, 154, 230, 212);
-
 THiNX::THiNX() {
+  // We could init from SPIFFS directly but it is initially empty anyway
+  // and otherwise it could cause a lot of distraction.
 }
 
+// Just provide thinx_api_key from Thinx.h as input to following initializer:
 THiNX::THiNX(String __apikey) {
-
   thinx_api_key = __apikey;
-
   initWithAPIKey(thinx_api_key);
-
   autoconf_ssid  = "AP-THiNX"; // SSID in AP mode
   autoconf_pwd   = "PASSWORD"; // fallback to default password, however this should be generated uniquely as it is logged to console
-
   thx_udid[64] = {0};
-
   status = WL_IDLE_STATUS;
   shouldSaveConfig = false;
   connected = false;
   once = true;
 }
-
-///
-/// Low level library logic
-///
 
 // Designated initializer
 void THiNX::initWithAPIKey(String api_key) {
@@ -62,7 +53,7 @@ void THiNX::initWithAPIKey(String api_key) {
   checkin();
 
   delay(1000);
-    start_mqtt(); // requires valid udid and api_keys, and allocated WiFiClient.
+  start_mqtt(); // requires valid udid and api_keys, and allocated WiFiClient.
 
 #ifdef __DEBUG__
   // test == our tenant name from THINX platform
@@ -114,8 +105,6 @@ void THiNX::esp_update(String url) {
 
 /* Private library definitions */
 
-static const String thx_connected_response = "{ \"status\" : \"connected\" }";
-static const String thx_disconnected_response = "{ \"status\" : \"disconnected\" }";
 
 /* Private library method */
 
@@ -299,66 +288,6 @@ void THiNX::checkin() {
 
 /* Private library method */
 
-void THiNX::senddata(String body) {
-
-  char shorthost[256] = {0};
-  sprintf(shorthost, "%s", thinx_cloud_url.c_str());
-
-  // Response payload placeholder
-  String payload = "";
-
-  Serial.print("*TH: thx_api_key API KEY "); Serial.println(thx_api_key);
-
-  if (thx_wifi_client->connect(shorthost, 7442)) {
-
-    // Standard public THiNX-Client device registration request
-    // (same request can be called in order to add matching mobile application push token)
-    thx_wifi_client->println("POST /device/register HTTP/1.1");
-    thx_wifi_client->println("Host: thinx.cloud");
-    thx_wifi_client->print("Authentication: "); thx_wifi_client->println(thx_api_key);
-    thx_wifi_client->println("Accept: application/json"); // application/json
-    thx_wifi_client->println("Origin: device");
-    thx_wifi_client->println("Content-Type: application/json");
-    thx_wifi_client->println("User-Agent: THiNX-Client");
-    thx_wifi_client->print("Content-Length: ");
-    thx_wifi_client->println(body.length());
-    thx_wifi_client->println();
-    Serial.println("Headers set...");
-    thx_wifi_client->println(body);
-    Serial.println("Body sent...");
-
-    long interval = 2000;
-    unsigned long currentMillis = millis(), previousMillis = millis();
-
-    while(!thx_wifi_client->available()){
-      delay(1);
-      if( (currentMillis - previousMillis) > interval ){
-        Serial.println("Response Timeout. TODO: Should retry later.");
-        thx_wifi_client->stop();
-        return;
-      }
-      currentMillis = millis();
-    }
-
-    while ( thx_wifi_client->connected() ) {
-      delay(1);
-      if ( thx_wifi_client->available() ) {
-        char str = thx_wifi_client->read();
-        payload = payload + String(str);
-        delay(1);
-      }
-    }
-
-    thinx_parse(payload);
-
-  } else {
-    Serial.println("*TH: API connection failed.");
-    return;
-  }
-}
-
-/* Private library method */
-
 //
 // MQTT Connection
 //
@@ -383,8 +312,13 @@ void mqtt_callback(const MQTT::Publish& pub) {
 }
 
 void THiNX::start_mqtt() {
+
   Serial.print("*TH: Contacting MQTT server ");
   Serial.print(thinx_mqtt_url);
+
+  //PubSubClient mqtt_client(thx_wifi_client, thinx_mqtt_url.c_str());
+  //mqtt_client = client;
+
   Serial.print(" on port ");
   Serial.println(thinx_mqtt_port);
 
@@ -620,4 +554,64 @@ String THiNX::deviceInfo()
   root.printTo(jsonString);
 
   return jsonString;
+}
+
+// Private: HTTP Communication to API
+
+void THiNX::senddata(String body) {
+
+  char shorthost[256] = {0};
+  sprintf(shorthost, "%s", thinx_cloud_url.c_str());
+
+  // Response payload placeholder
+  String payload = "";
+
+  Serial.print("*TH: thx_api_key API KEY "); Serial.println(thx_api_key);
+
+  if (thx_wifi_client->connect(shorthost, 7442)) {
+
+    // Standard public THiNX-Client device registration request
+    // (same request can be called in order to add matching mobile application push token)
+    thx_wifi_client->println("POST /device/register HTTP/1.1");
+    thx_wifi_client->println("Host: thinx.cloud");
+    thx_wifi_client->print("Authentication: "); thx_wifi_client->println(thx_api_key);
+    thx_wifi_client->println("Accept: application/json"); // application/json
+    thx_wifi_client->println("Origin: device");
+    thx_wifi_client->println("Content-Type: application/json");
+    thx_wifi_client->println("User-Agent: THiNX-Client");
+    thx_wifi_client->print("Content-Length: ");
+    thx_wifi_client->println(body.length());
+    thx_wifi_client->println();
+    Serial.println("Headers set...");
+    thx_wifi_client->println(body);
+    Serial.println("Body sent...");
+
+    long interval = 2000;
+    unsigned long currentMillis = millis(), previousMillis = millis();
+
+    while(!thx_wifi_client->available()){
+      delay(1);
+      if( (currentMillis - previousMillis) > interval ){
+        Serial.println("Response Timeout. TODO: Should retry later.");
+        thx_wifi_client->stop();
+        return;
+      }
+      currentMillis = millis();
+    }
+
+    while ( thx_wifi_client->connected() ) {
+      delay(1);
+      if ( thx_wifi_client->available() ) {
+        char str = thx_wifi_client->read();
+        payload = payload + String(str);
+        delay(1);
+      }
+    }
+
+    thinx_parse(payload);
+
+  } else {
+    Serial.println("*TH: API connection failed.");
+    return;
+  }
 }

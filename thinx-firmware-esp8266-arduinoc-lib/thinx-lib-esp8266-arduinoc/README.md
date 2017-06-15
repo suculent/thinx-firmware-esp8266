@@ -1,4 +1,5 @@
 # THiNX Lib (ESP)
+
 An Arduino/ESP8266 library to wrap client for OTA updates and RTM (Remote Things Management) based on THiNX platform.
 
 # Useage
@@ -12,88 +13,32 @@ An Arduino/ESP8266 library to wrap client for OTA updates and RTM (Remote Things
 ## Definition
 ### THiNX Library
 
-The daemon started by library should not require any additional parameters except for optional target host:
+The singleton class started by library should not require any additional parameters except for optional API Key.
+Connects to WiFI and reports to main THiNX server; otherwise starts WiFI in AP mode (AP-THiNX with password PASSWORD by default)
+and awaits optionally new API Key (security hole? FIXME: In case the API Key is saved (and validated) do not allow change from AP mode!!!).
 
 * if not defined, defaults to thinx.cloud platform
-* either your local `thinx-device-api` instance or [currently non-existent at the time of this writing] `thinx-secure-gateway` which does not exist now, but is planned to provide HTTP to HTTPS bridging from local network to 
+* TODO: either your local `thinx-device-api` instance or [currently non-existent at the time of this writing] `thinx-secure-gateway` which does not exist now, but is planned to provide HTTP to HTTPS bridging from local network to
 
 ```c
-THiNX 
-THiNX THiNX(&Serial);
-```
+#include "Arduino.h"
+#include "Thinx.h"
+#include "./thinx-lib-esp8266-arduinoc/src/thinx-lib-esp.h"
+// #include "<thinx-lib-esp.h>" // one day
 
-### SoftwareSerial
+THiNX* thx = NULL;
 
-```c
-THiNX THiNX(10, 11); // RX, TX
-```
-
-or
-
-```c
-SoftwareSerial mySoftwareSerial(10, 11); //RX, TX
-THiNX THiNX(&mySoftwareSerial);
-```
-
-Be careful that not all pins support SofwareSerial.
-
-Please check or test whether using pins for SoftwareSerial work or not.
-
-[SoftwareSerial](https://www.arduino.cc/en/Reference/SoftwareSerial)
-
-[ArduinoProducts](https://www.arduino.cc/en/Main/Products)
-
-## Use like Serial
-
-```c
 void setup() {
-  THiNX.begin(115200);
+  Serial.begin(115200);
+  while (!Serial);
+  Serial.setDebugOutput(true);  
+  thx = new THiNX(thinx_api_key);
+  Serial.println("Setup completed.");
 }
 
-void loop() {
-  THiNX.println("Hello world!");
-  delay(1000);
+void loop()
+{
+  // do what you want to...
 }
+
 ```
-
-## As HardwareSerial
-
-```c
-if (THiNX->isHardwareSerial()) {
-  THiNX->println("It is HardwareSerial");
-  THiNX->_thisOTAServer->println("Direct print to HardwareSerial");
-
-}
-```
-
-## As SoftwareSerial
-
-```c
-if (THiNX->isSoftwareSerial()) {
-  THiNX->println("It is SoftwareSerial");
-  THiNX->thisSoftwareSerial->println("Direct print to SoftwareSerial");
-}
-```
-
-## As USBAPI Serial_
-
-```c
-if (THiNX->isSerial_()) {
-  THiNX->println("It is USBAPI Serial_");
-  THiNX->thisSerial_->println("Direct print to USBAPI Serial_");
-}
-```
-
-If you want to use code for multiple platform including any board that does not support Serial_, call `thisSerial_` between `#ifdef __USB_SERIAL_AVAILABLE__` and `#endif`.
-
-```c
-#ifdef __USB_SERIAL_AVAILABLE__
-  THiNX->thisSerial_->println("Direct print to USBAPI Serial_");
-#endif
-```
-
-# References
-- [HardwareSerial.h](https://github.com/arduino/Arduino/blob/master/hardware/arduino/avr/cores/arduino/HardwareSerial.h)
-- [SoftwareSerial.h](https://github.com/arduino/Arduino/blob/master/hardware/arduino/avr/libraries/SoftwareSerial/src/SoftwareSerial.h)
-- [USBAPI.h](https://github.com/arduino/Arduino/blob/2bfe164b9a5835e8cb6e194b928538a9093be333/hardware/arduino/avr/cores/arduino/USBAPI.h)
-- [SoftwareSeiral/keywords.txt](https://github.com/arduino/Arduino/blob/master/hardware/arduino/avr/libraries/SoftwareSerial/keywords.txt)

@@ -40,6 +40,9 @@
 
 #define MQTT_BUFFER_SIZE 512
 
+static const String thx_connected_response = "{ \"status\" : \"connected\" }";
+static const String thx_disconnected_response = "{ \"status\" : \"disconnected\" }";
+
 class THiNX {
 
   public:
@@ -50,10 +53,6 @@ class THiNX {
     // WiFi Client
     EAVManager *manager;
     EAVManagerParameter *api_key_param;
-
-    // MQTT Client
-    IPAddress mqtt_server;
-    PubSubClient *mqtt_client;
 
     // THiNX Client
     String thinx_alias;
@@ -69,6 +68,10 @@ class THiNX {
     int thinx_mqtt_port;
 
     void initWithAPIKey(String);
+
+    // MQTT
+
+    PubSubClient *mqtt_client;
 
     uint8_t buf[MQTT_BUFFER_SIZE];
 
@@ -115,13 +118,11 @@ class THiNX {
       void esp_update(String);
 
       // MQTT
+      int last_mqtt_reconnect;
+      void start_mqtt();
       String thinx_mqtt_channel();
       String thinx_mqtt_shared_channel();
       String thinx_mac();
-      int last_mqtt_reconnect;
-
-      void start_mqtt();
-
 
       // Data Storage
       bool shouldSaveConfig;
