@@ -4,7 +4,7 @@
 #define BUFFER_SIZE 512
 
 IPAddress mqtt_server(207, 154, 230, 212);
-PubSubClient thx_mqtt_client(thx_wifi_client, mqtt_server);
+//PubSubClient thx_mqtt_client(thx_wifi_client, mqtt_server);
 
 THiNX::THiNX() {
 }
@@ -488,7 +488,7 @@ void THiNX::configModeCallback (EAVManager *myEAVManager) {
 // `api_key_param` should have its value set when this gets called
 void THiNX::saveConfigCallback() {
   Serial.println("Save config callback:");
-  strcpy(thx_api_key, api_key_param.getValue());
+  strcpy(thx_api_key, api_key_param->getValue());
   if (String(thx_api_key).length() > 0) {
     thinx_api_key = String(thx_api_key);
     Serial.print("Saving thinx_api_key: ");
@@ -508,13 +508,14 @@ void THiNX::saveConfigCallback() {
 void THiNX::connect() { // should return status bool
 
 #ifdef __USE_WIFI_MANAGER__
-  EAVManagerParameter api_key_param("apikey", "API Key", thx_api_key, 64);
-  manager.addParameter(&api_key_param);
+  EAVManagerParameter *api_key_param = new EAVManagerParameter("apikey", "API Key", thx_api_key, 64);
+  //EAVManagerParameter api_key_param("apikey", "API Key", thx_api_key, 64);
+  manager->addParameter(api_key_param);
 
   // TODO: FIXME: Does not work!
   //manager.setAPCallback(configModeCallback);
-  manager.setTimeout(10000);
-  manager.autoConnect(autoconf_ssid,autoconf_pwd);
+  manager->setTimeout(10000);
+  manager->autoConnect(autoconf_ssid,autoconf_pwd);
 #else
   status = WiFi.begin(ssid, pass);
 #endif
@@ -522,7 +523,7 @@ void THiNX::connect() { // should return status bool
   // attempt to connect to Wifi network:
   while ( !connected ) {
     #ifdef __USE_WIFI_MANAGER__
-    status = manager.autoConnect(autoconf_ssid,autoconf_pwd);
+    status = manager->autoConnect(autoconf_ssid,autoconf_pwd);
     if (status == true) {
       connected = true;
       return;

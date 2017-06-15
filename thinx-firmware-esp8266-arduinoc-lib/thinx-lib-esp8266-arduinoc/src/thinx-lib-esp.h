@@ -45,8 +45,8 @@
 
 WiFiClient thx_wifi_client;
 
-char thx_api_key[64];
-char thx_udid[64];
+//char thx_api_key[64];
+//char thx_udid[64];
 
 class THiNX {
   public:
@@ -67,12 +67,12 @@ class THiNX {
 
     void initWithAPIKey(String);
 
-    EAVManager manager;
+    EAVManager *manager;
+    EAVManagerParameter *api_key_param;
     IPAddress mqtt_server;
 
-    friend class EAVManager;
+    PubSubClient *thx_mqtt_client;
 
-    //EAVManagerParameter api_key_param; //(const char*, const char*, const char*, int, const char*);
     //friend class PubSubClient;
 
     private:
