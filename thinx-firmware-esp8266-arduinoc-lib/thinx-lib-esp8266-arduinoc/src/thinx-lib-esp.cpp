@@ -1,12 +1,9 @@
 #include "thinx-lib-esp.h"
 
-#define MQTT_BUFFER_SIZE 512
-
 // FIXME: Update to DNS record 'mqtt.thinx.cloud'
 IPAddress mqtt_server(207, 154, 230, 212);
 
 THiNX::THiNX() {
-
 }
 
 THiNX::THiNX(String __apikey) {
@@ -65,7 +62,7 @@ void THiNX::initWithAPIKey(String api_key) {
   checkin();
 
   delay(1000);
-  start_mqtt(thx_wifi_client); // requires valid udid and api_keys
+    start_mqtt(); // requires valid udid and api_keys, and allocated WiFiClient.
 
 #ifdef __DEBUG__
   // test == our tenant name from THINX platform
@@ -312,41 +309,41 @@ void THiNX::senddata(String body) {
 
   Serial.print("*TH: thx_api_key API KEY "); Serial.println(thx_api_key);
 
-  if (thx_wifi_client.connect(shorthost, 7442)) {
+  if (thx_wifi_client->connect(shorthost, 7442)) {
 
     // Standard public THiNX-Client device registration request
     // (same request can be called in order to add matching mobile application push token)
-    thx_wifi_client.println("POST /device/register HTTP/1.1");
-    thx_wifi_client.println("Host: thinx.cloud");
-    thx_wifi_client.print("Authentication: "); thx_wifi_client.println(thx_api_key);
-    thx_wifi_client.println("Accept: application/json"); // application/json
-    thx_wifi_client.println("Origin: device");
-    thx_wifi_client.println("Content-Type: application/json");
-    thx_wifi_client.println("User-Agent: THiNX-Client");
-    thx_wifi_client.print("Content-Length: ");
-    thx_wifi_client.println(body.length());
-    thx_wifi_client.println();
+    thx_wifi_client->println("POST /device/register HTTP/1.1");
+    thx_wifi_client->println("Host: thinx.cloud");
+    thx_wifi_client->print("Authentication: "); thx_wifi_client->println(thx_api_key);
+    thx_wifi_client->println("Accept: application/json"); // application/json
+    thx_wifi_client->println("Origin: device");
+    thx_wifi_client->println("Content-Type: application/json");
+    thx_wifi_client->println("User-Agent: THiNX-Client");
+    thx_wifi_client->print("Content-Length: ");
+    thx_wifi_client->println(body.length());
+    thx_wifi_client->println();
     Serial.println("Headers set...");
-    thx_wifi_client.println(body);
+    thx_wifi_client->println(body);
     Serial.println("Body sent...");
 
     long interval = 2000;
     unsigned long currentMillis = millis(), previousMillis = millis();
 
-    while(!thx_wifi_client.available()){
+    while(!thx_wifi_client->available()){
       delay(1);
       if( (currentMillis - previousMillis) > interval ){
         Serial.println("Response Timeout. TODO: Should retry later.");
-        thx_wifi_client.stop();
+        thx_wifi_client->stop();
         return;
       }
       currentMillis = millis();
     }
 
-    while ( thx_wifi_client.connected() ) {
+    while ( thx_wifi_client->connected() ) {
       delay(1);
-      if ( thx_wifi_client.available() ) {
-        char str = thx_wifi_client.read();
+      if ( thx_wifi_client->available() ) {
+        char str = thx_wifi_client->read();
         payload = payload + String(str);
         delay(1);
       }
@@ -385,7 +382,7 @@ void mqtt_callback(const MQTT::Publish& pub) {
   }
 }
 
-bool THiNX::start_mqtt(WiFiClient thx_wifi_client) {
+void THiNX::start_mqtt() {
   Serial.print("*TH: Contacting MQTT server ");
   Serial.print(thinx_mqtt_url);
   Serial.print(" on port ");
@@ -417,10 +414,14 @@ bool THiNX::start_mqtt(WiFiClient thx_wifi_client) {
   // FIXME: willTopic, willQos, willRetain, thx_disconnected_response.c_str()
 
   if (mqtt_client->connect(MQTT::Connect(id).set_auth(user, pass))) {
-    mqtt_client->set_callback(mqtt_callback);
+
+    mqtt_client->set_callback([this](const MQTT::Publish &pub) {
+      this->mqtt_callback(pub);
+    });
+
     Serial.println("*TH: MQTT Subscribing shared channel...");
     if (mqtt_client->subscribe(thinx_mqtt_shared_channel().c_str())) {
-      Serial.print("*TH: ");
+      Serial.print("*TH: MQTT channel ");
       Serial.print(channel);
       Serial.println(" successfully subscribed.");
     } else {
@@ -473,6 +474,8 @@ void THiNX::saveConfigCallback() {
 //
 
 void THiNX::connect() { // should return status bool
+  thx_wifi_client = new WiFiClient();
+
 
 #ifdef __USE_WIFI_MANAGER__
   EAVManagerParameter *api_key_param = new EAVManagerParameter("apikey", "API Key", thx_api_key, 64);

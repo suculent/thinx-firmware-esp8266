@@ -1,6 +1,3 @@
-#ifndef THiNX_H
-#define THiNX_H
-
 #include <Arduino.h>
 #define __DEBUG__
 #define __DEBUG_JSON__
@@ -41,7 +38,7 @@
 #include <ESP8266HTTPClient.h>
 #include <ESP8266httpUpdate.h>
 
-WiFiClient thx_wifi_client;
+#define MQTT_BUFFER_SIZE 512
 
 class THiNX {
 
@@ -73,9 +70,31 @@ class THiNX {
 
     void initWithAPIKey(String);
 
+    uint8_t buf[MQTT_BUFFER_SIZE];
+
+    inline void mqtt_callback(const MQTT::Publish& pub) {
+      if (pub.has_stream()) {
+        Serial.print(pub.topic());
+        Serial.print(" => ");
+        if (pub.has_stream()) {
+
+          int read;
+          while (read = pub.payload_stream()->read(buf, MQTT_BUFFER_SIZE)) {
+            // Do something with data in buffer
+            Serial.write(buf, read);
+          }
+          pub.payload_stream()->stop();
+          Serial.println("");
+        } else {
+          Serial.println(pub.payload_string());
+        }
+      }
+    }
+
     private:
 
       // WiFi Manager
+      WiFiClient *thx_wifi_client;
       const char* autoconf_ssid; // SSID in AP mode
       const char* autoconf_pwd; // fallback password, logged to console
       int status;                 // global WiFi status
@@ -101,8 +120,8 @@ class THiNX {
       String thinx_mac();
       int last_mqtt_reconnect;
 
-      bool start_mqtt(WiFiClient);
-      void mqtt_callback(const MQTT::Publish&);
+      void start_mqtt();
+
 
       // Data Storage
       bool shouldSaveConfig;
@@ -111,5 +130,3 @@ class THiNX {
       void saveDeviceInfo();
       String deviceInfo();
 };
-
-#endif
