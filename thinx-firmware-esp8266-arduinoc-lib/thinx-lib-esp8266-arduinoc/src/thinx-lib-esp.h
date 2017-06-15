@@ -5,8 +5,6 @@
 #define __DEBUG__
 #define __DEBUG_JSON__
 
-#define __DEBUG_WIFI__ /* use as fallback when device gets stucked with incorrect WiFi configuration */
-
 #define __USE_WIFI_MANAGER__
 
 #include <stdio.h>
@@ -45,14 +43,22 @@
 
 WiFiClient thx_wifi_client;
 
-//char thx_api_key[64];
-//char thx_udid[64];
-
 class THiNX {
+
   public:
+
     THiNX(String);
     THiNX();
 
+    // WiFi Client
+    EAVManager *manager;
+    EAVManagerParameter *api_key_param;
+
+    // MQTT Client
+    IPAddress mqtt_server;
+    PubSubClient *mqtt_client;
+
+    // THiNX Client
     String thinx_alias;
     String thinx_owner;
     String thinx_api_key;
@@ -67,48 +73,40 @@ class THiNX {
 
     void initWithAPIKey(String);
 
-    EAVManager *manager;
-    EAVManagerParameter *api_key_param;
-    IPAddress mqtt_server;
-
-    PubSubClient *thx_mqtt_client;
-
-    //friend class PubSubClient;
-
     private:
 
+      // WiFi Manager
       const char* autoconf_ssid; // SSID in AP mode
-      const char* autoconf_pwd; // fallback to default password, however this should be generated uniquely as it is logged to console
-
-      // Requires API v126+
-
-
-      // WiFiClient is required by PubSubClient and HTTP POST
-
-      int status;
-
-      int last_mqtt_reconnect;
-
-      bool shouldSaveConfig;
-      bool connected;
-
+      const char* autoconf_pwd; // fallback password, logged to console
+      int status;                 // global WiFi status
       bool once;
-
-      StaticJsonBuffer<1024> jsonBuffer;
-
+      bool connected;
       void configModeCallback(EAVManager*);
       void saveConfigCallback();
-      void esp_update(String);
+
+      // THiNX API
+      char thx_api_key[64];     // new firmware requires 64 bytes
+      char thx_udid[64];        // new firmware requires 64 bytes
+      StaticJsonBuffer<1024> jsonBuffer;
+
+      void checkin();
+      void senddata(String);
       void thinx_parse(String);
+      void connect();
+      void esp_update(String);
+
+      // MQTT
       String thinx_mqtt_channel();
       String thinx_mqtt_shared_channel();
       String thinx_mac();
-      void checkin();
-      void senddata(String);
-      void mqtt_callback(const MQTT::Publish&);
+      int last_mqtt_reconnect;
+
       bool start_mqtt(WiFiClient);
-      void thinx_mqtt_callback(char*, byte*, unsigned int);
-      void connect();
+      void mqtt_callback(const MQTT::Publish&);
+
+      // Data Storage
+      bool shouldSaveConfig;
+
       bool restoreDeviceInfo();
       void saveDeviceInfo();
       String deviceInfo();

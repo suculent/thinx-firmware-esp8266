@@ -1,12 +1,12 @@
 #include "thinx-lib-esp.h"
 
-// FIXME: Update to DNS record 'mqtt.thinx.cloud'
-#define BUFFER_SIZE 512
+#define MQTT_BUFFER_SIZE 512
 
+// FIXME: Update to DNS record 'mqtt.thinx.cloud'
 IPAddress mqtt_server(207, 154, 230, 212);
-//PubSubClient thx_mqtt_client(thx_wifi_client, mqtt_server);
 
 THiNX::THiNX() {
+
 }
 
 THiNX::THiNX(String __apikey) {
@@ -366,29 +366,22 @@ void THiNX::senddata(String body) {
 // MQTT Connection
 //
 
-void THiNX::mqtt_callback(const MQTT::Publish& pub) {
-  Serial.print(pub.topic());
-  Serial.print(" => ");
+void mqtt_callback(const MQTT::Publish& pub) {
   if (pub.has_stream()) {
-    uint8_t buf[BUFFER_SIZE];
-    int read;
-    while (read = pub.payload_stream()->read(buf, BUFFER_SIZE)) {
-      Serial.write(buf, read);
+    Serial.print(pub.topic());
+    Serial.print(" => ");
+    if (pub.has_stream()) {
+      uint8_t buf[MQTT_BUFFER_SIZE];
+      int read;
+      while (read = pub.payload_stream()->read(buf, MQTT_BUFFER_SIZE)) {
+        // Do something with data in buffer
+        Serial.write(buf, read);
+      }
+      pub.payload_stream()->stop();
+      Serial.println("");
+    } else {
+      Serial.println(pub.payload_string());
     }
-    pub.payload_stream()->stop();
-    Serial.println("");
-  } else
-    Serial.println(pub.payload_string());
-}
-
-void recv_payload(const MQTT::Publish& pub) {
-  if (pub.has_stream()) {
-    uint8_t buffer[64];
-    int read;
-    while (read = pub.payload_stream()->read(buffer, 64)) {
-      // Do something with data in buffer
-    }
-    pub.payload_stream()->stop();
   }
 }
 
@@ -419,66 +412,39 @@ bool THiNX::start_mqtt(WiFiClient thx_wifi_client) {
   int willQos = 0;
   bool willRetain = false;
 
-  //if ( thx_mqtt_client.connect( id, user, pass, willTopic, willQos, willRetain, thx_disconnected_response.c_str() ) ) {
+  // TODO: Reimplement
+  // if (thx.mqtt_client->connect( id, user, pass, willTopic, willQos, willRetain, thx_disconnected_response.c_str()))
+  // FIXME: willTopic, willQos, willRetain, thx_disconnected_response.c_str()
 
-  if (thx_mqtt_client.connect(MQTT::Connect(id).set_auth(user, pass))) {
-
-    //thx_mqtt_client.set_callback(mqtt_callback);
-    thx_mqtt_client.set_callback(recv_payload);
-
+  if (mqtt_client->connect(MQTT::Connect(id).set_auth(user, pass))) {
+    mqtt_client->set_callback(mqtt_callback);
     Serial.println("*TH: MQTT Subscribing shared channel...");
-
-    if (thx_mqtt_client.subscribe(thinx_mqtt_shared_channel().c_str())) {
+    if (mqtt_client->subscribe(thinx_mqtt_shared_channel().c_str())) {
       Serial.print("*TH: ");
       Serial.print(channel);
       Serial.println(" successfully subscribed.");
     } else {
       Serial.println("*TH: Not subscribed.");
     }
-
     Serial.println("*TH: MQTT Subscribing device channel...");
-
-    if (thx_mqtt_client.subscribe(thinx_mqtt_channel().c_str())) {
+    if (mqtt_client->subscribe(thinx_mqtt_channel().c_str())) {
       Serial.print("*TH: ");
       Serial.print(channel);
       Serial.println(" successfully subscribed.");
     } else {
       Serial.println("*TH: Not subscribed.");
     }
-    thx_mqtt_client.publish(channel.c_str(), thx_connected_response.c_str());
+    mqtt_client->publish(channel.c_str(), thx_connected_response.c_str());
   } else {
     Serial.println("*TH: MQTT Not connected.");
   }
 }
 
-/* Private library method */
-
-void ICACHE_FLASH_ATTR THiNX::thinx_mqtt_callback(char* topic, byte* payload, unsigned int length) {
-
-  Serial.println("*TH: MQTT Callback:");
-
-  char c_payload[length];
-  memcpy(c_payload, payload, length);
-  c_payload[length] = '\0';
-
-  String s_topic = String(topic);
-  String s_payload = String(c_payload);
-
-  Serial.println(topic);
-  Serial.println(c_payload);
-
-  if ( s_topic == thinx_mqtt_channel() ) {
-    Serial.println("*TH: NOT Parsing MQTT response.");
-    thinx_parse(s_payload);
-  }
-}
-
-/* Optional methods */
-
 //
 // EAVManager Setup Callbacks
 //
 
+// ICACHE_FLASH_ATTR
 void THiNX::configModeCallback (EAVManager *myEAVManager) {
   Serial.println("Entered config mode");
   Serial.println(WiFi.softAPIP());
@@ -486,6 +452,7 @@ void THiNX::configModeCallback (EAVManager *myEAVManager) {
 }
 
 // `api_key_param` should have its value set when this gets called
+// ICACHE_FLASH_ATTR
 void THiNX::saveConfigCallback() {
   Serial.println("Save config callback:");
   strcpy(thx_api_key, api_key_param->getValue());
@@ -509,7 +476,6 @@ void THiNX::connect() { // should return status bool
 
 #ifdef __USE_WIFI_MANAGER__
   EAVManagerParameter *api_key_param = new EAVManagerParameter("apikey", "API Key", thx_api_key, 64);
-  //EAVManagerParameter api_key_param("apikey", "API Key", thx_api_key, 64);
   manager->addParameter(api_key_param);
 
   // TODO: FIXME: Does not work!

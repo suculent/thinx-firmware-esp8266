@@ -1,7 +1,5 @@
 /*
- PubSubClient.cpp - A simple client for MQTT.
-  Nicholas O'Leary
-  http://knolleary.net
+ https://github.com/Imroy/pubsubclient
 */
 
 #include "PubSubClient.h"
@@ -151,7 +149,7 @@ bool PubSubClient::_wait_for(MQTT::message_type match_type, uint16_t match_pid) 
       if(match_type == MQTT::SUBACK && isSubAckFound){
         isSubAckFound = false;
         // Return false will cause a resend of a SUBSCRIBE message (and so a new chance to get a SUBACK)
-        return false; 
+        return false;
       }
 
       delete msg;

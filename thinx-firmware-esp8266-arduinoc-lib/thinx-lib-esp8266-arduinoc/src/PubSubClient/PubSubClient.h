@@ -1,7 +1,5 @@
 /*
- PubSubClient.h - A simple client for MQTT.
-  Nicholas O'Leary
-  http://knolleary.net
+ https://github.com/Imroy/pubsubclient
 */
 
 #ifndef PubSubClient_h
