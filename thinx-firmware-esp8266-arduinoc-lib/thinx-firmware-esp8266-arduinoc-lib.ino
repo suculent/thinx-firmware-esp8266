@@ -30,5 +30,5 @@ void loop()
   delay(10000);
   Serial.println(".");
 
-  thx->publish(); // publishes default welcome message, implement parameter!
+  //§-     tzkáá¨ikthx->publish(); // publishes default welcome message, implement parameter!
 }
