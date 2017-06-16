@@ -30,7 +30,5 @@ void loop()
   delay(10000);
   Serial.println(".");
 
-  if (thx->mqtt_client->connected()) {
-    thx->mqtt_client->publish(thx->thinx_mqtt_channel().c_str(), thx->thx_connected_response.c_str());
-  }
+  thx->publish(); // publishes default welcome message, implement parameter!
 }

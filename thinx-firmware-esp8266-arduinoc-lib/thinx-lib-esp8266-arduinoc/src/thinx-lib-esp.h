@@ -45,6 +45,7 @@ class THiNX {
   public:
 
     String thx_connected_response = "{ \"status\" : \"connected\" }";
+
     String thx_disconnected_response = "{ \"status\" : \"disconnected\" }";
 
     THiNX(String);
@@ -68,6 +69,7 @@ class THiNX {
     int thinx_mqtt_port;
 
     void initWithAPIKey(String);
+    void publish();
 
     // MQTT
 

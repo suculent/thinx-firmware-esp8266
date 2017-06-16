@@ -1,5 +1,7 @@
 #include "thinx-lib-esp.h"
 
+//#include "../../Thinx.h"
+
 THiNX::THiNX() {
   // We could init from SPIFFS directly but it is initially empty anyway
   // and otherwise it could cause a lot of distraction.
@@ -258,6 +260,24 @@ void THiNX::checkin() {
   };
 
   Serial.println("*TH: Building JSON...");
+
+  String tmac = thinx_mac();
+  Serial.println(tmac);
+
+  String fw = thinx_firmware_version;
+  Serial.println(fw);
+
+  String fws = thinx_firmware_version_short;
+  Serial.println(fws);
+
+  String cid = thinx_commit_id;
+  Serial.println(cid);
+
+  String oid = thinx_owner;
+  Serial.println(oid);
+
+  String als = thinx_alias;
+  Serial.println(thinx_alias);
 
   JsonObject& root = jsonBuffer.createObject();
   root["mac"] = thinx_mac();
@@ -613,5 +633,15 @@ void THiNX::senddata(String body) {
   } else {
     Serial.println("*TH: API connection failed.");
     return;
+  }
+}
+
+void THiNX::publish() {
+  String channel = thinx_mqtt_channel();
+  String message = thx_connected_response;
+  if (mqtt_client->connected()) {
+    mqtt_client->publish(channel.c_str(), message.c_str());
+  } else {
+    Serial.println("*TH: MQTT not connected, publish failed.");
   }
 }
