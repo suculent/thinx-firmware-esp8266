@@ -40,12 +40,12 @@
 
 #define MQTT_BUFFER_SIZE 512
 
-static const String thx_connected_response = "{ \"status\" : \"connected\" }";
-static const String thx_disconnected_response = "{ \"status\" : \"disconnected\" }";
-
 class THiNX {
 
   public:
+
+    String thx_connected_response = "{ \"status\" : \"connected\" }";
+    String thx_disconnected_response = "{ \"status\" : \"disconnected\" }";
 
     THiNX(String);
     THiNX();
@@ -94,6 +94,8 @@ class THiNX {
       }
     }
 
+    String thinx_mqtt_channel();
+
     private:
 
       // WiFi Manager
@@ -120,7 +122,7 @@ class THiNX {
       // MQTT
       int last_mqtt_reconnect;
       void start_mqtt();
-      String thinx_mqtt_channel();
+
       String thinx_mqtt_shared_channel();
       String thinx_mac();
 

@@ -15,7 +15,7 @@ void setup() {
   Serial.setDebugOutput(true);
 
 #ifdef __DEBUG_WIFI__
-  WiFi.begin("page42.showflake.czf", "quarantine");
+  WiFi.begin("HAVANA", "1234567890");
 #endif
 
   Serial.println("Setup completed.");
@@ -30,7 +30,7 @@ void loop()
   delay(10000);
   Serial.println(".");
 
-  //if (thx.mqtt_client.connected()) {
-  //  thx.mqtt_client.publish(thinx_mqtt_channel().c_str(), thx_connected_response.c_str());
-  //}
+  if (thx->mqtt_client->connected()) {
+    thx->mqtt_client->publish(thx->thinx_mqtt_channel().c_str(), thx->thx_connected_response.c_str());
+  }
 }

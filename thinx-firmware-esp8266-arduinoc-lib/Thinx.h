@@ -13,7 +13,7 @@ static const String thinx_firmware_version = "thinx-firmware-esp8266-1.6.82:2017
 String thinx_alias = "esp8266-rabbit-dev"; // device alias
 String thinx_api_key = "88eb20839c1d8bf43819818b75a25cef3244c28e77817386b7b73b043193cef4"; // may change when test environment gets destroyed
 String thinx_owner = "eaabae0d5165c5db4c46c3cb6f062938802f58d9b88a1b46ed69421809f0bf7f"; // default test owner
-String thinx_udid = NULL; // will be assigned by server
+String thinx_udid = ""; // will be assigned by server; must be validated throughout the code (server side must accept empty string as if there was no uuid given)
 
 int thinx_mqtt_port = 1883; // default MQTT port for devices, where HTTPS security is not expected
 int thinx_api_port = 7442; // default API port for devices where SSL is not supported
