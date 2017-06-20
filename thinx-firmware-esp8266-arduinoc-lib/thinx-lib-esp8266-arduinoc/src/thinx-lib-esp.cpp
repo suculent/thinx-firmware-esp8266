@@ -18,6 +18,8 @@ THiNX::THiNX(String __apikey) {
   shouldSaveConfig = false;
   connected = false;
   once = true;
+
+  initWithAPIKey(thinx_api_key);
 }
 
 // Designated initializer
@@ -313,6 +315,7 @@ void THiNX::checkin() {
 //
 
 void mqtt_callback(const MQTT::Publish& pub) {
+  Serial.println("*TH: MQTT callback...");
   if (pub.has_stream()) {
     Serial.print(pub.topic());
     Serial.print(" => ");
@@ -324,7 +327,7 @@ void mqtt_callback(const MQTT::Publish& pub) {
         Serial.write(buf, read);
       }
       pub.payload_stream()->stop();
-      Serial.println("");
+      Serial.println("stop.");
     } else {
       Serial.println(pub.payload_string());
     }
@@ -337,7 +340,7 @@ void THiNX::start_mqtt() {
   Serial.print(thinx_mqtt_url);
 
   //PubSubClient mqtt_client(thx_wifi_client, thinx_mqtt_url.c_str());
-  //mqtt_client = client;
+  new PubSubClient(*THiNX::mqtt_client);
 
   Serial.print(" on port ");
   Serial.println(thinx_mqtt_port);
@@ -445,7 +448,7 @@ void THiNX::connect() { // should return status bool
 
   // attempt to connect to Wifi network:
   while ( !connected ) {
-    #ifdef __USE_WIFI_MANAGER__
+#ifdef __USE_WIFI_MANAGER__
     status = manager->autoConnect(autoconf_ssid,autoconf_pwd);
     if (status == true) {
       connected = true;
@@ -455,7 +458,7 @@ void THiNX::connect() { // should return status bool
       delay(3000);
       connected = false;
     }
-    #else
+#else
     Serial.print("*TH: Connecting to SSID: ");
     Serial.print(ssid);
     Serial.print("*TH: Waiting for WiFi. Status: ");
@@ -465,7 +468,7 @@ void THiNX::connect() { // should return status bool
     if (status == WL_CONNECTED) {
       connected = true;
     }
-    #endif
+#endif
   }
 }
 
@@ -640,7 +643,9 @@ void THiNX::publish() {
   String channel = thinx_mqtt_channel();
   String message = thx_connected_response;
   if (mqtt_client->connected()) {
-    mqtt_client->publish(channel.c_str(), message.c_str());
+    // causes crash...
+    //mqtt_client->publish(channel.c_str(), message.c_str());
+    Serial.println("*TH: MQTT connected, publish skipped.");
   } else {
     Serial.println("*TH: MQTT not connected, publish failed.");
   }

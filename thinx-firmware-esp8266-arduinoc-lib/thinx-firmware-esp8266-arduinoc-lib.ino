@@ -12,23 +12,21 @@ THiNX* thx = NULL;
 void setup() {
   Serial.begin(115200);
   while (!Serial);
+
   Serial.setDebugOutput(true);
 
 #ifdef __DEBUG_WIFI__
   WiFi.begin("HAVANA", "1234567890");
 #endif
 
-  Serial.println("Setup completed.");
+  thx = new THiNX(thinx_api_key); // why do we have to call it all over? MQTT callback?
+
+  //Serial.println("Setup completed.");
 }
 
 void loop()
 {
-  if (thx == NULL) {
-    thx = new THiNX(thinx_api_key); // why do we have to call it all over? MQTT callback?
-  }
-
   delay(10000);
   Serial.println(".");
-
-  //§-     tzkáá¨ikthx->publish(); // publishes default welcome message, implement parameter!
+  //
 }

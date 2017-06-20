@@ -14,7 +14,7 @@ THINX_MQTT_URL="${THINX_CLOUD_URL}" # mqtt://?
 
 REPO_NAME='thinx-firmware-esp8266'
 VERSION=$(git rev-list HEAD --count)
-REPO_VERSION="1.3.${VERSION}"
+REPO_VERSION="1.6.${VERSION}"
 BUILD_DATE=`date +%Y-%m-%d`
 
 echo "//" > $THINX_FILE
@@ -31,7 +31,7 @@ echo "static const String thinx_firmware_version_short = \"${REPO_VERSION}\";" >
 echo "String thinx_owner = \"${THINX_OWNER}\";" >> $THINX_FILE
 echo "String thinx_alias = \"${THINX_ALIAS}\";" >> $THINX_FILE
 echo "String thinx_api_key = \"VANILLA_API_KEY\";" >> $THINX_FILE
-echo "String thinx_udid = \"unique-device-identifier\";" >> $THINX_FILE
+echo "String thinx_udid = \"\";" >> $THINX_FILE
 
 echo "" >> $THINX_FILE
 

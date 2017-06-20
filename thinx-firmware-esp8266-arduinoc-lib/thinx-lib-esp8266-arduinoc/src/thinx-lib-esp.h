@@ -69,9 +69,8 @@ class THiNX {
     int thinx_mqtt_port;
 
     void initWithAPIKey(String);
-    void publish(
-      
-    );
+
+    void publish();
 
     // MQTT
 
