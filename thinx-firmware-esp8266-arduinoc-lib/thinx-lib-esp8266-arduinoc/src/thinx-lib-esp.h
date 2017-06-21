@@ -93,8 +93,8 @@ class THiNX {
       Serial.setDebugOutput(true);
       if (ESP.updateSketch(*pub.payload_stream(), size, true, false)) {
         Serial.println("Clearing retained message.");
-        THiNX::mqtt_client.publish(MQTT::Publish(pub.topic(), "").set_retain());
-        THiNX::mqtt_client.disconnect();
+        THiNX::mqtt_client->publish(MQTT::Publish(pub.topic(), "").set_retain());
+        THiNX::mqtt_client->disconnect();
 
         Serial.printf("Update Success: %u\nRebooting...\n", millis() - startTime);
         ESP.restart();
