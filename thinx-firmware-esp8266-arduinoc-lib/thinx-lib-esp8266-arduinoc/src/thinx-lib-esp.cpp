@@ -74,6 +74,20 @@ void THiNX::esp_update(String url) {
   Serial.println("[update] Starting update...");
 #endif
 
+// #define __USE_ESP__
+#ifdef __USE_ESP__
+  uint32_t size = pub.payload_len();
+  if (ESP.updateSketch(*pub.payload_stream(), size, true, false)) {
+    Serial.println("Clearing retained message.");
+    THiNX::mqtt_client->publish(MQTT::Publish(pub.topic(), "").set_retain());
+    THiNX::mqtt_client->disconnect();
+
+    Serial.printf("Update Success: %u\nRebooting...\n", millis() - startTime);
+    ESP.restart();
+    delay(10000);
+  }
+#else
+
   t_httpUpdate_return ret = ESPhttpUpdate.update("thinx.cloud", 80, url.c_str());
 
   switch(ret) {
@@ -105,6 +119,9 @@ void THiNX::esp_update(String url) {
       break;
     }
   }
+
+#endif
+
 }
 
 /* Private library definitions */
@@ -632,6 +649,7 @@ void THiNX::publish() {
 }
 
 void THiNX::loop() {
+  Serial.println(".");
   if (mqtt_client->connected()) {
     // causes crash...
     //mqtt_client->publish(channel.c_str(), message.c_str());

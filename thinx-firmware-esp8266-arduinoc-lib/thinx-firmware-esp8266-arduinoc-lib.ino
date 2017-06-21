@@ -27,7 +27,6 @@ void setup() {
 
 void loop()
 {
-  delay(10000);
-  Serial.println(".");
+  delay(10000);  
   thx->loop(); // check MQTT status, reconnect, etc.
 }
