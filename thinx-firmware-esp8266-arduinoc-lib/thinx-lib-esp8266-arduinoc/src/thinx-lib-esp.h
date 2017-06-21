@@ -44,8 +44,13 @@ class THiNX {
 
   public:
 
-    String thx_connected_response = "{ \"status\" : \"connected\" }";
+    // Public API
+    void initWithAPIKey(String);
+    void publish();
+    void loop();
 
+    // Internal public API
+    String thx_connected_response = "{ \"status\" : \"connected\" }";
     String thx_disconnected_response = "{ \"status\" : \"disconnected\" }";
 
     THiNX(String);
@@ -68,29 +73,52 @@ class THiNX {
     String thinx_mqtt_url;
     int thinx_mqtt_port;
 
-    void initWithAPIKey(String);
-
-    void publish();
-
     // MQTT
 
     PubSubClient *mqtt_client;
 
     uint8_t buf[MQTT_BUFFER_SIZE];
 
+    void receive_ota(const MQTT::Publish& pub) {
+      Serial.println("*TH: MQTT update...");
+      uint32_t startTime = millis();
+      uint32_t size = pub.payload_len();
+      if (size == 0)
+        return;
+
+      Serial.print("Receiving OTA of ");
+      Serial.print(size);
+      Serial.println(" bytes...");
+
+      Serial.setDebugOutput(true);
+      if (ESP.updateSketch(*pub.payload_stream(), size, true, false)) {
+        Serial.println("Clearing retained message.");
+        THiNX::mqtt_client.publish(MQTT::Publish(pub.topic(), "").set_retain());
+        THiNX::mqtt_client.disconnect();
+
+        Serial.printf("Update Success: %u\nRebooting...\n", millis() - startTime);
+        ESP.restart();
+        delay(10000);
+      }
+
+      Update.printError(Serial);
+      Serial.setDebugOutput(false);
+    }
+
     inline void mqtt_callback(const MQTT::Publish& pub) {
+      Serial.println("*TH: MQTT callback...");
       if (pub.has_stream()) {
         Serial.print(pub.topic());
         Serial.print(" => ");
         if (pub.has_stream()) {
-
+          uint8_t buf[MQTT_BUFFER_SIZE];
           int read;
           while (read = pub.payload_stream()->read(buf, MQTT_BUFFER_SIZE)) {
             // Do something with data in buffer
             Serial.write(buf, read);
           }
           pub.payload_stream()->stop();
-          Serial.println("");
+          Serial.println("stop.");
         } else {
           Serial.println(pub.payload_string());
         }

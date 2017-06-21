@@ -314,26 +314,6 @@ void THiNX::checkin() {
 // MQTT Connection
 //
 
-void mqtt_callback(const MQTT::Publish& pub) {
-  Serial.println("*TH: MQTT callback...");
-  if (pub.has_stream()) {
-    Serial.print(pub.topic());
-    Serial.print(" => ");
-    if (pub.has_stream()) {
-      uint8_t buf[MQTT_BUFFER_SIZE];
-      int read;
-      while (read = pub.payload_stream()->read(buf, MQTT_BUFFER_SIZE)) {
-        // Do something with data in buffer
-        Serial.write(buf, read);
-      }
-      pub.payload_stream()->stop();
-      Serial.println("stop.");
-    } else {
-      Serial.println(pub.payload_string());
-    }
-  }
-}
-
 void THiNX::start_mqtt() {
 
   Serial.print("*TH: Contacting MQTT server ");
@@ -648,5 +628,15 @@ void THiNX::publish() {
     Serial.println("*TH: MQTT connected, publish skipped.");
   } else {
     Serial.println("*TH: MQTT not connected, publish failed.");
+  }
+}
+
+void THiNX::loop() {
+  if (mqtt_client->connected()) {
+    // causes crash...
+    //mqtt_client->publish(channel.c_str(), message.c_str());
+    Serial.println("*TH: MQTT connected, loop skipped.");
+  } else {
+    Serial.println("*TH: MQTT not connected, loop failed.");
   }
 }
