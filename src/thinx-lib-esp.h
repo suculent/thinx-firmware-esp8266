@@ -45,6 +45,7 @@ class THiNX {
     String thx_connected_response = "{ \"status\" : \"connected\" }";
     String thx_disconnected_response = "{ \"status\" : \"disconnected\" }";
     String thx_reboot_response = "{ \"status\" : \"rebooting\" }";
+    String thx_update_question = "{ title: \"Update Available\", body: \"There is an update available for this device. Do you want to install it now?\", type: \"actionable\", response_type: \"bool\" }";
 
     String checkin_body();
 
@@ -109,7 +110,7 @@ class THiNX {
       void senddata(String);
       void parse(String);
       void connect();
-      void esp_update(String);
+      void update_and_reboot(String);
 
       // MQTT
       int last_mqtt_reconnect;
@@ -122,7 +123,7 @@ class THiNX {
       // Data Storage
       bool shouldSaveConfig;
 
-      bool restoreDeviceInfo();
-      void saveDeviceInfo();
+      bool restore_device_info();
+      void save_device_info();
       String deviceInfo();
 };
