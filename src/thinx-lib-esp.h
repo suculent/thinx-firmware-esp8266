@@ -8,7 +8,7 @@
 
 #include <FS.h>
 #include "EAVManager/EAVManager.h"
-#include <EAVManager.h>
+//#include <EAVManager.h>
 
 // Using better than Arduino-bundled version of MQTT https://github.com/Imroy/pubsubclient
 #include "PubSubClient/PubSubClient.h" // Local checkout
