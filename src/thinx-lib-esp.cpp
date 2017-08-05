@@ -26,7 +26,6 @@ String THiNX::thinx_mac() {
 THiNX::THiNX() {
   // We could init from SPIFFS directly but it is initially empty anyway
   // and otherwise it could cause a lot of distraction.
-  available_update_url = null;
 }
 
 /*
@@ -231,8 +230,8 @@ void THiNX::parse(String payload) {
       String version = update["version"];
       Serial.println(String("version: ") + version);
 
-      if ((commit == thinx_commit_id) && (version == thinx_version_id)) {
-        if (strlen(available_update_url) > 5) {
+      if ((commit == thinx_commit_id) && (version == THINX_FIRMWARE_VERSION_SHORT)) {
+        if (available_update_url.length() > 5) {
           Serial.println("*TH: firmware has same commit_id as current and update availability is stored. Firmware has been installed.");
           available_update_url = "";
           save_device_info();
@@ -268,7 +267,7 @@ void THiNX::parse(String payload) {
         save_device_info();
         if (url) {
           Serial.println("*TH: Force update URL must not contain HTTP!!! :" + url);
-          url = url.replace("http://", "");
+          url.replace("http://", "");
           // TODO: must not contain HTTP, extend with http://thinx.cloud/"
           // TODO: Replace thinx.cloud with thinx.local in case proxy is available
           update_and_reboot(url);
@@ -293,7 +292,7 @@ void THiNX::parse(String payload) {
         bool response = notification["response"];
         if (response == true) {
           Serial.println("User allowed update using boolean.");
-          if (strlen(available_update_url) > 0) {
+          if (available_update_url.length() > 0) {
             update_and_reboot(available_update_url);
           }
         } else {
@@ -305,7 +304,7 @@ void THiNX::parse(String payload) {
         String response = notification["response"];
         if (response == "yes") {
           Serial.println("User allowed update using string.");
-          if (strlen(available_update_url) > 0) {
+          if (available_update_url.length() > 0) {
             update_and_reboot(available_update_url);
           }
         } else if (response == "no") {
@@ -359,8 +358,8 @@ void THiNX::parse(String payload) {
         String version = registration["version"];
         Serial.println(String("version: ") + version);
 
-        if ((commit == thinx_commit_id) && (version == thinx_version_id)) {
-          if (strlen(available_update_url) > 5) {
+        if ((commit == thinx_commit_id) && (version == THINX_FIRMWARE_VERSION_SHORT)) {
+          if (available_update_url.length() > 5) {
             Serial.println("*TH: firmware has same commit_id as current and update availability is stored. Firmware has been installed.");
             available_update_url = "";
             save_device_info();
@@ -395,8 +394,8 @@ void THiNX::parse(String payload) {
 
         String url = registration["url"];
         if (url) {
-          Serial.println("*TH: Running update with URL that should not contain http! :" + url);
-          url = url.replace("http://", "");
+          Serial.println("*TH: Running update with URL that should not contain http for ESP update only!!! :" + url);
+          url.replace("http://", "");
           update_and_reboot(url);
         }
       }
@@ -437,7 +436,7 @@ void THiNX::publish() {
 
 void THiNX::notify_on_successful_update() {
   if (mqtt_client) {
-    String *success = "{ title: \"Update Successful\", body: \"The device has been successfully updated.\", type: \"success\" }";
+    String success = "{ title: \"Update Successful\", body: \"The device has been successfully updated.\", type: \"success\" }";
     mqtt_client->publish(
       thinx_mqtt_status_channel().c_str(),
       success.c_str()
@@ -624,7 +623,6 @@ void THiNX::saveConfigCallback() {
        const char* saved_update = config["update"];
        if (strlen(saved_update) > 5) {
          available_update_url = String(saved_update);
-         sprintf(available_update_url, "%s", saved_update);
        }
 
        const char* saved_udid = config["udid"];

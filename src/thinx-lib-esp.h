@@ -47,6 +47,8 @@ class THiNX {
     String thx_reboot_response = "{ \"status\" : \"rebooting\" }";
     String thx_update_question = "{ title: \"Update Available\", body: \"There is an update available for this device. Do you want to install it now?\", type: \"actionable\", response_type: \"bool\" }";
 
+    String available_update_url;
+
     String checkin_body();
 
     THiNX(String);
@@ -86,6 +88,8 @@ class THiNX {
     // Response parsers
     //void parse_registration(JSONObject);
     //void parse_update(JSONObject);
+
+    void notify_on_successful_update();
 
     private:
 
