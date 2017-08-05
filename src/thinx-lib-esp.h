@@ -27,6 +27,9 @@
 class THiNX {
 
   public:
+    
+    THiNX();
+    THiNX(String);
 
     enum payload_type {
       Unknown = 0,
@@ -50,9 +53,6 @@ class THiNX {
     String available_update_url;
 
     String checkin_body();
-
-    THiNX(String);
-    THiNX();
 
     // WiFi Client
     EAVManager *manager;
