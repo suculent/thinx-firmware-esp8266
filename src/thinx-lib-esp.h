@@ -73,6 +73,7 @@ class THiNX {
     String thinx_owner;
     String thinx_udid;
     String thinx_api_key;
+    BOOL thinx_auto_update;
 
     // MQTT
 

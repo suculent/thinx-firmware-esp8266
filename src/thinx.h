@@ -12,6 +12,7 @@
 #define THINX_ALIAS "vanilla"
 #define THINX_API_KEY ""
 #define THINX_UDID ""
+#define THINX_AUTO_UPDATE true
 
 #define THINX_MQTT_PORT 1883
 #define THINX_API_PORT 7442

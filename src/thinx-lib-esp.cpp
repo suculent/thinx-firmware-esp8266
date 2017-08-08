@@ -24,9 +24,9 @@ String THiNX::thinx_mac() {
 }
 
 THiNX::THiNX() {
-  // We could init from SPIFFS directly but it is initially empty anyway
-  // and otherwise it could cause a lot of distraction.
+  // will be read from device info or kept by this default
   available_update_url = null;
+  thinx_auto_update = THINX_AUTO_UPDATE;
 }
 
 /*
@@ -359,6 +359,8 @@ void THiNX::parse(String payload) {
         String version = registration["version"];
         Serial.println(String("version: ") + version);
 
+        thinx_auto_update = registration["auto_update"];
+
         if ((commit == thinx_commit_id) && (version == thinx_version_id)) {
           if (strlen(available_update_url) > 5) {
             Serial.println("*TH: firmware has same commit_id as current and update availability is stored. Firmware has been installed.");
@@ -627,6 +629,9 @@ void THiNX::saveConfigCallback() {
          sprintf(available_update_url, "%s", saved_update);
        }
 
+       bool auto_update = config["auto_update"];
+       thinx_auto_update = auto_update;
+
        const char* saved_udid = config["udid"];
        Serial.print("*TH: Saved udid: "); Serial.println(saved_udid);
        if ((strlen(saved_udid) > 1)) {
@@ -693,6 +698,10 @@ String THiNX::deviceInfo()
   root["update"] = available_update_url;
   Serial.print("*TH: available_update_url: ");
   Serial.println(available_update_url);
+
+  root["auto_update"] = thinx_auto_update;
+  Serial.print("*TH: thinx_auto_update: ");
+  Serial.println(thinx_auto_update);
 
   String jsonString;
   root.printTo(jsonString);
