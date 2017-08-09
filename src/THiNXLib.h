@@ -1,5 +1,8 @@
 #include <Arduino.h>
 
+#ifndef THiNX_h
+#define THiNX_h
+
 #define __DEBUG__
 #define __DEBUG_JSON__
 
@@ -27,7 +30,7 @@
 class THiNX {
 
   public:
-    
+
     THiNX();
     THiNX(String);
 
@@ -50,8 +53,6 @@ class THiNX {
     String thx_reboot_response = "{ \"status\" : \"rebooting\" }";
     String thx_update_question = "{ title: \"Update Available\", body: \"There is an update available for this device. Do you want to install it now?\", type: \"actionable\", response_type: \"bool\" }";
 
-    String available_update_url;
-
     String checkin_body();
 
     // WiFi Client
@@ -66,6 +67,8 @@ class THiNX {
     String thinx_firmware_version;
     String thinx_firmware_version_short;
     String app_version;
+    String available_update_url;
+    String thinx_version_id;
 
     int thinx_mqtt_port;
     int thinx_api_port;
@@ -75,7 +78,6 @@ class THiNX {
     String thinx_owner;
     String thinx_udid;
     String thinx_api_key;
-    BOOL thinx_auto_update;
 
     // MQTT
 
@@ -89,8 +91,6 @@ class THiNX {
     // Response parsers
     //void parse_registration(JSONObject);
     //void parse_update(JSONObject);
-
-    void notify_on_successful_update();
 
     private:
 
@@ -131,4 +131,10 @@ class THiNX {
       bool restore_device_info();
       void save_device_info();
       String deviceInfo();
+
+      // Updates
+    void notify_on_successful_update();
+
 };
+
+#endif
