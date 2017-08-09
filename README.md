@@ -6,7 +6,7 @@ An Arduino/ESP8266 library to wrap client for OTA updates and RTM (Remote Things
 ## Include
 
 ```c
-#include "things-lib-esp.h"
+#include "THiNXLib.h"
 
 ```
 
@@ -22,23 +22,26 @@ and awaits optionally new API Key (security hole? FIXME: In case the API Key is 
 
 ```c
 #include "Arduino.h"
-#include "Thinx.h"
-#include "./thinx-lib-esp8266-arduinoc/src/thinx-lib-esp.h"
-// #include "<thinx-lib-esp.h>" // one day
+#include <THiNXLib.h>
 
-THiNX* thx = NULL;
+THiNX thx;
 
 void setup() {
   Serial.begin(115200);
+
+#ifdef __DEBUG__
   while (!Serial);
-  Serial.setDebugOutput(true);  
-  thx = new THiNX(thinx_api_key);
-  Serial.println("Setup completed.");
+#else
+  delay(500);
+#endif
+
+  thx = THiNX("71679ca646c63d234e957e37e4f4069bf4eed14afca4569a0c74abf503076732"); // THINX_API_KEY
 }
 
 void loop()
 {
-  // do what you want to...
+  delay(10000);
+  thx.loop(); // registers, checks MQTT status, reconnects, updates, etc.
 }
 
 ```
