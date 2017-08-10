@@ -45,6 +45,16 @@ THiNX::THiNX(String __apikey) {
   delay(50);
   Serial.println("*TH: SPIFFS mounted...");
 
+  if (once == true) {
+    once = false;
+    import_build_time_constants();
+    Serial.print("thinx_commit_id check: ");
+    Serial.println(thinx_commit_id);
+  } else  {
+     Serial.println("* TH: Already initialized...");
+     return;
+  }
+
   initWithAPIKey(__apikey);
 }
 
@@ -60,15 +70,7 @@ void THiNX::initWithAPIKey(String __api_key) {
     Serial.println(thinx_api_key);
   }
 
-  if (once == true) {
-    once = false;
-    import_build_time_constants();
-    Serial.print("thinx_commit_id check: ");
-    Serial.println(thinx_commit_id);
-  } else  {
-     Serial.println("* TH: Already initialized...");
-     return;
-  }
+
 
   restore_device_info();
 
@@ -678,6 +680,10 @@ void THiNX::saveConfigCallback() {
 
    if(flashCorrectlyConfigured) {
      Serial.println("*TH: Mounting SPIFFS...");
+
+     // if no udid set?
+     SPIFFS.format();
+
      SPIFFS.begin();
    }  else {
      Serial.println("flash incorrectly configured, SPIFFS cannot start, IDE size: " + ideSize + ", real size: " + realSize);
@@ -884,67 +890,63 @@ void THiNX::loop() {
 void THiNX::import_build_time_constants() {
 
   Serial.println("Importing build-time constants...");
-  Serial.println("THINX_COMMIT_ID: ");
-  Serial.println(String(THINX_COMMIT_ID));
+
+  Serial.print("thinx_api_key: ");
+  thinx_api_key = String(THINX_API_KEY);
+  Serial.println(thinx_api_key);
+
+  Serial.print("thinx_udid: ");
+  thinx_udid = String(THINX_UDID);
+  Serial.println(thinx_udid);
 
   thinx_commit_id = String(THINX_COMMIT_ID);
   Serial.print("thinx_commit_id: ");
   Serial.println(thinx_commit_id);
 
-  Serial.print("THINX_MQTT_URL: ");
-  Serial.println(String(THINX_MQTT_URL));
   Serial.print("thinx_mqtt_url: ");
   thinx_mqtt_url = String(THINX_MQTT_URL);
   Serial.println(thinx_mqtt_url);
 
-  Serial.print("thinx_cloud_url: ");
   thinx_cloud_url = String(THINX_CLOUD_URL);
-  Serial.println("thinx_cloud_url: " + thinx_cloud_url);
+  Serial.print("thinx_cloud_url: ");
+  Serial.println(thinx_cloud_url);
 
   Serial.print("thinx_firmware_version: ");
   thinx_firmware_version = String(THINX_FIRMWARE_VERSION);
-  Serial.println("thinx_firmware_version: " + thinx_firmware_version);
+  Serial.println(thinx_firmware_version);
 
   Serial.print("thinx_firmware_version_short: ");
   thinx_firmware_version_short = String(THINX_FIRMWARE_VERSION_SHORT);
-  Serial.println("thinx_firmware_version_short: " + thinx_firmware_version_short);
+  Serial.println(thinx_firmware_version_short);
 
   Serial.print("app_version: ");
   app_version = String(THINX_APP_VERSION);
-  Serial.println("app_version: " + app_version);
-
-  Serial.print("thinx_mqtt_port: ");
-  thinx_mqtt_port = THINX_MQTT_PORT;
-  Serial.println("thinx_mqtt_port: " + thinx_mqtt_port);
-
-  Serial.print("thinx_api_port: ");
-  thinx_api_port = THINX_API_PORT;
-  Serial.println("thinx_api_port: " + thinx_api_port);
+  Serial.println(app_version);
 
   // dynamic variables
   Serial.print("thinx_alias: ");
   thinx_alias = String(THINX_ALIAS);
-  Serial.println("thinx_alias: " + thinx_alias);
+  Serial.println(thinx_alias);
 
   Serial.print("thinx_owner: ");
   thinx_owner = String(THINX_OWNER);
-  Serial.println("thinx_owner: " + thinx_owner);
+  Serial.println(thinx_owner);
 
-  Serial.print("thinx_udid: ");
-  thinx_udid = String(THINX_UDID);
-  Serial.println("thinx_udid: " + thinx_udid);
+  Serial.print("thinx_mqtt_port: ");
+  thinx_mqtt_port = String(THINX_MQTT_PORT).toInt();
+  Serial.println(String(thinx_mqtt_port));
+
+  Serial.print("thinx_api_port: ");
+  thinx_api_port = String(THINX_API_PORT).toInt();
+  Serial.println(String(thinx_api_port));
 
   Serial.print("thinx_auto_update: ");
-  thinx_auto_update = THINX_AUTO_UPDATE;
-  Serial.println("thinx_auto_update: " + thinx_auto_update);
+  thinx_auto_update = atoi(String(THINX_AUTO_UPDATE).c_str());
+  //Serial.println(thinx_auto_update);
 
   Serial.print("thinx_forced_update: ");
-  thinx_forced_update = THINX_FORCED_UPDATE;
-  Serial.println("thinx_forced_update: " + thinx_forced_update);
-
-  Serial.print("thinx_api_key: ");
-  thinx_api_key = String(THINX_API_KEY);
-  Serial.println("thinx_api_key: " + thinx_api_key);
+  thinx_forced_update = atoi(String(THINX_FORCED_UPDATE).c_str());
+  //Serial.println(thinx_forced_update);
 
   Serial.flush();
   return;
