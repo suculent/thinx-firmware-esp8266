@@ -1,32 +1,30 @@
-/* OTA enabled firmware for Wemos D1 (ESP 8266, Arduino) */
+/* THiNX firmware for ESP 8266 (Arduino) */
 
 #include "Arduino.h"
 
-#include "../../src/thinx.h"
-#include "../../src/thinx-lib-esp.h"
+#define __DEBUG__ // wait for serial port on boot
 
-#define __DEBUG_WIFI__ /* use as fallback when device gets stucked with incorrect WiFi configuration, overwrites Flash in ESP */
+// 1. Include the THiNXLib
+#include <THiNXLib.h>
 
-THiNX* thx = NULL;
+// 2. Declare
+THiNX thx;
+
+// 3. Enter your API Key
+const char* apikey = "71679ca646c63d234e957e37e4f4069bf4eed14afca4569a0c74abf503076732";
 
 void setup() {
   Serial.begin(115200);
+#ifdef __DEBUG__
   while (!Serial);
-
-  Serial.printf("Sketch size: %u\n", ESP.getSketchSize());
-  Serial.printf("Free size: %u\n", ESP.getFreeSketchSpace());
-  Serial.setDebugOutput(true);
-
-#ifdef __DEBUG_WIFI__
-  WiFi.begin("HAVANA", "1234567890");
+  delay(5000);
 #endif
-
-  thx = new THiNX(thinx_api_key); // why do we have to call it all over? MQTT callback should be optinally set from here...
-  Serial.println("Setup completed.");
+  thx = THiNX(apikey); // 4. initialize with API Key
 }
 
 void loop()
 {
-  delay(10000);  
-  thx->loop(); // check MQTT status, reconnect, etc.
+  delay(10000);
+  Serial.printf("Free size: %u\n", ESP.getFreeSketchSpace());
+  thx.loop(); // 5. Waits for WiFI, register, check MQTT, reconnect, update...
 }
