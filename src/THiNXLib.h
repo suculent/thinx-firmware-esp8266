@@ -1,8 +1,5 @@
 #include <Arduino.h>
 
-#ifndef THiNX_h
-#define THiNX_h
-
 #define __DEBUG__
 #define __DEBUG_JSON__
 
@@ -59,26 +56,6 @@ class THiNX {
     EAVManager *manager;
     EAVManagerParameter *api_key_param;
 
-    // THiNX Client
-    // Import build-time values from thinx.h
-    String thinx_commit_id;
-    String thinx_mqtt_url;
-    String thinx_cloud_url;
-    String thinx_firmware_version;
-    String thinx_firmware_version_short;
-    String app_version;
-    String available_update_url;
-    String thinx_version_id;
-
-    int thinx_mqtt_port;
-    int thinx_api_port;
-
-    // dynamic variables
-    String thinx_alias;
-    String thinx_owner;
-    String thinx_udid;
-    String thinx_api_key;
-
     // MQTT
 
     PubSubClient *mqtt_client;
@@ -91,6 +68,28 @@ class THiNX {
     // Response parsers
     //void parse_registration(JSONObject);
     //void parse_update(JSONObject);
+
+    // Import build-time values from thinx.h
+    String thinx_commit_id;
+    String thinx_mqtt_url;
+    String thinx_cloud_url;
+    String thinx_firmware_version;
+    String thinx_firmware_version_short;
+    String app_version;
+    String available_update_url;
+    String thinx_version_id;
+
+    bool thinx_auto_update;
+    bool thinx_forced_update;
+
+    int thinx_mqtt_port;
+    int thinx_api_port;
+
+    // dynamic variables
+    String thinx_alias;
+    String thinx_owner;
+    String thinx_udid;
+    String thinx_api_key;
 
     private:
 
@@ -126,15 +125,17 @@ class THiNX {
       String thinx_mac();
 
       // Data Storage
-      bool shouldSaveConfig;
+      void import_build_time_constants();
 
+      bool shouldSaveConfig;
       bool restore_device_info();
       void save_device_info();
       String deviceInfo();
 
       // Updates
-    void notify_on_successful_update();
+      void notify_on_successful_update();
+
+      // THiNX Client
+
 
 };
-
-#endif

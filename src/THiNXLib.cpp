@@ -1,8 +1,8 @@
 #include "THiNXLib.h"
-#include "thinx.h"
 
 extern "C" {
   #include "user_interface.h"
+  #include "thinx.h"
 }
 
 String THiNX::thinx_mqtt_channel() {
@@ -28,6 +28,81 @@ THiNX::THiNX() {
   // and otherwise it could cause a lot of distraction.
   available_update_url = "";
 }
+
+// Should use THINX_API_KEY from thinx.h; resets once-token
+
+THiNX::THiNX(String __apikey) {
+
+  autoconf_ssid  = "AP-THiNX"; // SSID in AP mode
+  autoconf_pwd   = "PASSWORD"; // fallback to default password, however this should be generated uniquely as it is logged to console
+  thx_udid[64] = {0};
+  status = WL_IDLE_STATUS;
+  shouldSaveConfig = false;
+  connected = false;
+  once = true;
+  mqtt_client = NULL;
+
+  delay(50);
+  Serial.println("*TH: SPIFFS mounted...");
+
+  initWithAPIKey(__apikey);
+}
+
+// Designated initializer
+void THiNX::initWithAPIKey(String __api_key) {
+
+  Serial.print("Starting with API Key ");
+  Serial.println(__api_key);
+
+  if (__api_key != "") {
+    thinx_api_key = __api_key;
+    sprintf(thx_api_key, "%s", thinx_api_key.c_str()); // 40 max
+    Serial.println(thinx_api_key);
+  }
+
+  if (once == true) {
+    once = false;
+    import_build_time_constants();
+    Serial.print("thinx_commit_id check: ");
+    Serial.println(thinx_commit_id);
+  } else  {
+     Serial.println("* TH: Already initialized...");
+     return;
+  }
+
+  restore_device_info();
+
+  Serial.println("*TH: Connecting...");
+  connect();
+
+#ifdef __DEBUG__
+  if (connected) {
+    Serial.println("*TH: Connected to WiFi...");
+  } else {
+    Serial.println("*TH: Connection to WiFi failed...");
+  }
+#endif
+
+  delay(5000);
+  Serial.println("*TH: Checking in...");
+  checkin();
+
+  delay(1000);
+  mqtt_result = start_mqtt(); // requires valid udid and api_keys, and allocated WiFiClient.
+
+  if (mqtt_result == true) {
+    Serial.println("*TH: Starting MQTT...");
+  } else {
+    Serial.println("*TH: MQTT delayed...");
+  }
+
+#ifdef __DEBUG__
+  // test == our tenant name from THINX platform
+  // Serial.println("[update] Trying direct update...");
+  // update_and_reboot("/bin/test/firmware.elf");
+#endif
+}
+
 
 /*
  * Connection
@@ -594,6 +669,29 @@ void THiNX::saveConfigCallback() {
 
  bool THiNX::restore_device_info() {
 
+   Serial.println("* TH: Checking SPIFFS...");
+
+   String realSize = String(ESP.getFlashChipRealSize());
+   String ideSize = String(ESP.getFlashChipSize());
+   bool flashCorrectlyConfigured = realSize.equals(ideSize);
+   bool result = false;
+
+   if(flashCorrectlyConfigured) {
+     Serial.println("*TH: Mounting SPIFFS...");
+     SPIFFS.begin();
+   }  else {
+     Serial.println("flash incorrectly configured, SPIFFS cannot start, IDE size: " + ideSize + ", real size: " + realSize);
+     return false;
+   }
+
+   if (!result) {
+     Serial.println("* TH: SPIFFS failed...");
+     return false;
+   }
+
+  Serial.println("*TH: Restoring device info...");
+
+
    File f = SPIFFS.open("/thx.cfg", "r");
    if (!f) {
        Serial.println("*TH: No remote configuration found so far...");
@@ -700,14 +798,6 @@ String THiNX::deviceInfo()
 }
 
 
-// do_mqtt
-// process_mqtt()
-// parse_registration(json)
-// parse_update(json)
-
-// notify_on_successful_update()
-// send_update_question()
-
 /*
  * Updates
  */
@@ -790,87 +880,72 @@ void THiNX::loop() {
   //Serial.print("POST-PUBLISH memfree: "); memfree = system_get_free_heap_size(); Serial.println(memfree);
 }
 
-// Should use THINX_API_KEY from thinx.h
-THiNX::THiNX(String __apikey) {
-  thinx_api_key = __apikey;
-  autoconf_ssid  = "AP-THiNX"; // SSID in AP mode
-  autoconf_pwd   = "PASSWORD"; // fallback to default password, however this should be generated uniquely as it is logged to console
-  thx_udid[64] = {0};
-  status = WL_IDLE_STATUS;
-  shouldSaveConfig = false;
-  connected = false;
-  once = true;
-  mqtt_client = NULL;
+/* Imports all required build-time values from thinx.h */
+void THiNX::import_build_time_constants() {
 
-  initWithAPIKey(thinx_api_key);
-}
+  Serial.println("Importing build-time constants...");
+  Serial.println("THINX_COMMIT_ID: ");
+  Serial.println(String(THINX_COMMIT_ID));
 
-// Designated initializer
-void THiNX::initWithAPIKey(String api_key) {
-
-  // Import build-time values from thinx.h
   thinx_commit_id = String(THINX_COMMIT_ID);
-  thinx_mqtt_url = String(THINX_MQTT_URL);
-  thinx_cloud_url = String(THINX_CLOUD_URL);
-  thinx_firmware_version = String(THINX_FIRMWARE_VERSION);
-  thinx_firmware_version_short = String(THINX_FIRMWARE_VERSION_SHORT);
-  app_version = String(THINX_APP_VERSION);
+  Serial.print("thinx_commit_id: ");
+  Serial.println(thinx_commit_id);
 
+  Serial.print("THINX_MQTT_URL: ");
+  Serial.println(String(THINX_MQTT_URL));
+  Serial.print("thinx_mqtt_url: ");
+  thinx_mqtt_url = String(THINX_MQTT_URL);
+  Serial.println(thinx_mqtt_url);
+
+  Serial.print("thinx_cloud_url: ");
+  thinx_cloud_url = String(THINX_CLOUD_URL);
+  Serial.println("thinx_cloud_url: " + thinx_cloud_url);
+
+  Serial.print("thinx_firmware_version: ");
+  thinx_firmware_version = String(THINX_FIRMWARE_VERSION);
+  Serial.println("thinx_firmware_version: " + thinx_firmware_version);
+
+  Serial.print("thinx_firmware_version_short: ");
+  thinx_firmware_version_short = String(THINX_FIRMWARE_VERSION_SHORT);
+  Serial.println("thinx_firmware_version_short: " + thinx_firmware_version_short);
+
+  Serial.print("app_version: ");
+  app_version = String(THINX_APP_VERSION);
+  Serial.println("app_version: " + app_version);
+
+  Serial.print("thinx_mqtt_port: ");
   thinx_mqtt_port = THINX_MQTT_PORT;
+  Serial.println("thinx_mqtt_port: " + thinx_mqtt_port);
+
+  Serial.print("thinx_api_port: ");
   thinx_api_port = THINX_API_PORT;
+  Serial.println("thinx_api_port: " + thinx_api_port);
 
   // dynamic variables
+  Serial.print("thinx_alias: ");
   thinx_alias = String(THINX_ALIAS);
+  Serial.println("thinx_alias: " + thinx_alias);
+
+  Serial.print("thinx_owner: ");
   thinx_owner = String(THINX_OWNER);
+  Serial.println("thinx_owner: " + thinx_owner);
+
+  Serial.print("thinx_udid: ");
   thinx_udid = String(THINX_UDID);
+  Serial.println("thinx_udid: " + thinx_udid);
 
-  if (once == true) {
-    once = false;
-  } else {
-     return;
-  }
+  Serial.print("thinx_auto_update: ");
+  thinx_auto_update = THINX_AUTO_UPDATE;
+  Serial.println("thinx_auto_update: " + thinx_auto_update);
 
-  if (api_key != "") {
-    thinx_api_key = api_key;
-    sprintf(thx_api_key, "%s", thinx_api_key.c_str()); // 40 max
-  }
+  Serial.print("thinx_forced_update: ");
+  thinx_forced_update = THINX_FORCED_UPDATE;
+  Serial.println("thinx_forced_update: " + thinx_forced_update);
 
-  Serial.println("*TH: Mounting SPIFFS...");
-  bool result = SPIFFS.begin();
-  delay(50);
-  Serial.println("*TH: SPIFFS mounted: " + result);
+  Serial.print("thinx_api_key: ");
+  thinx_api_key = String(THINX_API_KEY);
+  Serial.println("thinx_api_key: " + thinx_api_key);
 
-  restore_device_info();
-
-  Serial.println("*TH: Connecting...");
-
-  connect();
-
-#ifdef __DEBUG__
-  if (connected) {
-    Serial.println("*TH: Connected to WiFi...");
-  } else {
-    Serial.println("*TH: Connection to WiFi failed...");
-  }
-#endif
-
-  //delay(5000);
-  Serial.println("*TH: Checking in...");
-  checkin();
-
-  delay(1000);
-
-  mqtt_result = start_mqtt(); // requires valid udid and api_keys, and allocated WiFiClient.
-
-  if (mqtt_result == true) {
-    Serial.println("*TH: Starting MQTT...");
-  } else {
-    Serial.println("*TH: MQTT delayed...");
-  }
-
-#ifdef __DEBUG__
-  // test == our tenant name from THINX platform
-  // Serial.println("[update] Trying direct update...");
-  // update_and_reboot("/bin/test/firmware.elf");
-#endif
+  Serial.flush();
+  return;
 }
