@@ -42,9 +42,6 @@ THiNX::THiNX(String __apikey) {
   once = true;
   mqtt_client = NULL;
 
-  delay(50);
-  Serial.println("*TH: SPIFFS mounted...");
-
   if (once == true) {
     once = false;
     import_build_time_constants();
@@ -70,9 +67,7 @@ void THiNX::initWithAPIKey(String __api_key) {
     Serial.println(thinx_api_key);
   }
 
-
-
-  restore_device_info();
+  bool done = restore_device_info();
 
   Serial.println("*TH: Connecting...");
   connect();
@@ -672,19 +667,23 @@ void THiNX::saveConfigCallback() {
  bool THiNX::restore_device_info() {
 
    Serial.println("* TH: Checking SPIFFS...");
-
    String realSize = String(ESP.getFlashChipRealSize());
+   Serial.println("* TH: .");
    String ideSize = String(ESP.getFlashChipSize());
+   Serial.println("* TH: .");
    bool flashCorrectlyConfigured = realSize.equals(ideSize);
    bool result = false;
 
    if(flashCorrectlyConfigured) {
-     Serial.println("*TH: Mounting SPIFFS...");
-
      // if no udid set?
-     SPIFFS.format();
-
-     SPIFFS.begin();
+     Serial.println("*TH: Mounting SPIFFS...");
+     result = SPIFFS.begin();
+     if (!result) {
+       Serial.println("*TH: Formatting SPIFFS...");
+       SPIFFS.format();
+       Serial.println("*TH: Re-mounting SPIFFS...");
+       result = SPIFFS.begin();
+     }
    }  else {
      Serial.println("flash incorrectly configured, SPIFFS cannot start, IDE size: " + ideSize + ", real size: " + realSize);
      return false;
@@ -696,7 +695,6 @@ void THiNX::saveConfigCallback() {
    }
 
   Serial.println("*TH: Restoring device info...");
-
 
    File f = SPIFFS.open("/thx.cfg", "r");
    if (!f) {
@@ -742,6 +740,8 @@ void THiNX::saveConfigCallback() {
       f.close();
      }
    }
+
+   return true;
  }
 
  /* Stores mutable device data (alias, owner) retrieved from API */
