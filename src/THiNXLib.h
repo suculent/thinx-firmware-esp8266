@@ -36,6 +36,7 @@ class THiNX {
       UPDATE = 1,		// Firmware Update Response Payload
       REGISTRATION = 2,		// Registration Response Payload
       NOTIFICATION = 3, // Notification/Interaction Response Payload
+      CONFIGURATION = 4,
       Reserved = 255,		// Reserved
     };
 
@@ -78,9 +79,11 @@ class THiNX {
     String app_version;
     String available_update_url;
     String thinx_version_id;
+    String thinx_remote_config; // so far unparsed JSON string
 
     bool thinx_auto_update;
     bool thinx_forced_update;
+    bool thinx_reset_on_update;
 
     int thinx_mqtt_port;
     int thinx_api_port;
@@ -90,6 +93,8 @@ class THiNX {
     String thinx_owner;
     String thinx_udid;
     String thinx_api_key;
+
+    String last_commit_id;
 
     private:
 

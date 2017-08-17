@@ -41,6 +41,8 @@ THiNX::THiNX(String __apikey) {
   connected = false;
   once = true;
   mqtt_client = NULL;
+  thinx_remote_config = "{\"configuration\":[]}";
+  thinx_reset_on_update = false;
 
   if (once == true) {
     once = false;
@@ -247,6 +249,7 @@ void THiNX::parse(String payload) {
   int reg_index = payload.indexOf("{\"registration\"");
   int upd_index = payload.indexOf("{\"update\"");
   int not_index = payload.indexOf("{\"notification\"");
+  int cfg_index = payload.indexOf("{\"configuration\"");
 
   if (upd_index > startIndex) {
     startIndex = upd_index;
@@ -263,6 +266,12 @@ void THiNX::parse(String payload) {
     startIndex = not_index;
     endIndex = payload.indexOf("}}") + 2; // is this still needed?
     ptype = NOTIFICATION;
+  }
+
+  if (cfg_index > startIndex) {
+    startIndex = cfg_index;
+    endIndex = payload.indexOf("}}") + 2; // is this still needed?
+    ptype = CONFIGURATION;
   }
 
   String body = payload.substring(startIndex, endIndex);
@@ -307,7 +316,8 @@ void THiNX::parse(String payload) {
         if (available_update_url.length() > 5) {
           Serial.println("*TH: firmware has same commit_id as current and update availability is stored. Firmware has been installed.");
           available_update_url = "";
-          save_device_info();
+          if (thinx_forced_update == true) thinx_forced_update == false; // foced update completed
+          save_device_info(); // save before reboot
           notify_on_successful_update();
           return;
         } else {
@@ -453,7 +463,7 @@ void THiNX::parse(String payload) {
         // TODO: must be current or 'ANY'
 
         String commit = registration["commit"];
-        Serial.println(String("commit: ") + commit);
+        Serial.println(String("incoming commit: ") + commit);
 
         // should not be same except for forced update
         if (commit == thinx_commit_id) {
@@ -474,6 +484,39 @@ void THiNX::parse(String payload) {
       }
 
       } break;
+
+    case CONFIGURATION: {
+
+      // store lazily without parsing...
+      thinx_remote_config = body;
+
+      JsonArray& configuration = root["configuration"];
+
+      if ( !configuration.success() ) {
+        Serial.println("Failed parsing configuration node.");
+        return;
+      }
+
+      for (auto& config : configuration) {
+         //int type = config["type"];
+         const char* key = config[0];
+         const char* value = config[1];
+         Serial.print("Reading remote configuration: ");
+         Serial.print(key);
+         Serial.print(":");
+         Serial.println(value);
+
+         // TODO: Store or process incoming configuration vars,
+         // do something meaningful like store; update; reboot, etc.
+         // THINX_AUTO_UPDATE, ENV_VARS( THINX_WIFI_SSID and THINX_WIFI_PASSWORD)
+      }
+
+      if (thinx_reset_on_update == true) {
+        save_device_info();
+        ESP.reboot();
+      }
+
+    } break;
 
     default:
       Serial.println("Nothing to do...");
@@ -723,9 +766,38 @@ void THiNX::saveConfigCallback() {
         sprintf(thx_api_key, "%s", saved_apikey); // 40 max; copy; should deprecate
        }
 
-       const char* saved_update = config["update"];
+       const char* saved_update = config["saved_update"];
        if (strlen(saved_update) > 5) {
          available_update_url = String(saved_update);
+       }
+
+       const char* remote_config = config["remote_config"];
+       if (strlen(remote_config) > 5) {
+         thinx_remote_config = String(remote_config);
+       }
+
+       if (config["auto_update"].success()) {
+         thinx_auto_update = config["auto_update"];
+       }
+
+       if (config["forced_update"].success()) {
+         thinx_forced_update = config["THINX_FORCED_UPDATE"];
+       }
+
+       if (config["reset_on_update"].success()) {
+         thinx_reset_on_update = config["reset_on_update"];
+       }
+
+       const char* last_commit_id = config["last_commit_id"];
+       if (strlen(last_commit_id) > 5) {
+         last_commit_id = String(last_commit_id);
+       }
+
+       if (strcmp(last_commit_id, thinx_commit_id)) {
+         Serial.println("Last version installed successfully, forced update will be disabled now.");
+         thinx_forced_update = false;
+       } else {
+         Serial.println("New version not installed.");
        }
 
        const char* saved_udid = config["udid"];
@@ -793,9 +865,15 @@ String THiNX::deviceInfo()
   Serial.print("*TH: thinx_udid: ");
   Serial.println(thinx_udid);
 
-  root["update"] = available_update_url;
+  root["saved_update"] = available_update_url;
   Serial.print("*TH: available_update_url: ");
   Serial.println(available_update_url);
+
+  root["last_commit_id"] = last_commit_id;
+  root["auto_update"] = thinx_auto_update;
+  root["forced_update"] = thinx_forced_update;
+
+  root["remote_config"] = thinx_remote_config;
 
   String jsonString;
   root.printTo(jsonString);
@@ -900,6 +978,7 @@ void THiNX::import_build_time_constants() {
   Serial.println(thinx_udid);
 
   thinx_commit_id = String(THINX_COMMIT_ID);
+  last_commit_id = thinx_commit_id;
   Serial.print("thinx_commit_id: ");
   Serial.println(thinx_commit_id);
 
