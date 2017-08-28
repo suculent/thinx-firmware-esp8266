@@ -58,7 +58,40 @@ THiNX::THiNX(String __apikey) {
 // Designated initializer
 void THiNX::initWithAPIKey(String __api_key) {
 
-  Serial.print("Starting with API Key ");
+  String realSize = String(ESP.getFlashChipRealSize());
+  String ideSize = String(ESP.getFlashChipSize());
+  bool flashCorrectlyConfigured = realSize.equals(ideSize);
+  bool fileSystemReady = false;
+
+#ifdef __DEBUG__
+  Serial.println("* TH: Booting in 5 seconds..."); Serial.flush();
+  delay(5000);
+#endif
+
+  Serial.print("* TH: SPIFFS real size = ");
+  Serial.println(realSize); Serial.flush();
+
+  Serial.print("* TH: SPIFFS IDE size = ");
+  Serial.println(ideSize); Serial.flush();
+
+  if(flashCorrectlyConfigured) {
+    Serial.println("* TH: Starting SPIFFS..."); Serial.flush();
+    fileSystemReady = SPIFFS.begin();
+    if (!fileSystemReady) {
+      Serial.println("* TH: Formatting SPIFFS..."); Serial.flush();
+      fileSystemReady = SPIFFS.format();;
+      Serial.println("* TH: Format complete, rebooting..."); Serial.flush();
+      ESP.reset();
+    }
+    Serial.println("* TH: SPIFFS Initialization completed."); Serial.flush();
+    delay(1000);
+    Serial.println("."); Serial.flush();
+  }  else {
+    Serial.println("flash incorrectly configured, SPIFFS cannot start, IDE size: " + ideSize + ", real size: " + realSize);
+    return;
+  }
+
+  Serial.print("*TH: Starting with API Key...");
   Serial.println(__api_key);
 
   if (__api_key != "") {
@@ -664,35 +697,7 @@ void THiNX::saveConfigCallback() {
  * Device Info
  */
 
- bool THiNX::restore_device_info() {
-
-   Serial.println("* TH: Checking SPIFFS...");
-   String realSize = String(ESP.getFlashChipRealSize());
-   Serial.println("* TH: .");
-   String ideSize = String(ESP.getFlashChipSize());
-   Serial.println("* TH: .");
-   bool flashCorrectlyConfigured = realSize.equals(ideSize);
-   bool result = false;
-
-   if(flashCorrectlyConfigured) {
-     // if no udid set?
-     Serial.println("*TH: Mounting SPIFFS...");
-     result = SPIFFS.begin();
-     if (!result) {
-       Serial.println("*TH: Formatting SPIFFS...");
-       SPIFFS.format();
-       Serial.println("*TH: Re-mounting SPIFFS...");
-       result = SPIFFS.begin();
-     }
-   }  else {
-     Serial.println("flash incorrectly configured, SPIFFS cannot start, IDE size: " + ideSize + ", real size: " + realSize);
-     return false;
-   }
-
-   if (!result) {
-     Serial.println("* TH: SPIFFS failed...");
-     return false;
-   }
+ bool THiNX::restore_device_info() {   
 
   Serial.println("*TH: Restoring device info...");
 
