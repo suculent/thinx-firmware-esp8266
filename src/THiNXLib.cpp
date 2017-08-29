@@ -546,7 +546,7 @@ void THiNX::parse(String payload) {
 
       if (thinx_reset_on_update == true) {
         save_device_info();
-        ESP.reboot();
+        ESP.restart();
       }
 
     } break;
@@ -740,7 +740,7 @@ void THiNX::saveConfigCallback() {
  * Device Info
  */
 
- bool THiNX::restore_device_info() {   
+ bool THiNX::restore_device_info() {
 
   Serial.println("*TH: Restoring device info...");
 
@@ -793,18 +793,17 @@ void THiNX::saveConfigCallback() {
          thinx_reset_on_update = config["reset_on_update"];
        }
 
-       const char* last_commit_id = config["last_commit_id"];
-       if (strlen(last_commit_id) > 5) {
-         last_commit_id = String(last_commit_id);
+       const char * last_commit_id;
+       const char * commit_id = config["last_commit_id"];
+       if (strlen(commit_id) > 5) {
+         last_commit_id = commit_id;
        }
-
-       if (strcmp(last_commit_id, thinx_commit_id)) {
+       if (strcmp(last_commit_id, thinx_commit_id.c_str())) {
          Serial.println("Last version installed successfully, forced update will be disabled now.");
          thinx_forced_update = false;
        } else {
          Serial.println("New version not installed.");
        }
-
        const char* saved_udid = config["udid"];
        Serial.print("*TH: Saved udid: "); Serial.println(saved_udid);
        if ((strlen(saved_udid) > 1)) {
@@ -813,7 +812,6 @@ void THiNX::saveConfigCallback() {
         thinx_udid = THINX_UDID;
       }
       sprintf(thx_udid, "%s", thinx_udid.c_str()); // 40 max
-
       f.close();
      }
    }
