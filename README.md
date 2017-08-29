@@ -2,7 +2,61 @@
 
 An Arduino/ESP8266 library to wrap client for OTA updates and RTM (Remote Things Management) based on THiNX platform.
 
-# Useage
+# Success log (library is not finished)
+
+```
+*TH: Initializing in 5 seconds...
+scandone
+no 6RA found, reconnect after 1s
+reconnect
+f 0, scandone
+state: 0 -> 2 (b0)
+state: 2 -> 3 (0)
+state: 3 -> 5 (10)
+add 0
+aid 1
+cnt
+*TH: Imported build-time constants...
+*TH: No remote configuration found so far...
+EAVWM: Adding parameter
+EAVWM: apikey
+
+*TH: AutoConnect with AP Mode (no password):
+
+Soft WDT reset
+
+```
+
+Stack trace:
+```
+Decoding 24 results
+0x402143ac: String::StringIfHelper() const at ?? line ?
+0x40203198: delay at ?? line ?
+0x402143ac: String::StringIfHelper() const at ?? line ?
+0x402031a3: delay at ?? line ?
+0x4020f930: ESP8266WiFiSTAClass::waitForConnectResult() at ?? line ?
+0x4020f93e: ESP8266WiFiSTAClass::waitForConnectResult() at ?? line ?
+0x4020f718: ESP8266WiFiSTAClass::status() at ?? line ?
+0x40206dfc: EAVManager::waitForConnectResult() at ?? line ?
+0x4020f90c: ESP8266WiFiSTAClass::begin() at ?? line ?
+0x4020f8f9: ESP8266WiFiSTAClass::begin() at ?? line ?
+0x402143ac: String::StringIfHelper() const at ?? line ?
+0x40206f5b: EAVManager::connectWifi(String, String) at ?? line ?
+0x40202030: String::changeBuffer(unsigned int) at ?? line ?
+0x4020207f: String::reserve(unsigned int) at ?? line ?
+0x402020b5: String::copy(char const*, unsigned int) at ?? line ?
+0x40202106: String::String(char const*) at ?? line ?
+0x40207d97: EAVManager::autoConnect(char const*, char const*) at ?? line ?
+0x40201748: Print::println() at ?? line ?
+0x4020449e: THiNX::connect() at ?? line ?
+0x40206256: THiNX::initWithAPIKey(char const*) at ?? line ?
+0x402063cc: THiNX::THiNX(char const*) at ?? line ?
+0x40202c40: esp_yield at ?? line ?
+0x402031ae: delay at ?? line ?
+0x40214e2a: setup at ?? line ?
+
+```
+# Usage
 ## Include
 
 ```c
