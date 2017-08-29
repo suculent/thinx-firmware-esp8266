@@ -216,19 +216,13 @@ boolean  EAVManager::startConfigPortal(char const *apName, char const *apPasswor
   return  WiFi.status() == WL_CONNECTED;
 }
 
-
 int EAVManager::connectWifi(String ssid, String pass) {
-  DEBUG_WM(F("Connecting as wifi client..."));
-
   // check if we've got static_ip settings, if we do, use those.
   if (_sta_static_ip) {
-    DEBUG_WM(F("Custom STA IP/GW/Subnet"));
     WiFi.config(_sta_static_ip, _sta_static_gw, _sta_static_sn);
-    DEBUG_WM(WiFi.localIP());
   }
   //fix for auto connect racing issue
   if (WiFi.status() == WL_CONNECTED) {
-    DEBUG_WM("Already connected.");
     return WL_CONNECTED;
   }
   //check if we have ssid and pass and force those, if not, try with last saved values
@@ -236,28 +230,15 @@ int EAVManager::connectWifi(String ssid, String pass) {
     WiFi.begin(ssid.c_str(), pass.c_str());
   } else {
     if (WiFi.SSID()) {
-      DEBUG_WM("Using credentials stored to EEPROM");
       //trying to fix connection in progress hanging
       ETS_UART_INTR_DISABLE();
       wifi_station_disconnect();
       ETS_UART_INTR_ENABLE();
-
       WiFi.begin();
-    } else {
-      DEBUG_WM("No saved credentials");
     }
   }
 
   int connRes = waitForConnectResult();
-
-#ifdef __WiFi_DEBUG__
-  if (connRes != WL_CONNECTED) {
-    DEBUG_WM ("DEBUG Connection fallback to IoT-WLAN...");
-    WiFi.begin("IoT-WLAN", "mytoudelame");
-    connRes = waitForConnectResult();
-  }
-#endif
-
   DEBUG_WM ("Connection result: ");
   DEBUG_WM ( connRes );
   //not connected, WPS enabled, no pass - first attempt
