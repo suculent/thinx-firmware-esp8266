@@ -29,7 +29,7 @@ class THiNX {
   public:
 
     THiNX();
-    THiNX(String);
+    THiNX(const char *);
 
     enum payload_type {
       Unknown = 0,
@@ -40,7 +40,7 @@ class THiNX {
     };
 
     // Public API
-    void initWithAPIKey(String);
+    void initWithAPIKey(const char *);
     void publish();
     void loop();
 
@@ -70,33 +70,31 @@ class THiNX {
     //void parse_update(JSONObject);
 
     // Import build-time values from thinx.h
-    String thinx_commit_id;
-    String thinx_mqtt_url;
-    String thinx_cloud_url;
-    String thinx_firmware_version;
-    String thinx_firmware_version_short;
-    String app_version;
-    String available_update_url;
-    String thinx_version_id;
+    const char* app_version;                  // max 80 bytes
+    const char* available_update_url;         // up to 1k
+    const char* thinx_cloud_url;              // up to 1k but generally something where FQDN fits
+    const char* thinx_commit_id;              // 40 bytes + 1
+    const char* thinx_firmware_version_short; // 14 bytes
+    const char* thinx_firmware_version;       // max 80 bytes
+    const char* thinx_mqtt_url;               // up to 1k but generally something where FQDN fits
+    const char* thinx_version_id;             // max 80 bytes (DEPRECATED?)
 
     bool thinx_auto_update;
     bool thinx_forced_update;
 
-    int thinx_mqtt_port;
-    int thinx_api_port;
+    long thinx_mqtt_port;
+    long thinx_api_port;
 
     // dynamic variables
-    String thinx_alias;
-    String thinx_owner;
-    String thinx_udid;
-    String thinx_api_key;
+    char* thinx_alias;
+    char* thinx_owner;
+    char* thinx_udid;
+    char* thinx_api_key;
 
     private:
 
       // WiFi Manager
-      WiFiClient *thx_wifi_client;
-      const char* autoconf_ssid; // SSID in AP mode
-      const char* autoconf_pwd; // fallback password, logged to console
+      WiFiClient *thx_wifi_client;      
       int status;                 // global WiFi status
       bool once;
       bool connected;
@@ -113,7 +111,7 @@ class THiNX {
       void checkin();
       void senddata(String);
       void parse(String);
-      void connect();
+      bool connect();
       void update_and_reboot(String);
 
       // MQTT
@@ -137,5 +135,12 @@ class THiNX {
 
       // THiNX Client
 
+      // Consistency checks
+      String realSize;
+      String ideSize;
+      bool flashCorrectlyConfigured;
+      bool fileSystemReady;
+      bool fsck();
 
+      //void strcp(const char* from, char [] to);
 };
