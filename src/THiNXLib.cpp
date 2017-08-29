@@ -513,7 +513,7 @@ void THiNX::parse(String payload) {
 
       if (thinx_reset_on_update == true) {
         save_device_info();
-        ESP.reboot();
+        ESP.restart();
       }
 
     } break;
@@ -773,7 +773,7 @@ void THiNX::saveConfigCallback() {
 
        const char* remote_config = config["remote_config"];
        if (strlen(remote_config) > 5) {
-         thinx_remote_config = String(remote_config);
+         thinx_remote_config = strdup(remote_config);
        }
 
        if (config["auto_update"].success()) {
@@ -788,12 +788,12 @@ void THiNX::saveConfigCallback() {
          thinx_reset_on_update = config["reset_on_update"];
        }
 
-       const char* last_commit_id = config["last_commit_id"];
-       if (strlen(last_commit_id) > 5) {
-         last_commit_id = String(last_commit_id);
+       const char* commit_id = config["last_commit_id"];
+       if (strlen(commit_id) > 5) {
+         last_commit_id = strdup(commit_id);
        }
 
-       if (strcmp(last_commit_id, thinx_commit_id)) {
+       if (strcmp(last_commit_id.c_str(), thinx_commit_id.c_str())) {
          Serial.println("Last version installed successfully, forced update will be disabled now.");
          thinx_forced_update = false;
        } else {
