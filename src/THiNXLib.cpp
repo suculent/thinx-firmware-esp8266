@@ -43,6 +43,8 @@ THiNX::THiNX(const char * __apikey) {
 
   if (__apikey) {
     thinx_api_key = strdup(__apikey);
+  } else {
+    thinx_api_key = strdup("");
   }
 
   // memory may be optimized later, this should pre-allocate enough except for available_update_url which may be very long
@@ -65,7 +67,8 @@ THiNX::THiNX(const char * __apikey) {
     return;
   }
 
-  initWithAPIKey(__apikey);
+  Serial.println("* TH: Init with AK...");
+  initWithAPIKey(thinx_api_key);
 }
 
 // Designated initializer
@@ -83,19 +86,23 @@ void THiNX::initWithAPIKey(const char * __apikey) {
 
   bool done = restore_device_info();
 
-  // override from code only if restored API key is not set
+  // override from code only if there's no saved API key yet
   if (strlen(thinx_api_key) < 4) {
+    // override from code only if override is defined
     if (strlen(__apikey) > 1) {
+      Serial.println("*TH: Assigning...");
       thinx_api_key = strdup(__apikey);
     }
   }
 
+  Serial.println("*TH: Checking AK...");
   if (strlen(thinx_api_key) < 4) {
     // TODO: FIXME: Repeat later (loop until WiFi is not 'connected')
     Serial.println("*TH: Exiting (no API Key)...");
     return;
   }
 
+  Serial.println("*TH: Connecting...");
   connected = connect();
 
   if (connected) {
@@ -494,6 +501,7 @@ void THiNX::parse(String payload) {
  */
 
 void THiNX::publish() {
+  if (!connected) return;
   if (mqtt_client == NULL) return;
   if (strlen(thinx_udid) < 4) return;
   bool done = restore_device_info(); // thinx_mqtt_status_channel() requires owner and uuid
@@ -888,8 +896,10 @@ bool THiNX::fsck() {
  */
 
 void THiNX::loop() {
-  Serial.println(".");
-  // uint32_t memfree = system_get_free_heap_size(); Serial.print("PRE-PUBLISH memfree: "); Serial.println(memfree);
-  publish();
-  //Serial.print("POST-PUBLISH memfree: "); memfree = system_get_free_heap_size(); Serial.println(memfree);
+  if (connected) {
+    Serial.println(".");
+    // uint32_t memfree = system_get_free_heap_size(); Serial.print("PRE-PUBLISH memfree: "); Serial.println(memfree);
+    publish();
+    //Serial.print("POST-PUBLISH memfree: "); memfree = system_get_free_heap_size(); Serial.println(memfree);
+  }
 }
