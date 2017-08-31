@@ -51,7 +51,7 @@ THiNX::THiNX(const char * __apikey) {
     return;
   }
 
-  if (thinx_api_key) {
+  if (strlen(thinx_api_key) > 4) {
     Serial.println("*TH: Init with AK...");
   } else {
     Serial.println("*TH: Init without AK (captive portal)...");
@@ -86,7 +86,7 @@ void THiNX::initWithAPIKey(const char * __apikey) {
   if (connected) {
     Serial.println("*TH: Connected to WiFi...");
     Serial.println("*TH: Checking in..."); Serial.flush();
-    if (thinx_api_key) {
+    if (strlen(thinx_api_key) > 4) {
       checkin();
       mqtt_result = start_mqtt(); // requires valid udid and api_keys, and allocated WiFiClient.
       if (mqtt_result == true) {
@@ -233,7 +233,7 @@ void THiNX::senddata(String body) {
  * Response Parser
  */
 
-void THiNX::parse(String body) {
+void THiNX::parse(String payload) {
 
   // TODO: Should parse response only for this device_id (which must be internal and not a mac)
 
