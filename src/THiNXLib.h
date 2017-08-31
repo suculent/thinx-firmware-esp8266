@@ -132,14 +132,6 @@ class THiNX {
       // Updates
       void notify_on_successful_update();
 
-      // THiNX Client
-
-      // Consistency checks
-      String realSize;
-      String ideSize;
-      bool flashCorrectlyConfigured;
-      bool fileSystemReady;
+      // File system consistency check
       bool fsck();
-
-      //void strcp(const char* from, char [] to);
 };

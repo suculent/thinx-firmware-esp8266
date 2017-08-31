@@ -6,9 +6,28 @@ extern "C" {
 }
 
 THiNX::THiNX() {
-  // We could init from SPIFFS directly but it is initially empty anyway
-  // and otherwise it could cause a lot of distraction.
-  available_update_url = "";
+
+  once = true;
+
+  Serial.println("*TH: Constructor 1..."); Serial.flush();
+  thx_udid[64] = {0};
+  status = WL_IDLE_STATUS;
+  shouldSaveConfig = false;
+  connected = false;
+  once = true;
+  mqtt_client = NULL;
+
+  thinx_udid = strdup("");
+  app_version = strdup("");
+  available_update_url = strdup("");
+  thinx_cloud_url = strdup("");
+  thinx_commit_id = strdup("");
+  thinx_firmware_version_short = strdup("");
+  thinx_firmware_version = strdup("");
+  thinx_mqtt_url = strdup("");
+  thinx_version_id = strdup("");
+  thinx_owner = strdup("");
+  thinx_api_key = strdup("");
 }
 
 // Should use THINX_API_KEY from thinx.h; if __apikey is not defined (NULL); resets once-token
@@ -16,21 +35,13 @@ THiNX::THiNX() {
 THiNX::THiNX(const char * __apikey) {
 
   thx_udid[64] = {0};
+
   status = WL_IDLE_STATUS;
   shouldSaveConfig = false;
   connected = false;
-  once = true;
+
   mqtt_client = NULL;
-  thx_wifi_client = new WiFiClient();
 
-  // Use __apikey only if set; may be NULL
-  if (__apikey) {
-    thinx_api_key = strdup(__apikey);
-  } else {
-    thinx_api_key = strdup("");
-  }
-
-  // memory may be optimized later, this should pre-allocate enough except for available_update_url which may be very long
   thinx_udid = strdup("");
   app_version = strdup("");
   available_update_url = strdup("");
@@ -42,32 +53,40 @@ THiNX::THiNX(const char * __apikey) {
   thinx_version_id = strdup("");
   thinx_owner = strdup("");
 
+
+  // Use __apikey only if set; may be NULL
+  if (strlen(__apikey) > 4) {
+    Serial.println("*TH: With API Key...");
+    thinx_api_key = strdup(__apikey);
+    Serial.println(thinx_api_key);
+  } else {
+    Serial.println("*TH: Without API Key...");
+    thinx_api_key = strdup("");
+  }
+
   // Read constants and possibly stored UDID/API Key
   if (once == true) {
     once = false;
     import_build_time_constants();
-  } else  {
-    Serial.println("*TH: Already initialized...");
-    return;
+    if (strlen(thinx_api_key) > 4) {
+      Serial.println("*TH: Init with AK...");
+    } else {
+      Serial.println("*TH: Init without AK (captive portal)...");
+    }
+    initWithAPIKey(thinx_api_key);
   }
-
-  if (strlen(thinx_api_key) > 4) {
-    Serial.println("*TH: Init with AK...");
-  } else {
-    Serial.println("*TH: Init without AK (captive portal)...");
-  }
-
-  initWithAPIKey(thinx_api_key);
 }
 
 // Designated initializer
 void THiNX::initWithAPIKey(const char * __apikey) {
 
-  if (!fsck()) {
-    Serial.println("* TH: Filesystem check failed, disabling THiNX."); Serial.flush();
-    return;
-  }
+  //Serial.println("*TH: Checking FS...");
+  //if (!fsck()) {
+  //  Serial.println("*TH: Filesystem check failed, disabling THiNX.");
+  //  return;
+  //}
 
+  Serial.println("*TH: Restoring device info...");
   bool done = restore_device_info();
 
   // override from code only if there's no saved API key yet
@@ -79,13 +98,16 @@ void THiNX::initWithAPIKey(const char * __apikey) {
     }
   }
 
-  Serial.println("*TH: Connecting...");
+  Serial.println("*TH: Initializing WiFi...");
+  thx_wifi_client = new WiFiClient();
+
+  Serial.println("*TH: Connecting..."); Serial.flush();
   connected = connect();
 
   // In case device has API Key, it must check-in now:
   if (connected) {
     Serial.println("*TH: Connected to WiFi...");
-    Serial.println("*TH: Checking in..."); Serial.flush();
+    Serial.println("*TH: Checking in...");
     if (strlen(thinx_api_key) > 4) {
       checkin();
       mqtt_result = start_mqtt(); // requires valid udid and api_keys, and allocated WiFiClient.
@@ -97,15 +119,13 @@ void THiNX::initWithAPIKey(const char * __apikey) {
     } else {
       Serial.println("Skipping checkin, no API Key...");
     }
+    #ifdef __DEBUG__
+      // Serial.println("[update] Trying direct update...");
+      // update_and_reboot("/bin/test/firmware.elf");
+    #endif
   } else {
     Serial.println("*TH: Connection to WiFi failed...");
-    return;
   }
-
-#ifdef __DEBUG__
-  // Serial.println("[update] Trying direct update...");
-  // update_and_reboot("/bin/test/firmware.elf");
-#endif
 }
 
 /*
@@ -117,17 +137,16 @@ bool THiNX::connect() {
    EAVManagerParameter *api_key_param = new EAVManagerParameter("apikey", "API Key", thinx_api_key, 64);
    manager->addParameter(api_key_param);
    manager->setTimeout(10000);
-   manager->setDebugOutput(false);
+   manager->setDebugOutput(true);
    Serial.println("*TH: AutoConnect with AP Mode (no password):");
-   Serial.setDebugOutput(false);
    _connected = manager->autoConnect("AP-THiNX");
-   Serial.println("*TH: AutoConnect loop..."); Serial.flush();
+   Serial.println("*TH: AutoConnect loop...");
    while ( !_connected ) {
-     Serial.println("failed to connect and hit timeout"); Serial.flush();
-     yield();
+     Serial.println("failed to connect and hit timeout");
      _connected = manager->autoConnect("AP-THiNX");
+     //yield();
      if (_connected == true) {
-       Serial.print("*TH: connect(): connected, exiting..."); Serial.flush();
+       Serial.print("*TH: connect(): connected, exiting...");
      }
    }
    return _connected;
@@ -203,7 +222,7 @@ void THiNX::senddata(String body) {
     unsigned long currentMillis = millis(), previousMillis = millis();
 
     while(!thx_wifi_client->available()){
-      yield();
+      //yield();
       if( (currentMillis - previousMillis) > interval ){
         Serial.println("Response Timeout. TODO: Should retry later.");
         thx_wifi_client->stop();
@@ -213,7 +232,7 @@ void THiNX::senddata(String body) {
     }
 
     while ( thx_wifi_client->connected() ) {
-      yield();
+      //yield();
       if ( thx_wifi_client->available() ) {
         char str = thx_wifi_client->read();
         payload = payload + String(str);
@@ -591,7 +610,6 @@ bool THiNX::start_mqtt() {
 
         if (pub.has_stream()) {
           Serial.println("*TH: MQTT Type: Stream...");
-          Serial.setDebugOutput(true);
           uint32_t startTime = millis();
           uint32_t size = pub.payload_len();
           if ( ESP.updateSketch(*pub.payload_stream(), size, true, false) ) {
@@ -666,9 +684,16 @@ void THiNX::saveConfigCallback() {
  */
 
 bool THiNX::restore_device_info() {
+  Serial.println("*TH: Checking file...");
+  if (!SPIFFS.exists("/thx.cfg")) return false;
+   Serial.println("*TH: Trying to open file...");
    File f = SPIFFS.open("/thx.cfg", "r");
    if (!f) {
        Serial.println("*TH: No remote configuration found so far...");
+       return false;
+   }
+   if (f.size() == 0) {
+        Serial.println("*TH: Remote configuration file empty...");
        return false;
    }
    String data = f.readStringUntil('\n');
@@ -858,31 +883,41 @@ void THiNX::import_build_time_constants() {
 #endif
 }
 
+/*
+0x4010020c: _umm_free at umm_malloc.c line ?
+0x40100688: free at ?? line ?
+0x40201344: Print::print(char const*) at ?? line ?
+0x40203e7b: THiNX::fsck() at ?? line ?
+0x4020135c: Print::println() at ?? line ?
+0x402059f4: THiNX::initWithAPIKey(char const*) at ?? line ?
+0x40205ba9: THiNX::THiNX(char const*) at ?? line ?
+0x4021501c: setup at ?? line ?
+*/
+
 bool THiNX::fsck() {
-    realSize = String(ESP.getFlashChipRealSize());
-    ideSize = String(ESP.getFlashChipSize());
-    flashCorrectlyConfigured = realSize.equals(ideSize);
-    fileSystemReady = false;
-    Serial.print("* TH: SPIFFS real size = ");
-    Serial.println(realSize); Serial.flush();
-    Serial.print("* TH: SPIFFS IDE size = ");
-    Serial.println(ideSize); Serial.flush();
-    Serial.println("* TH: Running file-system check...");
-    if(flashCorrectlyConfigured) {
-      Serial.println("* TH: Starting SPIFFS..."); Serial.flush();
-      fileSystemReady = SPIFFS.begin();
-      if (!fileSystemReady) {
-        Serial.println("* TH: Formatting SPIFFS..."); Serial.flush();
-        fileSystemReady = SPIFFS.format();;
-        Serial.println("* TH: Format complete, rebooting..."); Serial.flush();
-        ESP.reset();
-        return false;
-      }
-      Serial.println("* TH: SPIFFS Initialization completed."); Serial.flush();
-    }  else {
-      Serial.println("flash incorrectly configured, SPIFFS cannot start, IDE size: " + ideSize + ", real size: " + realSize); Serial.flush();
+  String realSize = String(ESP.getFlashChipRealSize());
+  String ideSize = String(ESP.getFlashChipSize());
+  bool flashCorrectlyConfigured = realSize.equals(ideSize);
+  bool fileSystemReady = false;
+  if(flashCorrectlyConfigured) {
+    Serial.println("* TH: Starting SPIFFS...");
+    fileSystemReady = SPIFFS.begin();
+    if (!fileSystemReady) {
+      Serial.println("* TH: Formatting SPIFFS...");
+      fileSystemReady = SPIFFS.format();;
+      Serial.println("* TH: Format complete, rebooting..."); Serial.flush();
+      delay(3000);
+      ESP.reset();
+      return false;
     }
-    return fileSystemReady;
+    Serial.println("* TH: SPIFFS Initialization completed.");
+  }  else {
+    Serial.println("flash incorrectly configured, SPIFFS cannot start, IDE size: " + ideSize + ", real size: " + realSize);
+  }
+
+  delay(1000);
+
+  return fileSystemReady ? true : false;
 }
 
 /*
