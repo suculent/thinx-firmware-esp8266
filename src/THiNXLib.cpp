@@ -5,31 +5,13 @@ extern "C" {
   #include "thinx.h"
 }
 
-String THiNX::thinx_mqtt_channel() {
-  return String("/") + thinx_owner + "/" + thinx_udid;
-}
-
-String THiNX::thinx_mqtt_status_channel() {
-  return String("/") + thinx_owner + "/" + thinx_udid + "/status";
-}
-
-String THiNX::thinx_mac() {
-  byte mac[] = {
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00
-  };
-  WiFi.macAddress(mac);
-  char macString[16] = {0};
-  sprintf(macString, "5CCF7F%6X", ESP.getChipId()); // ESP8266 only!
-  return String(macString);
-}
-
 THiNX::THiNX() {
   // We could init from SPIFFS directly but it is initially empty anyway
   // and otherwise it could cause a lot of distraction.
   available_update_url = "";
 }
 
-// Should use THINX_API_KEY from thinx.h; resets once-token
+// Should use THINX_API_KEY from thinx.h; if __apikey is not defined (NULL); resets once-token
 
 THiNX::THiNX(const char * __apikey) {
 
@@ -41,6 +23,7 @@ THiNX::THiNX(const char * __apikey) {
   mqtt_client = NULL;
   thx_wifi_client = new WiFiClient();
 
+  // Use __apikey only if set; may be NULL
   if (__apikey) {
     thinx_api_key = strdup(__apikey);
   } else {
@@ -59,6 +42,7 @@ THiNX::THiNX(const char * __apikey) {
   thinx_version_id = strdup("");
   thinx_owner = strdup("");
 
+  // Read constants and possibly stored UDID/API Key
   if (once == true) {
     once = false;
     import_build_time_constants();
@@ -67,17 +51,17 @@ THiNX::THiNX(const char * __apikey) {
     return;
   }
 
-  Serial.println("*TH: Init with AK...");
+  if (thinx_api_key) {
+    Serial.println("*TH: Init with AK...");
+  } else {
+    Serial.println("*TH: Init without AK (captive portal)...");
+  }
+
   initWithAPIKey(thinx_api_key);
 }
 
 // Designated initializer
 void THiNX::initWithAPIKey(const char * __apikey) {
-
-  if (__apikey == NULL || __apikey == "") {
-    Serial.println("* THiNX API Key not set. Exiting."); Serial.flush();
-    return;
-  }
 
   if (!fsck()) {
     Serial.println("* TH: Filesystem check failed, disabling THiNX."); Serial.flush();
@@ -95,25 +79,23 @@ void THiNX::initWithAPIKey(const char * __apikey) {
     }
   }
 
-  Serial.println("*TH: Checking AK...");
-  if (strlen(thinx_api_key) < 4) {
-    // TODO: FIXME: Repeat later (loop until WiFi is not 'connected')
-    Serial.println("*TH: Exiting (no API Key)...");
-    return;
-  }
-
   Serial.println("*TH: Connecting...");
   connected = connect();
 
+  // In case device has API Key, it must check-in now:
   if (connected) {
     Serial.println("*TH: Connected to WiFi...");
     Serial.println("*TH: Checking in..."); Serial.flush();
-    checkin();
-    mqtt_result = start_mqtt(); // requires valid udid and api_keys, and allocated WiFiClient.
-    if (mqtt_result == true) {
-      Serial.println("*TH: Starting MQTT...");
+    if (thinx_api_key) {
+      checkin();
+      mqtt_result = start_mqtt(); // requires valid udid and api_keys, and allocated WiFiClient.
+      if (mqtt_result == true) {
+        Serial.println("*TH: Starting MQTT...");
+      } else {
+        Serial.println("*TH: MQTT delayed...");
+      }
     } else {
-      Serial.println("*TH: MQTT delayed...");
+      Serial.println("Skipping checkin, no API Key...");
     }
   } else {
     Serial.println("*TH: Connection to WiFi failed...");
@@ -500,6 +482,25 @@ void THiNX::parse(String body) {
 /*
  * MQTT
  */
+
+String THiNX::thinx_mqtt_channel() {
+ return String("/") + thinx_owner + "/" + thinx_udid;
+}
+
+String THiNX::thinx_mqtt_status_channel() {
+ return String("/") + thinx_owner + "/" + thinx_udid + "/status";
+}
+
+String THiNX::thinx_mac() {
+ byte mac[] = {
+   0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+ };
+ WiFi.macAddress(mac);
+ char macString[16] = {0};
+ sprintf(macString, "5CCF7F%6X", ESP.getChipId()); // ESP8266 only!
+ return String(macString);
+}
+
 
 void THiNX::publish() {
   if (!connected) return;
