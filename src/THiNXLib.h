@@ -94,11 +94,10 @@ class THiNX {
     private:
 
       // WiFi Manager
-      WiFiClient *thx_wifi_client;      
+      WiFiClient *thx_wifi_client;
       int status;                 // global WiFi status
       bool once;
       bool connected;
-      //void configModeCallback(EAVManager*);
       void saveConfigCallback();
 
       // THiNX API

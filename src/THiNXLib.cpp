@@ -63,11 +63,11 @@ THiNX::THiNX(const char * __apikey) {
     once = false;
     import_build_time_constants();
   } else  {
-    Serial.println("* TH: Already initialized...");
+    Serial.println("*TH: Already initialized...");
     return;
   }
 
-  Serial.println("* TH: Init with AK...");
+  Serial.println("*TH: Init with AK...");
   initWithAPIKey(thinx_api_key);
 }
 
@@ -107,7 +107,7 @@ void THiNX::initWithAPIKey(const char * __apikey) {
 
   if (connected) {
     Serial.println("*TH: Connected to WiFi...");
-    Serial.println("*TH: Checking in...");
+    Serial.println("*TH: Checking in..."); Serial.flush();
     checkin();
     mqtt_result = start_mqtt(); // requires valid udid and api_keys, and allocated WiFiClient.
     if (mqtt_result == true) {
@@ -138,12 +138,11 @@ bool THiNX::connect() {
    manager->setDebugOutput(false);
    Serial.println("*TH: AutoConnect with AP Mode (no password):");
    Serial.setDebugOutput(false);
-   //--> crashes here
-   connected = manager->autoConnect("AP-THiNX");
+   _connected = manager->autoConnect("AP-THiNX");
    Serial.println("*TH: AutoConnect loop..."); Serial.flush();
    while ( !_connected ) {
-     //Serial.println("failed to connect and hit timeout");
-     delay(3000);
+     Serial.println("failed to connect and hit timeout"); Serial.flush();
+     yield();
      _connected = manager->autoConnect("AP-THiNX");
      if (_connected == true) {
        Serial.print("*TH: connect(): connected, exiting..."); Serial.flush();
@@ -222,6 +221,7 @@ void THiNX::senddata(String body) {
     unsigned long currentMillis = millis(), previousMillis = millis();
 
     while(!thx_wifi_client->available()){
+      yield();
       if( (currentMillis - previousMillis) > interval ){
         Serial.println("Response Timeout. TODO: Should retry later.");
         thx_wifi_client->stop();
@@ -231,6 +231,7 @@ void THiNX::senddata(String body) {
     }
 
     while ( thx_wifi_client->connected() ) {
+      yield();
       if ( thx_wifi_client->available() ) {
         char str = thx_wifi_client->read();
         payload = payload + String(str);
@@ -250,7 +251,7 @@ void THiNX::senddata(String body) {
  * Response Parser
  */
 
-void THiNX::parse(String payload) {
+void THiNX::parse(String body) {
 
   // TODO: Should parse response only for this device_id (which must be internal and not a mac)
 
@@ -642,16 +643,12 @@ bool THiNX::start_mqtt() {
     Serial.println("*TH: MQTT Not connected.");
     return false;
   }
-}
-}
+}}
 
 //
 // EAVManager Setup Callbacks
 //
 
-
-// `api_key_param` should have its value set when this gets called
-// ICACHE_FLASH_ATTR
 void THiNX::saveConfigCallback() {
   Serial.println("Saveing configuration...");
   strcpy(thx_api_key, api_key_param->getValue());
@@ -740,8 +737,7 @@ bool THiNX::restore_device_info() {
    bool done = restore_device_info();
  }
 
-String THiNX::deviceInfo()
-{
+String THiNX::deviceInfo() {
   Serial.println("*TH: building device info:");
   JsonObject& root = jsonBuffer.createObject();
   root["alias"] = thinx_alias;
@@ -862,9 +858,6 @@ void THiNX::import_build_time_constants() {
 }
 
 bool THiNX::fsck() {
-#ifdef __DEBUG__
-  return true;
-#endif
     realSize = String(ESP.getFlashChipRealSize());
     ideSize = String(ESP.getFlashChipSize());
     flashCorrectlyConfigured = realSize.equals(ideSize);
@@ -897,9 +890,11 @@ bool THiNX::fsck() {
 
 void THiNX::loop() {
   if (connected) {
-    Serial.println(".");
     // uint32_t memfree = system_get_free_heap_size(); Serial.print("PRE-PUBLISH memfree: "); Serial.println(memfree);
     publish();
     //Serial.print("POST-PUBLISH memfree: "); memfree = system_get_free_heap_size(); Serial.println(memfree);
+  }
+  if (mqtt_client != NULL) {
+    mqtt_client->loop();
   }
 }
