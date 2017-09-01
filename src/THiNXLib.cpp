@@ -52,26 +52,29 @@ THiNX::THiNX(const char * __apikey) {
   thinx_mqtt_url = strdup("");
   thinx_version_id = strdup("");
   thinx_owner = strdup("");
+  thinx_api_key = strdup("");
 
-  // Use __apikey only if set; may be NULL
-  if (strlen(__apikey) > 4) {
-    Serial.print("*TH: With custom API Key: ");
-    thinx_api_key = strdup(__apikey);
-    Serial.println(thinx_api_key);
-  } else {
-    Serial.println("*TH: Without API Key...");
-    thinx_api_key = strdup("");
-  }
 
   // Read constants and possibly stored UDID/API Key
   if (once == true) {
     once = false;
     import_build_time_constants();
+
+    // Use __apikey only if set; may be NULL
     if (strlen(thinx_api_key) > 4) {
-      Serial.println("*TH: Init with stored AK...");
+      Serial.print("*TH: Init with stored API Key: ");
     } else {
-      Serial.println("*TH: Init without AK (captive portal)...");
+
+      if (strlen(__apikey) > 4) {
+        Serial.print("*TH: With custom API Key: ");
+        thinx_api_key = strdup(__apikey);
+        Serial.println(thinx_api_key);
+      } else {
+        Serial.println("*TH: Init without AK (captive portal)...");
+      }
     }
+
+    Serial.print(thinx_api_key);
     initWithAPIKey(thinx_api_key);
   }
 }
@@ -212,7 +215,7 @@ void THiNX::senddata(String body) {
     // (same request can be called in order to add matching mobile application push token)
     thx_wifi_client->println("POST /device/register HTTP/1.1");
     thx_wifi_client->println("Host: thinx.cloud");
-    thx_wifi_client->print("Authentication: "); thx_wifi_client->println(thx_api_key);
+    thx_wifi_client->print("Authentication: "); thx_wifi_client->println(thinx_api_key);
     thx_wifi_client->println("Accept: application/json"); // application/json
     thx_wifi_client->println("Origin: device");
     thx_wifi_client->println("Content-Type: application/json");
@@ -783,9 +786,9 @@ String THiNX::deviceInfo() {
   Serial.print("*TH: thinx_owner: ");
   Serial.println(thinx_owner);
 
-  root["apikey"] = thx_api_key;
-  Serial.print("*TH: thx_api_key: ");
-  Serial.println(thx_api_key);
+  root["apikey"] = thinx_api_key;
+  Serial.print("*TH: thinx_api_key: ");
+  Serial.println(thinx_api_key);
 
   root["udid"] = thinx_udid;
   Serial.print("*TH: thinx_udid: ");
@@ -950,7 +953,7 @@ void THiNX::loop() {
   if (should_save_config) {
     if (strlen(thx_api_key) > 4) {
       thinx_api_key = thx_api_key;
-      Serial.print("Saving thinx_api_key: ");
+      Serial.print("Saving thx_api_key from Captive Portal: ");
       Serial.println(thinx_api_key);
       save_device_info();
       should_save_config = false;
