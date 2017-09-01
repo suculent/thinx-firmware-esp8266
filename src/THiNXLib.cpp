@@ -3,44 +3,28 @@
 extern "C" {
   #include "user_interface.h"
   #include "thinx.h"
+  #include <cont.h>
+  extern cont_t g_cont;
 }
+
+register uint32_t *sp asm("a1");
 
 THiNX::THiNX() {
-
   once = true;
-
-  Serial.println("*TH: Constructor 1..."); Serial.flush();
-  thx_udid[64] = {0};
-  status = WL_IDLE_STATUS;
-  should_save_config = false;
-  connected = false;
-  once = true;
-  mqtt_client = NULL;
-
-  thinx_udid = strdup("");
-  app_version = strdup("");
-  available_update_url = strdup("");
-  thinx_cloud_url = strdup("");
-  thinx_commit_id = strdup("");
-  thinx_firmware_version_short = strdup("");
-  thinx_firmware_version = strdup("");
-  thinx_mqtt_url = strdup("");
-  thinx_version_id = strdup("");
-  thinx_owner = strdup("");
-  thinx_api_key = strdup("");
 }
-
-// Should use THINX_API_KEY from thinx.h; if __apikey is not defined (NULL); resets once-token
 
 THiNX::THiNX(const char * __apikey) {
 
-  thx_udid[64] = {0};
-
   status = WL_IDLE_STATUS;
   should_save_config = false;
   connected = false;
 
   mqtt_client = NULL;
+
+  if (once != true) {
+    Serial.print("*TH: Setting ONCE token...");
+    once = true;
+  }
 
   thinx_udid = strdup("");
   app_version = strdup("");
@@ -54,29 +38,23 @@ THiNX::THiNX(const char * __apikey) {
   thinx_owner = strdup("");
   thinx_api_key = strdup("");
 
-
   // Read constants and possibly stored UDID/API Key
-  if (once == true) {
-    once = false;
-    import_build_time_constants();
+  import_build_time_constants();
 
-    // Use __apikey only if set; may be NULL
-    if (strlen(thinx_api_key) > 4) {
-      Serial.print("*TH: Init with stored API Key: ");
+  // Use __apikey only if set; may be NULL
+  if (strlen(thinx_api_key) > 4) {
+    Serial.print("*TH: Init with stored API Key: ");
+  } else {
+    if (strlen(__apikey) > 4) {
+      Serial.print("*TH: With custom API Key: ");
+      thinx_api_key = strdup(__apikey);
     } else {
-
-      if (strlen(__apikey) > 4) {
-        Serial.print("*TH: With custom API Key: ");
-        thinx_api_key = strdup(__apikey);
-        Serial.println(thinx_api_key);
-      } else {
-        Serial.println("*TH: Init without AK (captive portal)...");
-      }
+      Serial.println("*TH: Init without AK (captive portal)...");
     }
-
-    Serial.print(thinx_api_key);
-    initWithAPIKey(thinx_api_key);
   }
+
+  Serial.println(thinx_api_key);
+  initWithAPIKey(thinx_api_key); Serial.flush();
 }
 
 // Designated initializer
@@ -88,20 +66,32 @@ void THiNX::initWithAPIKey(const char * __apikey) {
   //  return;
   //}
 
+  Serial.printf("unmodified stack   = %4d\n", cont_get_free_stack(&g_cont));
+  Serial.printf("current free stack = %4d\n", 4 * (sp - g_cont.stack));
+  // 84, 144
+
   Serial.println("*TH: Restoring device info...");
-  bool done = restore_device_info();
+  // restore_device_info();
+
+  Serial.printf("unmodified stack   = %4d\n", cont_get_free_stack(&g_cont));
+  Serial.printf("current free stack = %4d\n", 4 * (sp - g_cont.stack));
+  // 0, 144
 
   // override from code only if there's no saved API key yet
   if (strlen(thinx_api_key) < 4) {
     // override from code only if override is defined
-    if (strlen(__apikey) > 1) {
-      Serial.println("*TH: Assigning...");
+    if (String(__apikey).length() > 1) {
+      Serial.println("*TH: Assigning custom API Key: ");
       thinx_api_key = strdup(__apikey);
     }
+  } else {
+    Serial.print("*TH: Using stored API Key: ");
   }
 
-  Serial.println("*TH: Initializing WiFiClient...");
-  thx_wifi_client = new WiFiClient();
+  Serial.println(thinx_api_key);
+
+  Serial.printf("unmodified stack   = %4d\n", cont_get_free_stack(&g_cont));
+  Serial.printf("current free stack = %4d\n", 4 * (sp - g_cont.stack));
 
   delay(3000);
 
@@ -248,7 +238,6 @@ void THiNX::senddata(String body) {
       }
     }
 
-    thx_wifi_client->stop();
     parse(payload);
 
   } else {
@@ -684,7 +673,6 @@ bool THiNX::start_mqtt() {
 //
 
 void THiNX::saveConfigCallback() {
-  Serial.println("Saveing configuration...");
   should_save_config = true;
   strcpy(thx_api_key, api_key_param->getValue());
 }
@@ -695,17 +683,17 @@ void THiNX::saveConfigCallback() {
 
 bool THiNX::restore_device_info() {
   if (!SPIFFS.exists("/thx.cfg")) {
-    //Serial.println("*TH: No persistent data found.");
+    Serial.println("*TH: No persistent data found."); Serial.flush();
     return false;
   }
-   //Serial.println("*TH: Found persistent data...");
+   Serial.println("*TH: Found persistent data..."); Serial.flush();
    File f = SPIFFS.open("/thx.cfg", "r");
    if (!f) {
-       Serial.println("*TH: No remote configuration found so far...");
+       Serial.println("*TH: No remote configuration found so far..."); Serial.flush();
        return false;
    }
    if (f.size() == 0) {
-        Serial.println("*TH: Remote configuration file empty...");
+        Serial.println("*TH: Remote configuration file empty..."); Serial.flush();
        return false;
    }
    String data = f.readStringUntil('\n');
@@ -740,7 +728,6 @@ bool THiNX::restore_device_info() {
       Serial.println(THINX_UDID);
       thinx_udid = strdup(THINX_UDID);
     }
-    sprintf(thx_udid, "%s", thinx_udid); // 40 max
     f.close();
    }
    return true;

@@ -101,8 +101,7 @@ class THiNX {
       void saveConfigCallback();
 
       // THiNX API
-      char thx_api_key[64];     // new firmware requires 64 bytes
-      char thx_udid[64];        // new firmware requires 64 bytes
+      char thx_api_key[64];     // for EAVManager/WiFiManager callback
       char mac_string[16] = {0};
       const char * thinx_mac();
 
