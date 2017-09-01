@@ -7,8 +7,10 @@
 #include "ArduinoJson/ArduinoJson.h"
 
 #include <FS.h>
-#include "EAVManager/EAVManager.h"
+#include <EEPROM.h>
+//#include "EAVManager/EAVManager.h"
 //#include <EAVManager.h>
+#include <WiFiManager.h>
 
 // Using better than Arduino-bundled version of MQTT https://github.com/Imroy/pubsubclient
 #include "PubSubClient/PubSubClient.h" // Local checkout
@@ -44,17 +46,10 @@ class THiNX {
     void publish();
     void loop();
 
-    // THiNX MQTT Protocol
-    const char* thx_connected_response = "{ \"status\" : \"connected\" }";
-    const char* thx_disconnected_response = "{ \"status\" : \"disconnected\" }";
-    const char* thx_reboot_response = "{ \"status\" : \"rebooting\" }";
-    const char* thx_update_question = "{ title: \"Update Available\", body: \"There is an update available for this device. Do you want to install it now?\", type: \"actionable\", response_type: \"bool\" }";
-
     String checkin_body(); // TODO: Refactor to C-string
 
-    // WiFi Client
-    EAVManager *manager;
-    EAVManagerParameter *api_key_param;
+    WiFiManager *manager;
+    WiFiManagerParameter *api_key_param;
 
     // MQTT
 
@@ -110,7 +105,8 @@ class THiNX {
 
       // In order of appearance
       bool fsck();
-      bool connect_wifi();
+      void start();
+      void connect_wifi();
       void checkin();
       void senddata(String); // TODO: Refactor to C-string
       void parse(String); // TODO: Refactor to C-string
