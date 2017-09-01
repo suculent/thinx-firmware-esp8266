@@ -44,13 +44,13 @@ class THiNX {
     void publish();
     void loop();
 
-    // Internal public API
-    String thx_connected_response = "{ \"status\" : \"connected\" }";
-    String thx_disconnected_response = "{ \"status\" : \"disconnected\" }";
-    String thx_reboot_response = "{ \"status\" : \"rebooting\" }";
-    String thx_update_question = "{ title: \"Update Available\", body: \"There is an update available for this device. Do you want to install it now?\", type: \"actionable\", response_type: \"bool\" }";
+    // THiNX MQTT Protocol
+    const char* thx_connected_response = "{ \"status\" : \"connected\" }";
+    const char* thx_disconnected_response = "{ \"status\" : \"disconnected\" }";
+    const char* thx_reboot_response = "{ \"status\" : \"rebooting\" }";
+    const char* thx_update_question = "{ title: \"Update Available\", body: \"There is an update available for this device. Do you want to install it now?\", type: \"actionable\", response_type: \"bool\" }";
 
-    String checkin_body();
+    String checkin_body(); // TODO: Refactor to C-string
 
     // WiFi Client
     EAVManager *manager;
@@ -62,8 +62,8 @@ class THiNX {
 
     uint8_t buf[MQTT_BUFFER_SIZE];
 
-    String thinx_mqtt_channel();
-    String thinx_mqtt_status_channel();
+    String thinx_mqtt_channel(); // TODO: Refactor to C-string
+    String thinx_mqtt_status_channel(); // TODO: Refactor to C-string
 
     // Response parsers
     //void parse_registration(JSONObject);
@@ -103,35 +103,32 @@ class THiNX {
       // THiNX API
       char thx_api_key[64];     // new firmware requires 64 bytes
       char thx_udid[64];        // new firmware requires 64 bytes
+      char mac_string[16] = {0};
+      const char * thinx_mac();
 
       StaticJsonBuffer<1024> jsonBuffer;
       StaticJsonBuffer<2048> wrapperBuffer;
 
+      // In order of appearance
+      bool fsck();
+      bool connect_wifi();
       void checkin();
-      void senddata(String);
-      void parse(String);
-      bool connect();
-      void update_and_reboot(String);
+      void senddata(String); // TODO: Refactor to C-string
+      void parse(String); // TODO: Refactor to C-string
+      void update_and_reboot(String); // TODO: Refactor to C-string
 
       // MQTT
       int last_mqtt_reconnect;
       bool start_mqtt();
       bool mqtt_result;
 
-      String thinx_mqtt_shared_channel();
-      String thinx_mac();
-
       // Data Storage
+      bool should_save_config; // called after autoconnect, may provide new API Key
       void import_build_time_constants();
-
-      bool shouldSaveConfig;
+      String deviceInfo(); // TODO: Refactor to C-string
       bool restore_device_info();
       void save_device_info();
-      String deviceInfo();
 
       // Updates
       void notify_on_successful_update();
-
-      // File system consistency check
-      bool fsck();
 };
