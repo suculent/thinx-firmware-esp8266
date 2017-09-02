@@ -1,6 +1,6 @@
 # thinx-esp8266-firmware
 
-Firmware for automatic device registration and OTA updates.
+Firmware for automatic device registration and OTA updates based on [THiNX OpenSource IoT management platform](https://thinx.cloud).
 
 Provides example implementations in Arduino C, LUA and Micropython.
 
@@ -52,7 +52,7 @@ Tested with:
 
 # Usage
 
-1. Create account on the [http://rtm.thinx.cloud/](http://rtm.thinx.cloud/) site
+1. Create account on the [https://rtm.thinx.cloud/](https://rtm.thinx.cloud/) site
 2. Create an API Key
 3. Clone [vanilla NodeMCU app repository](https://github.com/suculent/thinx-firmware-esp8266) 
 4. Run the bash ./prerelease.sh to create Thinx.h file; you can edit this with your custom information but the file will be overwritten when building on the server
