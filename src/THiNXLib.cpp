@@ -39,11 +39,17 @@ THiNX::THiNX(const char * __apikey) {
   thinx_owner = strdup("");
   thinx_api_key = strdup("");
 
+#ifdef __USE_WIFI_MANAGER__
   manager = new WiFiManager;
   WiFiManagerParameter *api_key_param = new WiFiManagerParameter("apikey", "API Key", thinx_api_key, 64);
   manager->addParameter(api_key_param);
   manager->setTimeout(800); // more than 1s might cause wdt_reset
   manager->setDebugOutput(false); // does some logging on mode set
+#else
+  if (WiFi.status() == WL_CONNECTED) {
+    connected = true;
+  }
+#endif
 
   // Read constants and possibly stored UDID/API Key
   import_build_time_constants();
@@ -112,13 +118,34 @@ void THiNX::connect_wifi() {
    Serial.printf("autoConnect: current free stack = %4d\n", 4 * (sp - g_cont.stack));
    // 4, 208!
 
+#ifdef __USE_WIFI_MANAGER__
    manager->setDebugOutput(false); // does some logging on mode set
-
    while ( !manager->autoConnect("AP-THiNX") ) {
      Serial.println("*TH: AutoConnect loop...");;
-     delay(500);
-     yield();
+     delay(1);
    }
+#else
+  if (connected) {
+    return;
+  }
+
+  const char * ssid = strdup(THINX_ENV_SSID);
+  const char * pass = strdup(THINX_ENV_PASS);
+
+  if (ssid != "") {
+    Serial.println("*TH: Connecting to AP with pre-defined credentials...");;
+    WiFi.begin(ssid, pass);
+  } else {
+    if (WiFi.SSID()) {
+      //trying to fix connection in progress hanging
+      ETS_UART_INTR_DISABLE();
+      wifi_station_disconnect();
+      ETS_UART_INTR_ENABLE();
+      WiFi.begin();
+      Serial.println("*TH: Connecting with saved values...");;
+    }
+  }
+#endif
  }
 
  void THiNX::checkin() {
@@ -635,6 +662,7 @@ bool THiNX::start_mqtt() {
   }
 }}
 
+#ifdef __USE_WIFI_MANAGER__
 //
 // WiFiManager Setup Callbacks
 //
@@ -643,6 +671,7 @@ void THiNX::saveConfigCallback() {
   should_save_config = true;
   strcpy(thx_api_key, api_key_param->getValue());
 }
+#endif
 
 /*
  * Device Info
@@ -903,16 +932,13 @@ bool THiNX::fsck() {
       Serial.println("* TH: Formatting SPIFFS...");
       fileSystemReady = SPIFFS.format();;
       Serial.println("* TH: Format complete, rebooting..."); Serial.flush();
-      delay(3000);
-      ESP.reset();
+      ESP.restart();
       return false;
     }
     Serial.println("* TH: SPIFFS Initialization completed.");
   }  else {
     Serial.println("flash incorrectly configured, SPIFFS cannot start, IDE size: " + ideSize + ", real size: " + realSize);
   }
-
-  delay(1000);
 
   return fileSystemReady ? true : false;
 }

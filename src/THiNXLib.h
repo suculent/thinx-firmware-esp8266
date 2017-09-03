@@ -26,6 +26,8 @@
 
 #define MQTT_BUFFER_SIZE 512
 
+//#define __USE_WIFI_MANAGER__
+
 class THiNX {
 
   public:
@@ -48,21 +50,18 @@ class THiNX {
 
     String checkin_body(); // TODO: Refactor to C-string
 
+#ifdef __USE_WIFI_MANAGER__
     WiFiManager *manager;
     WiFiManagerParameter *api_key_param;
+#endif
 
     // MQTT
-
     PubSubClient *mqtt_client;
 
     uint8_t buf[MQTT_BUFFER_SIZE];
 
     String thinx_mqtt_channel(); // TODO: Refactor to C-string
     String thinx_mqtt_status_channel(); // TODO: Refactor to C-string
-
-    // Response parsers
-    //void parse_registration(JSONObject);
-    //void parse_update(JSONObject);
 
     // Import build-time values from thinx.h
     const char* app_version;                  // max 80 bytes
@@ -126,4 +125,11 @@ class THiNX {
 
       // Updates
       void notify_on_successful_update();
+
+      // Local WiFi Impl
+      bool wifi_wait_for_connect;
+      unsigned long wifi_wait_start;
+      unsigned long wifi_wait_timeout;
+      int wifi_retry;
+      uint8_t wifi_status;
 };
