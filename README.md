@@ -4,34 +4,38 @@ An Arduino/ESP8266 library to wrap client for OTA updates and RTM (Remote Things
 
 # Success log (library is not finished)
 
+Currently crashes somewhere in the middle of senddata(String) ; should be refactored to const char *
+
 ```
-* TH: Init with AK...
-*TH: No remote configuration found so far...
-*TH: Checking AK...
-*TH: Exiting (no API Key)...
-*TH: Starting loop...
-.
-Free size: 3222364160
+*THiNX: LOOP >>>
+*TH: WiFi connected, checking in...
+*TH: Starting API checkin...
+*THiNXLib::checkin_body(): heap = 36056
+*TH: Wrapping request...
+{"registration":{"mac":"5CCF7FC3AF7C","firmware":"thinx-firmware-arduinoc-2.0.34:2017-08-28","version":"2.0.34","commit":"14ee4171ac64e8e641e2cecf2000aaac9959113b","owner":"cedc
+16bb6bb06daaa3ff6d30666d91aacd6e3efbf9abbc151b4dcade59af7c12","alias":"robotdyn-esp8266-wifi-node","platform":"platformio"}}
+Fatal exception 9(LoadStoreAlignmentCause):
+epc1=0x4020b21e, epc2=0x00000000, epc3=0x00000000, excvaddr=0xfeefeffe, depc=0x00000000
 
+Exception (9):
+epc1=0x4020b21e epc2=0x00000000 epc3=0x00000000 excvaddr=0xfeefeffe depc=0x00000000
 
-Soft WDT reset
+ctx: sys
 
+sp: 3fff0960 end: 3fffffb0 offset: 01a0
 ```
 
 Stack trace:
 ```
-Exception 9: LoadStoreAlignmentCause: Load or store to an unaligned address
-Decoding 10 results
-0x40201646: Print::write(char const*) at ?? line ?
-0x402098e4: PubSubClient::loop() at ?? line ?
-0x402017b5: Print::println(char const*) at ?? line ?
-0x40204eb8: ArduinoJson::Internals::JsonParser  ::Reader, ArduinoJson::StaticJsonBufferBase&>::parseObject() at ?? line ?
-0x4021415c: HTTPClient::~HTTPClient() at ?? line ?
-0x4020164d: Print::write(char const*) at ?? line ?
-0x4020164d: Print::write(char const*) at ?? line ?
-0x40206229: THiNX::start_mqtt() at ?? line ?
-0x40206400: THiNX::THiNX(char const*) at ?? line ?
-0x40214e46: TransportTraits::verify(WiFiClient&, char const*) at ?? line ?
+0x4020b21e: THiNX::senddata(String) at ??:?
+0x4020b21e: THiNX::senddata(String) at ??:?
+0x4020b218: THiNX::senddata(String) at ??:?
+0x40201848: Print::println() at ??:?
+0x40201848: Print::println() at ??:?
+0x4020b3eb: THiNX::checkin() at ??:?
+0x40201894: Print::println(char const*) at ??:?
+0x4020b870: THiNX::loop() at ??:?
+0x4020fd34: loop at ??:?
 
 ```
 # Usage

@@ -60,8 +60,8 @@ class THiNX {
 
     uint8_t buf[MQTT_BUFFER_SIZE];
 
-    String thinx_mqtt_channel(); // TODO: Refactor to C-string
-    String thinx_mqtt_status_channel(); // TODO: Refactor to C-string
+    const char* thinx_mqtt_channel();
+    const char* thinx_mqtt_status_channel();
 
     // Import build-time values from thinx.h
     const char* app_version;                  // max 80 bytes
@@ -100,7 +100,7 @@ class THiNX {
       const char * thinx_mac();
 
       StaticJsonBuffer<1024> jsonBuffer;
-      StaticJsonBuffer<2048> wrapperBuffer;
+      StaticJsonBuffer<1280> wrapperBuffer;
 
       // In order of appearance
       bool fsck();
@@ -115,6 +115,7 @@ class THiNX {
       int last_mqtt_reconnect;
       bool start_mqtt();
       bool mqtt_result;
+      String mqtt_payload;
 
       // Data Storage
       bool should_save_config; // called after autoconnect, may provide new API Key
@@ -126,10 +127,15 @@ class THiNX {
       // Updates
       void notify_on_successful_update();
 
+      // Event Queue
+      bool checked_in;
+      bool mqtt_started;
+
       // Local WiFi Impl
       bool wifi_wait_for_connect;
       unsigned long wifi_wait_start;
       unsigned long wifi_wait_timeout;
       int wifi_retry;
       uint8_t wifi_status;
+      bool wifi_connection_in_progress;
 };
