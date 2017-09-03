@@ -7,35 +7,38 @@ An Arduino/ESP8266 library to wrap client for OTA updates and RTM (Remote Things
 Currently crashes somewhere in the middle of senddata(String) ; should be refactored to const char *
 
 ```
-*THiNX: LOOP >>>
 *TH: WiFi connected, checking in...
 *TH: Starting API checkin...
-*THiNXLib::checkin_body(): heap = 36056
-*TH: Wrapping request...
-{"registration":{"mac":"5CCF7FC3AF7C","firmware":"thinx-firmware-arduinoc-2.0.34:2017-08-28","version":"2.0.34","commit":"14ee4171ac64e8e641e2cecf2000aaac9959113b","owner":"cedc
+{"registration":{"mac":"5CCF7FF0949A","firmware":"thinx-firmware-arduinoc-2.0.34:2017-08-28","version":"2.0.34","commit":"14ee4171ac64e8e641e2cecf2000aaac9959113b","owner":"cedc
 16bb6bb06daaa3ff6d30666d91aacd6e3efbf9abbc151b4dcade59af7c12","alias":"robotdyn-esp8266-wifi-node","platform":"platformio"}}
-Fatal exception 9(LoadStoreAlignmentCause):
-epc1=0x4020b21e, epc2=0x00000000, epc3=0x00000000, excvaddr=0xfeefeffe, depc=0x00000000
+*THiNXLib::senddata(): connected...*THiNXLib::senddata(): with api key...*THiNXLib::senddata(): waiting for response...*THiNXLib::senddata(): parsing payload...*TH: Parsing resp
+onse: '{"registration":{"success":true,"owner":"cedc16bb6bb06daaa3ff6d30666d91aacd6e3efbf9abbc151b4dcade59af7c12","alias":"robotdyn-esp8266-wifi-node","udid":"816067f0-90ec-11e7
+-bf7f-3d24207fb6af","status":"OK"}}'
+commit:
+version:
+*TH: building device info:
+*TH: thinx_alias: robotdyn-esp8266-wifi-node
+*TH: thinx_owner: cedc16bb6bb06daaa3ff6d30666d91aacd6e3efbf9abbc151b4dcade59af7c12
+*TH: thinx_api_key: 71679ca646c63d234e957e37e4f4069bf4eed14afca4569a0c74abf503076732
+*TH: thinx_udid: 816067f0-90ec-11e7-bf7f-3d24207fb6af
+*TH: available_update_url:
 
-Exception (9):
-epc1=0x4020b21e epc2=0x00000000 epc3=0x00000000 excvaddr=0xfeefeffe depc=0x00000000
-
-ctx: sys
-
-sp: 3fff0960 end: 3fffffb0 offset: 01a0
+*TH: saving configuration to EEPROM...{"alias":"robotdyn-esp8266-wifi-node","owner":"cedc16bb6bb06daaa3ff6d30666d91aacd6e3efbf9abbc151b4dcade59af7c12","apikey":"71679ca646c63d23
+4e957e37e4f4069bf4eed14afca4569a0c74abf503076732","udid":"816067f0-90ec-11e7-bf7f-3d24207fb6af","update":""}
+*TH: EEPROM data committed...
 ```
 
 Stack trace:
 ```
-0x4020b21e: THiNX::senddata(String) at ??:?
-0x4020b21e: THiNX::senddata(String) at ??:?
-0x4020b218: THiNX::senddata(String) at ??:?
+0x4020b252: THiNX::senddata(String) at ??:?
+0x4020b252: THiNX::senddata(String) at ??:?
+0x4020b24c: THiNX::senddata(String) at ??:?
 0x40201848: Print::println() at ??:?
 0x40201848: Print::println() at ??:?
-0x4020b3eb: THiNX::checkin() at ??:?
+0x4020b41f: std::_Function_handler<void (MQTT::Publish const&), THiNX::start_mqtt()::{lambda(MQTT::Publish const&)#1}>::_M_invoke(std::_Any_data const&, MQTT::Publish const&) at THiNXLib.cpp:?
 0x40201894: Print::println(char const*) at ??:?
-0x4020b870: THiNX::loop() at ??:?
-0x4020fd34: loop at ??:?
+0x4020b8a4: MQTT::Connect::~Connect() at ??:?
+0x4020fd6e: loop at ??:?
 
 ```
 # Usage

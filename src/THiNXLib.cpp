@@ -81,14 +81,16 @@ THiNX::THiNX(const char * __apikey) {
 // Designated initializer
 void THiNX::initWithAPIKey(const char * __apikey) {
 
+  Serial.println("*TH: Restoring device info...");
+  bool success = restore_device_info();
+
+  // FS may deprecate in favour of EEPROM
   //Serial.println("*TH: Checking FS...");
   //if (!fsck()) {
   //  Serial.println("*TH: Filesystem check failed, disabling THiNX.");
   //  return;
   //}
 
-  //Serial.println("*TH: Restoring device info...");
-  //bool success = restore_device_info();
   if (strlen(thinx_api_key) < 4) {
     if (String(__apikey).length() > 1) {
       thinx_api_key = strdup(__apikey);
@@ -459,24 +461,17 @@ void THiNX::parse(String payload) {
       if (status == "OK") {
 
         String alias = registration["alias"];
-        Serial.print("Reading alias: ");
-        Serial.print(alias);
         if ( alias.length() > 0 ) {
-          Serial.println(String("assigning alias: ") + alias);
           thinx_alias = strdup(alias.c_str());
         }
 
         String owner = registration["owner"];
-        Serial.println("Reading owner: ");
         if ( owner.length() > 0 ) {
-          Serial.println(String("assigning owner: ") + owner);
           thinx_owner = strdup(owner.c_str());
         }
 
-        Serial.println("Reading udid: ");
         String udid = registration["udid"];
         if ( udid.length() > 4 ) {
-          Serial.println(String("assigning udid: ") + udid);
           thinx_udid = strdup(udid.c_str());
         }
 
@@ -543,11 +538,11 @@ void THiNX::parse(String payload) {
  */
 
 const char* THiNX::thinx_mqtt_channel() {
- return String(String("/") + thinx_owner + "/" + thinx_udid).c_str();
+ return String(String("/") + String(thinx_owner) + "/" + String(thinx_udid)).c_str();
 }
 
 const char* THiNX::thinx_mqtt_status_channel() {
- return String(String("/") + thinx_owner + "/" + thinx_udid + "/status").c_str();
+ return String(String("/") + String(thinx_owner) + "/" + String(thinx_udid) + "/status").c_str();
 }
 
 const char * THiNX::thinx_mac() {
@@ -727,19 +722,51 @@ void THiNX::saveConfigCallback() {
 
 bool THiNX::restore_device_info() {
 
-  /*
+#ifndef __USE_SPIFFS__
+
+  // EEPROM read
+  // first character should be {
+
+  // Serial.println("*TH: restoring configuration from EEPROM...");
+
   int value;
-  char info[4096] = {0}
-  Serial.print("*TH: restoring configuration from EEPROM...");
-  EEPROM.begin(4096); // SPI_FLASH_SEC_SIZE
-  for (long a = 0; a < 4096; a++) {
+  char info[512] = {0};
+  //Serial.print("*TH: EEPROM.begin() with size: ");
+  //Serial.println(4096); Serial.flush();
+  //EEPROM.begin(4096); // SPI_FLASH_SEC_SIZE
+  delay(1);
+  for (long a = 0; a < 512; a++) {
+    //Serial.print("*TH: reading ");
+    //Serial.print(a);
+    //Serial.print(" : ");
     value = EEPROM.read(a);
-    info[value] = value;
-    if (value == 0) break;
-  } */
+    info[a] = value;
+    if (value == 0) {
+      //break;
+    }
+    Serial.print(value);
 
-  //String jdata = String(info);
+    /*
+    if (a == 0) {
+      if (value == '{') {
+        //Serial.print("*TH: found JSON...");
+      } else {
+        //Serial.print("*TH: found no JSON...");
+        //break;
+        // return false; in case no SPIFFS is used
+      }
+    }
+    */
+  }
 
+  Serial.println("*TH: EEPROM reading complete...");
+
+  String data = String(info);
+  Serial.print("Restored string:");
+  Serial.println(data);
+  EEPROM.end();
+
+#else
   if (!SPIFFS.exists("/thx.cfg")) {
     //Serial.println("*TH: No persistent data found.");
     return false;
@@ -755,6 +782,7 @@ bool THiNX::restore_device_info() {
        return false;
    }
    String data = f.readStringUntil('\n');
+#endif
    JsonObject& config = jsonBuffer.parseObject(data.c_str());
    if (!config.success()) {
      //Serial.println("*TH: parseObject() failed");
@@ -789,7 +817,9 @@ bool THiNX::restore_device_info() {
       //Serial.println(THINX_UDID);
       thinx_udid = strdup(THINX_UDID);
     }
+#ifdef __USE_SPIFFS__
     f.close();
+#endif
    }
    return true;
  }
@@ -797,39 +827,34 @@ bool THiNX::restore_device_info() {
  /* Stores mutable device data (alias, owner) retrieved from API */
  void THiNX::save_device_info()
  {
-   const char *config = deviceInfo().c_str();
+   String info = deviceInfo();
+   const char *config = info.c_str();
 
-   Serial.print("*TH: saving configuration to EEPROM...");
-   EEPROM.begin(strlen(config) + 1); // SPI_FLASH_SEC_SIZE
+   // --> Can be extracted to a separate function THiNX::eeprom_save(chonst char* config)
+   Serial.println("*TH: saving configuration (to EEPROM first):");
+   Serial.println(info);
+   EEPROM.begin(strlen(config) + 1); // maximum is SPI_FLASH_SEC_SIZE
    for (long i = 0; i <= strlen(config); i++) {
      EEPROM.put(i, config[i]);
    }
    EEPROM.commit();
-   Serial.print("*TH: EEPROM data committed...");
+   EEPROM.end();
+   Serial.println("*TH: EEPROM data committed..."); // works until here so far...
+   // <--
 
+   // disabled for it crashes when closing the file (LoadStoreAlignmentCause) when using String
+#ifdef __USE_SPIFFS__
    File f = SPIFFS.open("/thx.cfg", "w");
    if (f) {
-     Serial.print("*TH: saving configuration to SPIFFS...");
-     f.println(config);
+     Serial.println("*TH: saving configuration to SPIFFS...");
+     f.println(config); // String instead of const char* due to LoadStoreAlignmentCause...
+     Serial.println("*TH: closing file...");
      f.close();
-
-   } else {
-     Serial.println("*TH: Cannot save configuration, formatting SPIFFS...");
-     SPIFFS.format();
-     Serial.println("*TH: Trying to save again...");
-     f = SPIFFS.open("/thx.cfg", "w");
-     if (f) {
-       save_device_info();
-       f.close();
-     } else {
-       Serial.println("*TH: Retry failed...");
-     }
+     delay(1); // yield some cpu time for saving
    }
+#endif
 
-   Serial.println("*TH: save_device_info() completed.");
-   SPIFFS.end();
-   Serial.println("*TH: SPIFFS.end();");
-
+   Serial.println("*TH: Updating device info...");
    bool done = restore_device_info();
  }
 
