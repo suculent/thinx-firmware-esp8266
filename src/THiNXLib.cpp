@@ -165,14 +165,14 @@ void THiNX::connect_wifi() {
     // Serial.println("*TH: Connection in progress...");
     //Serial.printf("THiNXLib::connect_wifi(): unmodified stack   = %4d\n", cont_get_free_stack(&g_cont));
     //Serial.printf("THiNXLib::connect_wifi(): current free stack = %4d\n", 4 * (sp - g_cont.stack));
-    Serial.print("*THiNXLib::connect_wifi(SKIP): heap = "); Serial.println(system_get_free_heap_size()); Serial.flush();
+    Serial.print("*THiNXLib::connect_wifi(SKIP): heap = "); Serial.println(system_get_free_heap_size());
     wifi_retry++;
     return;
   }
 
   if (strlen(THINX_ENV_SSID) > 2) {
     if (wifi_retry == 0) {
-      Serial.println("*TH: Connecting to AP with pre-defined credentials..."); Serial.flush();
+      Serial.println("*TH: Connecting to AP with pre-defined credentials...");
       WiFi.mode(WIFI_STA);
       WiFi.begin(strdup(THINX_ENV_SSID), strdup(THINX_ENV_PASS));
       wifi_connection_in_progress = true; // prevents re-entering connect_wifi()
@@ -231,7 +231,7 @@ void THiNX::connect_wifi() {
 void THiNX::senddata(String body) {
 
   if (thx_wifi_client->connect(thinx_cloud_url, 7442)) {
-    Serial.print("*THiNXLib::senddata(): with api key..."); Serial.flush();
+    Serial.print("*THiNXLib::senddata(): with api key...");
 
     thx_wifi_client->println("POST /device/register HTTP/1.1");
     thx_wifi_client->print("Host: "); thx_wifi_client->println(thinx_cloud_url);
@@ -481,11 +481,11 @@ void THiNX::parse(String payload) {
 
         // Check current firmware based on commit id and store Updated state...
         String commit = registration["commit"];
-        Serial.println(String("commit: ") + commit);
+        Serial.print("commit: "); Serial.println(commit);
 
         // Check current firmware based on version and store Updated state...
         String version = registration["version"];
-        Serial.println(String("version: ") + version);
+        Serial.print("version: "); Serial.println(version);
 
         if ((commit == thinx_commit_id) && (version == thinx_version_id)) {
           if (strlen(available_update_url) > 4) {
@@ -543,7 +543,7 @@ void THiNX::parse(String payload) {
 
 const char* THiNX::thinx_mqtt_channel() {
   String s = String("/") + String(thinx_owner) + String("/") + String(thinx_udid);
- return s.c_str();
+  return s.c_str();
 }
 
 const char* THiNX::thinx_mqtt_status_channel() {
@@ -631,7 +631,6 @@ bool THiNX::start_mqtt() {
   const char* channel = thinx_mqtt_channel();
   Serial.println("*TH: Connecting to MQTT...");
 
-
   Serial.print("*TH: AK: ");
   Serial.println(thinx_api_key);
   Serial.print("*TH: DCH: ");
@@ -644,11 +643,41 @@ bool THiNX::start_mqtt() {
   int willQos = 0;
   bool willRetain = false;
 
+  delay(1);
+
   if (mqtt_client->connect(MQTT::Connect(id)
                 .set_will(willTopic, "{ \"status\" : \"disconnected\" }")
                 .set_auth(user, pass)
                 .set_keepalive(30)
               )) {
+
+        Serial.print("*TH: MQTT Subscribing device channel: ");
+        Serial.println(thinx_mqtt_channel());
+
+        if (mqtt_client->subscribe(thinx_mqtt_channel())) {
+          Serial.print("*TH: DCH ");
+          Serial.print(thinx_mqtt_channel());
+          Serial.println(" successfully subscribed.");
+
+          // Publish status on status channel
+          mqtt_client->publish(
+            thinx_mqtt_status_channel(),
+            "{ \"status\" : \"connected\" }"
+          );
+
+          /* crashes?
+          // Publish registration on status channel to request possible update
+          mqtt_client->publish(
+            thinx_mqtt_status_channel(),
+            checkin_body().c_str()
+          );
+          */
+
+          return true;
+      } else {
+        Serial.println("*TH: MQTT Not connected.");
+        return false;
+      }
 
       mqtt_client->set_callback([this](const MQTT::Publish &pub){
 
@@ -681,34 +710,6 @@ bool THiNX::start_mqtt() {
 
         }
     }); // end-of-callback
-
-    Serial.print("*TH: MQTT Subscribing device channel: ");
-    Serial.println(channel);
-
-    if (mqtt_client->subscribe(channel)) {
-      Serial.print("*TH: ");
-      Serial.print(channel);
-      Serial.println(" successfully subscribed.");
-
-      // Publish status on status channel
-      mqtt_client->publish(
-        thinx_mqtt_status_channel(),
-        "{ \"status\" : \"connected\" }"
-      );
-
-      /* crashes?
-      // Publish registration on status channel to request possible update
-      mqtt_client->publish(
-        thinx_mqtt_status_channel(),
-        checkin_body().c_str()
-      );
-      */
-
-      return true;
-  } else {
-    Serial.println("*TH: MQTT Not connected.");
-    return false;
-  }
 }}
 
 #ifdef __USE_WIFI_MANAGER__
@@ -764,7 +765,7 @@ bool THiNX::restore_device_info() {
     return false;
   }
    File f = SPIFFS.open("/thx.cfg", "r");
-   Serial.println("*TH: Found persistent data..."); Serial.flush();
+   Serial.println("*TH: Found persistent data...");
    if (!f) {
        //Serial.println("*TH: No remote configuration found so far...");
        return false;
@@ -1038,6 +1039,22 @@ void THiNX::loop() {
   } else {
 
     //
+    // After checked in, connect MQTT
+    //
+
+    if (checked_in == true) {
+      Serial.println("THiNX > LOOP > MQTT...");
+      if (mqtt_client != NULL) {
+        Serial.println("THiNX > LOOP > MQTT > LOOP");
+        mqtt_client->loop();
+      } else {
+        Serial.println("*TH: WiFi connected, starting MQTT...");
+        delay(1);
+        mqtt_result = start_mqtt(); // requires valid udid and api_keys, and allocated WiFiClient; might be blocking
+      }
+    }
+
+    //
     // If connected and not checked_in, perform check in.
     //
 
@@ -1048,21 +1065,6 @@ void THiNX::loop() {
         checked_in = true;
         checkin(); // blocking
         return; // init MQTT in next loop
-      }
-    }
-
-    //
-    // If checked in, connect MQTT
-    //
-
-    if (checked_in == true) {
-      Serial.println("THiNX > LOOP > MQTT...");
-      if (mqtt_client != NULL) {
-        Serial.println("THiNX > LOOP > MQTT > LOOP");
-        mqtt_client->loop();
-      } else {
-        Serial.println("*TH: WiFi connected, starting MQTT..."); Serial.flush();
-        mqtt_result = start_mqtt(); // requires valid udid and api_keys, and allocated WiFiClient; might be blocking
       }
     }
 
