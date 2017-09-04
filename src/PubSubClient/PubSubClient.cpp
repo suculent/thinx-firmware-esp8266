@@ -125,7 +125,7 @@ bool PubSubClient::_wait_for(MQTT::message_type match_type, uint16_t match_pid) 
   while (!_client.available()) {
     if (millis() - lastInActivity > keepalive * 1000UL)
       return false;
-    yield();
+    delay(1);
   }
 
   while (millis() < lastInActivity + (keepalive * 1000)) {
@@ -155,7 +155,7 @@ bool PubSubClient::_wait_for(MQTT::message_type match_type, uint16_t match_pid) 
       delete msg;
     }
 
-    yield();
+    delay(1);
   }
 
   return false;

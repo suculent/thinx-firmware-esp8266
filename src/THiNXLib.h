@@ -37,10 +37,10 @@ class THiNX {
 
     enum payload_type {
       Unknown = 0,
-      UPDATE = 1,		// Firmware Update Response Payload
-      REGISTRATION = 2,		// Registration Response Payload
-      NOTIFICATION = 3, // Notification/Interaction Response Payload
-      Reserved = 255,		// Reserved
+      UPDATE = 1,		                         // Firmware Update Response Payload
+      REGISTRATION = 2,		                   // Registration Response Payload
+      NOTIFICATION = 3,                      // Notification/Interaction Response Payload
+      Reserved = 255,		                     // Reserved
     };
 
     // Public API
@@ -48,7 +48,7 @@ class THiNX {
     void publish();
     void loop();
 
-    String checkin_body(); // TODO: Refactor to C-string
+    String checkin_body();                  // TODO: Refactor to C-string
 
 #ifdef __USE_WIFI_MANAGER__
     WiFiManager *manager;
@@ -85,17 +85,18 @@ class THiNX {
     char* thinx_udid;
     char* thinx_api_key;
 
+    bool connected;                         // WiFi connected in station mode
+
     private:
 
       // WiFi Manager
       WiFiClient *thx_wifi_client;
-      int status;                 // global WiFi status
-      bool once;
-      bool connected;
-      void saveConfigCallback();
+      int status;                             // global WiFi status
+      bool once;                              // once token for initialization      
+      void saveConfigCallback();              // when user sets new API Key in AP mode
 
       // THiNX API
-      char thx_api_key[64];     // for EAVManager/WiFiManager callback
+      char thx_api_key[64];                   // for EAVManager/WiFiManager callback
       char mac_string[16] = {0};
       const char * thinx_mac();
 
@@ -103,33 +104,36 @@ class THiNX {
       StaticJsonBuffer<1280> wrapperBuffer;
 
       // In order of appearance
-      bool fsck();
-      void start();
-      void connect_wifi();
-      void checkin();
-      void senddata(String); // TODO: Refactor to C-string
-      void parse(String); // TODO: Refactor to C-string
-      void update_and_reboot(String); // TODO: Refactor to C-string
+      bool fsck();                            // check filesystem if using SPIFFS
+      void connect();                         // start the connect loop
+      void connect_wifi();                    // start connecting
+      void checkin();                         // checkin when connected
+      void senddata(String);                  // TODO: Refactor to C-string
+      void parse(String);                     // TODO: Refactor to C-string
+      void update_and_reboot(String);         // TODO: Refactor to C-string
 
       // MQTT
-      int last_mqtt_reconnect;
-      bool start_mqtt();
-      bool mqtt_result;
-      String mqtt_payload;
+      bool start_mqtt();                      // connect to broker and subscribe
+      bool mqtt_result;                       // success or failure on connection
+      String mqtt_payload;                    // mqtt_payload store for parsing
+      int last_mqtt_reconnect;                // interval
 
       // Data Storage
-      bool should_save_config; // called after autoconnect, may provide new API Key
-      void import_build_time_constants();
-      String deviceInfo(); // TODO: Refactor to C-string
-      bool restore_device_info();
-      void save_device_info();
+      bool should_save_config;                // after autoconnect, may provide new API Key
+      void import_build_time_constants();     // sets variables from thinx.h file
+      void save_device_info();                // saves variables to SPIFFS or EEPROM
+      bool restore_device_info();             // reads variables from SPIFFS or EEPROM
+      String deviceInfo();                    // TODO: Refactor to C-string
 
       // Updates
-      void notify_on_successful_update();
+      void notify_on_successful_update();     // send a MQTT notification back to Web UI
 
-      // Event Queue
+      // Event Queue / States
       bool checked_in;
       bool mqtt_started;
+      bool connection_in_progress;
+      bool complete;
+      void evt_save_api_key();
 
       // Local WiFi Impl
       bool wifi_wait_for_connect;

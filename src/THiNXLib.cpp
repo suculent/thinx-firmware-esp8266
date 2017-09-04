@@ -61,6 +61,8 @@ THiNX::THiNX(const char * __apikey) {
   }
 #endif
 
+  EEPROM.begin(512); // maximum is SPI_FLASH_SEC_SIZE; happens in init
+
   // Read constants and possibly stored UDID/API Key
   import_build_time_constants();
 
@@ -85,11 +87,13 @@ void THiNX::initWithAPIKey(const char * __apikey) {
   bool success = restore_device_info();
 
   // FS may deprecate in favour of EEPROM
-  //Serial.println("*TH: Checking FS...");
-  //if (!fsck()) {
-  //  Serial.println("*TH: Filesystem check failed, disabling THiNX.");
-  //  return;
-  //}
+#ifdef __USE_SPIFFS__
+  Serial.println("*TH: Checking FS...");
+  if (!fsck()) {
+    Serial.println("*TH: Filesystem check failed, disabling THiNX.");
+    return;
+  }
+#endif
 
   if (strlen(thinx_api_key) < 4) {
     if (String(__apikey).length() > 1) {
@@ -98,22 +102,30 @@ void THiNX::initWithAPIKey(const char * __apikey) {
   }
 }
 
-void THiNX::start() {
-  Serial.println("THiNX > LOOP > START()");
+void THiNX::connect() {
+  //Serial.println("THiNX > LOOP > START()");
+  if (connected) return;
   if (WiFi.SSID()) {
-    Serial.println("THiNX > LOOP > ALREADY HAVE SSID");
-    //ETS_UART_INTR_DISABLE();
-    //wifi_station_disconnect();
-    //ETS_UART_INTR_ENABLE();
-    //WiFi.begin();
+    if (!wifi_connection_in_progress) {
+
+      Serial.println("THiNX > LOOP > CONNECT > STATION DISCONNECT");
+      ETS_UART_INTR_DISABLE();
+      wifi_station_disconnect();
+      ETS_UART_INTR_ENABLE();
+      Serial.println("THiNX > LOOP > CONNECT > STATION RECONNECT");
+      WiFi.begin();
+      wifi_connection_in_progress = true; // prevents re-entering connect_wifi()
+    }
   }
   if (WiFi.status() == WL_CONNECTED) {
     Serial.println("THiNX > LOOP > ALREADY CONNECTED");
-    connected = true;
+    connected = true; // prevents re-entering start() [this method]
     wifi_connection_in_progress = false;
   } else {
-    Serial.println("THiNX > LOOP > CONNECTING WiFi: ");
-    connect_wifi();
+    if (!wifi_connection_in_progress) {
+      Serial.println("THiNX > LOOP > CONNECTING WiFi:");
+      connect_wifi();
+    }
   }
 }
 
@@ -137,45 +149,36 @@ void THiNX::connect_wifi() {
     return;
   }
 
-  const char * ssid = strdup(THINX_ENV_SSID);
-  const char * pass = strdup(THINX_ENV_PASS);
-
-  //Serial.printf("THiNXLib::start(): unmodified stack   = %4d\n", cont_get_free_stack(&g_cont));
-  //Serial.printf("THiNXLib::start(): current free stack = %4d\n", 4 * (sp - g_cont.stack));
-  //Serial.print("*THiNXLib::start(): heap = ");
-  //Serial.println(system_get_free_heap_size()); Serial.flush();
   // 84, 176; 35856
 
-  if (wifi_retry > 100) {
+  if (wifi_retry > 1000) {
     wifi_connection_in_progress = false;
     Serial.println("*TH: Starting THiNX-AP with PASSWORD...");
     WiFi.mode(WIFI_AP);
-    WiFi.softAP("THiNX-AP");
+    WiFi.softAP("THiNX-AP", "PASSWORD");
+    wifi_retry = 0;
+    connection_in_progress = false;
     return;
   }
 
   if (wifi_connection_in_progress) {
-    Serial.println("*TH: Connection in progress...");
+    // Serial.println("*TH: Connection in progress...");
+    //Serial.printf("THiNXLib::connect_wifi(): unmodified stack   = %4d\n", cont_get_free_stack(&g_cont));
+    //Serial.printf("THiNXLib::connect_wifi(): current free stack = %4d\n", 4 * (sp - g_cont.stack));
+    Serial.print("*THiNXLib::connect_wifi(SKIP): heap = "); Serial.println(system_get_free_heap_size()); Serial.flush();
+    wifi_retry++;
     return;
   }
 
-  if (ssid != "") {
-    Serial.println("*TH: Connecting to AP with pre-defined credentials..."); Serial.flush();
-    WiFi.mode(WIFI_STA);
-    WiFi.begin(ssid, pass);
-    wifi_connection_in_progress = true;
+  if (strlen(THINX_ENV_SSID) > 2) {
+    if (wifi_retry == 0) {
+      Serial.println("*TH: Connecting to AP with pre-defined credentials..."); Serial.flush();
+      WiFi.mode(WIFI_STA);
+      WiFi.begin(strdup(THINX_ENV_SSID), strdup(THINX_ENV_PASS));
+      wifi_connection_in_progress = true; // prevents re-entering connect_wifi()
+    }
     wifi_retry++;
     // exit loop here to prevent wdt lock
-  } else {
-    if (WiFi.SSID()) {
-      Serial.println("*TH: Connecting with saved values...");
-      //trying to fix connection in progress hanging
-      //ETS_UART_INTR_DISABLE();
-      wifi_station_disconnect();
-      //ETS_UART_INTR_ENABLE();
-      WiFi.begin();
-      wifi_connection_in_progress = true;
-    }
   }
 #endif
  }
@@ -227,19 +230,11 @@ void THiNX::connect_wifi() {
 
 void THiNX::senddata(String body) {
 
-  //Serial.print("*THiNXLib::senddata(): heap = ");
-  //Serial.println(system_get_free_heap_size()); Serial.flush();
-  // 36200
-
-  //Serial.println("*TH: Wrapping request...");
-
   if (thx_wifi_client->connect(thinx_cloud_url, 7442)) {
-    Serial.print("*THiNXLib::senddata(): connected..."); Serial.flush();
-    // Standard public THiNX-Client device registration request
-    // (same request can be called in order to add matching mobile application push token)
-    thx_wifi_client->println("POST /device/register HTTP/1.1");
-    thx_wifi_client->println("Host: thinx.cloud");
     Serial.print("*THiNXLib::senddata(): with api key..."); Serial.flush();
+
+    thx_wifi_client->println("POST /device/register HTTP/1.1");
+    thx_wifi_client->print("Host: "); thx_wifi_client->println(thinx_cloud_url);
     thx_wifi_client->print("Authentication: "); thx_wifi_client->println(thinx_api_key);
     thx_wifi_client->println("Accept: application/json"); // application/json
     thx_wifi_client->println("Origin: device");
@@ -255,14 +250,12 @@ void THiNX::senddata(String body) {
     long interval = 10000;
     unsigned long currentMillis = millis(), previousMillis = millis();
 
-    //yield(); may cause crash
-    // delay(1); //safer
-
     Serial.print("*THiNXLib::senddata(): waiting for response...");
     // TODO: FIXME: Drop the loop here, wait for response!
 
+    // Wait until client available or timeout...
     while(!thx_wifi_client->available()){
-      //yield();
+      delay(1);
       if( (currentMillis - previousMillis) > interval ){
         //Serial.println("Response Timeout. TODO: Should retry later.");
         thx_wifi_client->stop();
@@ -271,9 +264,10 @@ void THiNX::senddata(String body) {
       currentMillis = millis();
     }
 
+    // Read while connected
     String payload = "";
     while ( thx_wifi_client->connected() ) {
-      //yield();
+      delay(1);
       if ( thx_wifi_client->available() ) {
         char str = thx_wifi_client->read();
         payload = payload + String(str);
@@ -394,9 +388,19 @@ void THiNX::parse(String payload) {
         // local url   = payload['url']
         // local type  = payload['type']
 
+        String type = update["type"];
+        Serial.print("Payload type: "); Serial.println(type);
+
+        String files = update["files"];
+
         String url = update["url"]; // may be OTT URL
         available_update_url = url.c_str();
+
+        String ott = update["ott"];
+        available_update_url = ott.c_str();
+
         save_device_info();
+
         if (url) {
           Serial.println("*TH: Force update URL must not contain HTTP!!! :" + url);
           url.replace("http://", "");
@@ -538,11 +542,13 @@ void THiNX::parse(String payload) {
  */
 
 const char* THiNX::thinx_mqtt_channel() {
- return String(String("/") + String(thinx_owner) + "/" + String(thinx_udid)).c_str();
+  String s = String("/") + String(thinx_owner) + String("/") + String(thinx_udid);
+ return s.c_str();
 }
 
 const char* THiNX::thinx_mqtt_status_channel() {
- return String(String("/") + String(thinx_owner) + "/" + String(thinx_udid) + "/status").c_str();
+  String s = String("/") + String(thinx_owner) + String("/") + String(thinx_udid) + String("/status");
+ return s.c_str();
 }
 
 const char * THiNX::thinx_mac() {
@@ -720,53 +726,39 @@ void THiNX::saveConfigCallback() {
  * Device Info
  */
 
+// Calles (private): initWithAPIKey; save_device_info()
 bool THiNX::restore_device_info() {
 
 #ifndef __USE_SPIFFS__
 
-  // EEPROM read
-  // first character should be {
-
   // Serial.println("*TH: restoring configuration from EEPROM...");
-
   int value;
+  long buf_len = 512;
   char info[512] = {0};
-  //Serial.print("*TH: EEPROM.begin() with size: ");
-  //Serial.println(4096); Serial.flush();
-  //EEPROM.begin(4096); // SPI_FLASH_SEC_SIZE
-  delay(1);
-  for (long a = 0; a < 512; a++) {
-    //Serial.print("*TH: reading ");
-    //Serial.print(a);
-    //Serial.print(" : ");
-    value = EEPROM.read(a);
-    info[a] = value;
-    if (value == 0) {
-      //break;
-    }
-    Serial.print(value);
 
-    /*
+  for (long a = 0; a < buf_len; a++) {
+    value = EEPROM.read(a);
+    if (value == 0) {
+      Serial.print("*TH: "); Serial.print(a); Serial.println(" bytes read from EEPROM.");
+      break;
+    }
+    // validate at least data start
     if (a == 0) {
-      if (value == '{') {
-        //Serial.print("*TH: found JSON...");
-      } else {
-        //Serial.print("*TH: found no JSON...");
-        //break;
-        // return false; in case no SPIFFS is used
+      if (value != '{') {
+        Serial.println("Data is not a JSON string, exiting.");
+        break;
       }
     }
-    */
+    info[a] = value;
+    // Serial.print(value);
   }
 
-  Serial.println("*TH: EEPROM reading complete...");
-
+  Serial.println("*TH: EEPROM reading complete:");
   String data = String(info);
-  Serial.print("Restored string:");
-  Serial.println(data);
-  EEPROM.end();
+  Serial.println("'"+data+"'");
 
 #else
+
   if (!SPIFFS.exists("/thx.cfg")) {
     //Serial.println("*TH: No persistent data found.");
     return false;
@@ -783,18 +775,24 @@ bool THiNX::restore_device_info() {
    }
    String data = f.readStringUntil('\n');
 #endif
+
+  //void apply_device_info(string) {
+
    JsonObject& config = jsonBuffer.parseObject(data.c_str());
    if (!config.success()) {
-     //Serial.println("*TH: parseObject() failed");
+     Serial.println("*TH: parsing JSON failed.");
      return false;
    } else {
 
-     Serial.println("*TH: Parsing saved data"); Serial.flush();
+     // Serial.println("*TH: Parsing saved data..."); // may crash: Serial.flush();
 
      const char* saved_alias = config["alias"];
      if (strlen(saved_alias) > 1) {
        thinx_alias = strdup(saved_alias);
      }
+     //Serial.print("*TH: Alias: ");
+     //Serial.println(thinx_alias);
+
      const char* saved_owner = config["owner"];
      if (strlen(saved_owner) > 4) {
        thinx_owner = strdup(saved_owner);
@@ -806,8 +804,9 @@ bool THiNX::restore_device_info() {
      }
      const char* saved_update = config["update"];
      if (strlen(saved_update) > 4) {
-       available_update_url = saved_update;
+       available_update_url = strdup(saved_update);
      }
+
      const char* saved_udid = config["udid"];
      //Serial.print("*TH: Saved udid: "); Serial.println(saved_udid);
      if ((strlen(saved_udid) > 4)) {
@@ -818,6 +817,7 @@ bool THiNX::restore_device_info() {
       thinx_udid = strdup(THINX_UDID);
     }
 #ifdef __USE_SPIFFS__
+    Serial.print("*TH: Closing SPIFFS file.");
     f.close();
 #endif
    }
@@ -827,59 +827,62 @@ bool THiNX::restore_device_info() {
  /* Stores mutable device data (alias, owner) retrieved from API */
  void THiNX::save_device_info()
  {
-   String info = deviceInfo();
-   const char *config = info.c_str();
-
-   // --> Can be extracted to a separate function THiNX::eeprom_save(chonst char* config)
-   Serial.println("*TH: saving configuration (to EEPROM first):");
-   Serial.println(info);
-   EEPROM.begin(strlen(config) + 1); // maximum is SPI_FLASH_SEC_SIZE
-   for (long i = 0; i <= strlen(config); i++) {
-     EEPROM.put(i, config[i]);
-   }
-   EEPROM.commit();
-   EEPROM.end();
-   Serial.println("*TH: EEPROM data committed..."); // works until here so far...
-   // <--
+   String info = deviceInfo() + "\n";
 
    // disabled for it crashes when closing the file (LoadStoreAlignmentCause) when using String
 #ifdef __USE_SPIFFS__
    File f = SPIFFS.open("/thx.cfg", "w");
    if (f) {
      Serial.println("*TH: saving configuration to SPIFFS...");
-     f.println(config); // String instead of const char* due to LoadStoreAlignmentCause...
+     f.println(info); // String instead of const char* due to LoadStoreAlignmentCause...
      Serial.println("*TH: closing file...");
      f.close();
      delay(1); // yield some cpu time for saving
    }
+#else
+  Serial.println("*TH: saving configuration to EEPROM...");
+  Serial.println(info);
+  for (long addr = 0; addr <= info.length(); addr++) {
+    EEPROM.put(addr, info.charAt(addr));
+  }
+  EEPROM.commit();
+  Serial.println("*TH: EEPROM data committed..."); // works until here so far...
 #endif
 
    Serial.println("*TH: Updating device info...");
    bool done = restore_device_info();
+   if (done) {
+     Serial.println("*TH: Restoration success.");
+   } else {
+     Serial.println("*TH: Restoration failure.");
+   }
  }
 
 String THiNX::deviceInfo() {
-  Serial.println("*TH: building device info:");
+
+  //Serial.println("*TH: building device info:");
+
   JsonObject& root = jsonBuffer.createObject();
-  root["alias"] = thinx_alias;
-  Serial.print("*TH: thinx_alias: ");
-  Serial.println(thinx_alias);
+  root["alias"] = thinx_alias; // allow alias change
+  root["owner"] = thinx_owner; // allow owner change
+  root["update"] = available_update_url; // allow update
+  root["apikey"] = thinx_api_key; // allow changing API Key
+  root["udid"] = thinx_udid; // allow setting UDID
 
-  root["owner"] = thinx_owner;
-  Serial.print("*TH: thinx_owner: ");
-  Serial.println(thinx_owner);
+  //Serial.print("*TH: thinx_alias: ");
+  //Serial.println(thinx_alias);
 
-  root["apikey"] = thinx_api_key;
-  Serial.print("*TH: thinx_api_key: ");
-  Serial.println(thinx_api_key);
+  //Serial.print("*TH: thinx_owner: ");
+  //Serial.println(thinx_owner);
 
-  root["udid"] = thinx_udid;
-  Serial.print("*TH: thinx_udid: ");
-  Serial.println(thinx_udid);
+  //Serial.print("*TH: thinx_api_key: ");
+  //Serial.println(thinx_api_key);
 
-  root["update"] = available_update_url;
-  Serial.print("*TH: available_update_url: ");
-  Serial.println(available_update_url);
+  //Serial.print("*TH: thinx_udid: ");
+  //Serial.println(thinx_udid);
+
+  //Serial.print("*TH: available_update_url: ");
+  //Serial.println(available_update_url);
 
   String jsonString;
   root.printTo(jsonString);
@@ -898,11 +901,11 @@ String THiNX::deviceInfo() {
 void THiNX::update_and_reboot(String url) {
 
 #ifdef __DEBUG__
-  Serial.println("[update] Starting update...");
+  Serial.println("[update] Starting update & reboot...");
 #endif
 
-// #define __USE_ESP__
-#ifdef __USE_ESP__
+// #define __USE_ESP_UPDATER__ ; // Warning, this is MQTT-based streamed update!
+#ifdef __USE_ESP_UPDATER__
   uint32_t size = pub.payload_len();
   if (ESP.updateSketch(*pub.payload_stream(), size, true, false)) {
     Serial.println("Clearing retained message.");
@@ -924,7 +927,8 @@ void THiNX::update_and_reboot(String url) {
   }
 #else
 
-  t_httpUpdate_return ret = ESPhttpUpdate.update("thinx.cloud", 80, url.c_str());
+  //
+  t_httpUpdate_return ret = ESPhttpUpdate.update(thinx_cloud_url, 80, url.c_str());
 
   switch(ret) {
     case HTTP_UPDATE_FAILED:
@@ -1006,44 +1010,73 @@ bool THiNX::fsck() {
   return fileSystemReady ? true : false;
 }
 
+void THiNX::evt_save_api_key() {
+  if (should_save_config) {
+    if (strlen(thx_api_key) > 4) {
+      thinx_api_key = thx_api_key;
+      Serial.print("Saving thx_api_key from Captive Portal: ");
+      Serial.println(thinx_api_key);
+      save_device_info();
+      should_save_config = false;
+    }
+  }
+}
+
 /*
  * Core loop
  */
 
 void THiNX::loop() {
+
+  uint32_t memfree = system_get_free_heap_size(); Serial.print("THINX LOOP memfree                  = "); Serial.println(memfree);
+  //Serial.printf("THiNXLib::connect_wifi(): unmodified stack   = %4d\n", cont_get_free_stack(&g_cont));
+  //Serial.printf("THiNXLib::connect_wifi(): current free stack = %4d\n", 4 * (sp - g_cont.stack));
+
+  //
+  // If not connected, start connection in progress...
+  //
+
   if (!connected) {
-    start();
+    //Serial.println("THiNX > LOOP > START..."); Serial.flush();
+    if (WiFi.status() == WL_CONNECTED) {
+      connected = true;
+    } else {
+      connect(); // blocking
+    }
   } else {
-    // uint32_t memfree = system_get_free_heap_size(); Serial.print("PRE-PUBLISH memfree: "); Serial.println(memfree);
-    // publish();
-    //Serial.print("POST-PUBLISH memfree: "); memfree = system_get_free_heap_size(); Serial.println(memfree);
 
-    if (mqtt_client != NULL) {
-      Serial.println("THiNX > LOOP > MQTT...");
-      mqtt_client->loop();
-    }
-
-    if (should_save_config) {
-      if (strlen(thx_api_key) > 4) {
-        thinx_api_key = thx_api_key;
-        Serial.print("Saving thx_api_key from Captive Portal: ");
-        Serial.println(thinx_api_key);
-        save_device_info();
-        should_save_config = false;
-      }
-    }
+    //
+    // If connected and not checked_in, perform check in.
+    //
 
     if (checked_in == false) {
-      Serial.println("*TH: WiFi connected, checking in...");
+      Serial.println("THiNX > LOOP > CHECKIN...");
       if (strlen(thinx_api_key) > 4) {
+        Serial.println("*TH: WiFi connected, checking in...");
         checked_in = true;
-        checkin();
+        checkin(); // blocking
+        return; // init MQTT in next loop
       }
     }
 
+    //
+    // If checked in, connect MQTT
+    //
+
     if (checked_in == true) {
-      Serial.println("*TH: WiFi connected, starting MQTT...");
-      mqtt_result = start_mqtt(); // requires valid udid and api_keys, and allocated WiFiClient.
+      Serial.println("THiNX > LOOP > MQTT...");
+      if (mqtt_client != NULL) {
+        Serial.println("THiNX > LOOP > MQTT > LOOP");
+        mqtt_client->loop();
+      } else {
+        Serial.println("*TH: WiFi connected, starting MQTT..."); Serial.flush();
+        mqtt_result = start_mqtt(); // requires valid udid and api_keys, and allocated WiFiClient; might be blocking
+      }
     }
+
+    // Save API key on change
+    evt_save_api_key(); // only happens on should_save_config
   }
+
+  //Serial.println("THiNX < LOOP."); Serial.flush();
 }
