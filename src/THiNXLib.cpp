@@ -28,8 +28,9 @@ THiNX::THiNX(const char * __apikey) {
   }
 
   checked_in = false;
-
   mqtt_payload = "";
+  mqtt_result = false;
+  mqtt_connected = false;
 
   wifi_connection_in_progress = false;
   thx_wifi_client = new WiFiClient();
@@ -655,34 +656,25 @@ bool THiNX::start_mqtt() {
                 .set_keepalive(30)
               )) {
 
-/*
-        Serial.print("*TH: MQTT Subscribing device channel: ");
+        mqtt_connected = true;
+
+        /*
+        Serial.print("*TH: MQTT Prematurely subscribing device channel: ");
         Serial.println(thinx_mqtt_channel());
 
         if (mqtt_client->subscribe(thinx_mqtt_channel())) {
           Serial.print("*TH: DCH ");
           Serial.print(thinx_mqtt_channel());
           Serial.println(" successfully subscribed.");
+        }*/
 
-          // Publish status on status channel
-          mqtt_client->publish(
-            thinx_mqtt_status_channel(),
-            "{ \"status\" : \"connected\" }"
-          );
-          */
+        return true;
 
-          /* crashes?
-          // Publish registration on status channel to request possible update
-          mqtt_client->publish(
-            thinx_mqtt_status_channel(),
-            checkin_body().c_str()
-          );
-          */
-
-          return true;
       } else {
+
         Serial.println("*TH: MQTT Not connected.");
         return false;
+
       }
 
       mqtt_client->set_callback([this](const MQTT::Publish &pub){
@@ -1026,7 +1018,7 @@ void THiNX::evt_save_api_key() {
 
 void THiNX::loop() {
 
-  uint32_t memfree = system_get_free_heap_size(); Serial.print("THINX LOOP memfree                  = "); Serial.println(memfree);
+  //uint32_t memfree = system_get_free_heap_size(); Serial.print("THINX LOOP memfree                  = "); Serial.println(memfree);
   //Serial.printf("THiNXLib::connect_wifi(): unmodified stack   = %4d\n", cont_get_free_stack(&g_cont));
   //Serial.printf("THiNXLib::connect_wifi(): current free stack = %4d\n", 4 * (sp - g_cont.stack));
 
@@ -1044,24 +1036,19 @@ void THiNX::loop() {
   } else {
 
     //
-    // After checked in, connect MQTT
+    // After MQTT gets connected:
     //
 
-    if (checked_in == true) {
-      Serial.println("THiNX > LOOP > MQTT...");
-      if (mqtt_client != NULL) {
-        Serial.println("THiNX > LOOP > MQTT > LOOP");
-        mqtt_client->loop();
-      } else {
-        Serial.println("*TH: WiFi connected, starting MQTT...");
-        delay(1);
-        mqtt_result = start_mqtt(); // requires valid udid and api_keys, and allocated WiFiClient; might be blocking
-      }
-    }
+    if (mqtt_connected && mqtt_client->connected()) {
+      // disable looping... should be done with something like mqtt_checked_in = true instead
+      mqtt_connected = false;
 
-    // After MQTT gets connected
-    if (mqtt_result) {
-      mqtt_result = false;
+      Serial.print("*TH: MQTT Publishing device status: ");
+      // Publish status on status channel
+      mqtt_client->publish(
+        thinx_mqtt_status_channel(),
+        "{ \"status\" : \"connected\" }"
+      );
 
       Serial.print("*TH: MQTT Subscribing device channel: ");
       Serial.println(thinx_mqtt_channel());
@@ -1070,12 +1057,22 @@ void THiNX::loop() {
         Serial.print("*TH: DCH ");
         Serial.print(thinx_mqtt_channel());
         Serial.println(" successfully subscribed.");
+      }
 
-        // Publish status on status channel
-        mqtt_client->publish(
-          thinx_mqtt_status_channel(),
-          "{ \"status\" : \"connected\" }"
-        );
+
+    }
+
+    //
+    // After checked in, connect MQTT
+    //
+
+    if (checked_in == true) {
+      if (mqtt_client != NULL) {
+        mqtt_client->loop();
+      } else {
+        Serial.println("*TH: WiFi connected, starting MQTT...");
+        delay(1);
+        mqtt_result = start_mqtt(); // requires valid udid and api_keys, and allocated WiFiClient; might be blocking
       }
     }
 

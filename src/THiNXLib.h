@@ -92,7 +92,7 @@ class THiNX {
       // WiFi Manager
       WiFiClient *thx_wifi_client;
       int status;                             // global WiFi status
-      bool once;                              // once token for initialization      
+      bool once;                              // once token for initialization
       void saveConfigCallback();              // when user sets new API Key in AP mode
 
       // THiNX API
@@ -115,6 +115,7 @@ class THiNX {
       // MQTT
       bool start_mqtt();                      // connect to broker and subscribe
       bool mqtt_result;                       // success or failure on connection
+      bool mqtt_connected;                    // success or failure on subscription
       String mqtt_payload;                    // mqtt_payload store for parsing
       int last_mqtt_reconnect;                // interval
 
