@@ -604,7 +604,11 @@ void THiNX::notify_on_successful_update() {
 bool THiNX::start_mqtt() {
 
   if (mqtt_client != NULL) {
-    return true;
+    if (mqtt_client->connected()) {
+      return true;
+    } else {
+      return false;
+    }
   }
 
   if (strlen(thinx_udid) < 4) {
@@ -651,6 +655,7 @@ bool THiNX::start_mqtt() {
                 .set_keepalive(30)
               )) {
 
+/*
         Serial.print("*TH: MQTT Subscribing device channel: ");
         Serial.println(thinx_mqtt_channel());
 
@@ -664,6 +669,7 @@ bool THiNX::start_mqtt() {
             thinx_mqtt_status_channel(),
             "{ \"status\" : \"connected\" }"
           );
+          */
 
           /* crashes?
           // Publish registration on status channel to request possible update
@@ -710,13 +716,12 @@ bool THiNX::start_mqtt() {
 
         }
     }); // end-of-callback
-}}
+}
 
 #ifdef __USE_WIFI_MANAGER__
-//
-// WiFiManager Setup Callbacks
-//
-
+/*
+ * WiFiManager Setup Callback
+*/
 void THiNX::saveConfigCallback() {
   should_save_config = true;
   strcpy(thx_api_key, api_key_param->getValue());
@@ -1051,6 +1056,26 @@ void THiNX::loop() {
         Serial.println("*TH: WiFi connected, starting MQTT...");
         delay(1);
         mqtt_result = start_mqtt(); // requires valid udid and api_keys, and allocated WiFiClient; might be blocking
+      }
+    }
+
+    // After MQTT gets connected
+    if (mqtt_result) {
+      mqtt_result = false;
+
+      Serial.print("*TH: MQTT Subscribing device channel: ");
+      Serial.println(thinx_mqtt_channel());
+
+      if (mqtt_client->subscribe(thinx_mqtt_channel())) {
+        Serial.print("*TH: DCH ");
+        Serial.print(thinx_mqtt_channel());
+        Serial.println(" successfully subscribed.");
+
+        // Publish status on status channel
+        mqtt_client->publish(
+          thinx_mqtt_status_channel(),
+          "{ \"status\" : \"connected\" }"
+        );
       }
     }
 
