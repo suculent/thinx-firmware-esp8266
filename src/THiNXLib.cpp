@@ -232,7 +232,7 @@ void THiNX::connect_wifi() {
 void THiNX::senddata(String body) {
 
   if (thx_wifi_client->connect(thinx_cloud_url, 7442)) {
-    Serial.print("*THiNXLib::senddata(): with api key...");
+    Serial.println("*THiNXLib::senddata(): with api key...");
 
     thx_wifi_client->println("POST /device/register HTTP/1.1");
     thx_wifi_client->print("Host: "); thx_wifi_client->println(thinx_cloud_url);
