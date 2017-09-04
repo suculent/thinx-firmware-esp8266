@@ -848,15 +848,7 @@ bool THiNX::restore_device_info() {
   EEPROM.commit();
   Serial.println("*TH: EEPROM data committed..."); // works until here so far...
 #endif
-
-   Serial.println("*TH: Updating device info...");
-   bool done = restore_device_info();
-   if (done) {
-     Serial.println("*TH: Restoration success.");
-   } else {
-     Serial.println("*TH: Restoration failure.");
-   }
- }
+}
 
 String THiNX::deviceInfo() {
 
