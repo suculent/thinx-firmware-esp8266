@@ -177,7 +177,6 @@ boolean  EAVManager::startConfigPortal(char const *apName, char const *apPasswor
     //HTTP
     server->handleClient();
 
-
     if (connect) {
       connect = false;
       delay(2000);
@@ -207,7 +206,6 @@ boolean  EAVManager::startConfigPortal(char const *apName, char const *apPasswor
         break;
       }
     }
-    yield();
   }
 
   server.reset();

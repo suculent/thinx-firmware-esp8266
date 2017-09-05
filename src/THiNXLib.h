@@ -7,8 +7,10 @@
 #include "ArduinoJson/ArduinoJson.h"
 
 #include <FS.h>
-#include "EAVManager/EAVManager.h"
+#include <EEPROM.h>
+//#include "EAVManager/EAVManager.h"
 //#include <EAVManager.h>
+#include <WiFiManager.h>
 
 // Using better than Arduino-bundled version of MQTT https://github.com/Imroy/pubsubclient
 #include "PubSubClient/PubSubClient.h" // Local checkout
@@ -24,6 +26,8 @@
 
 #define MQTT_BUFFER_SIZE 512
 
+//#define __USE_WIFI_MANAGER__
+
 class THiNX {
 
   public:
@@ -33,10 +37,10 @@ class THiNX {
 
     enum payload_type {
       Unknown = 0,
-      UPDATE = 1,		// Firmware Update Response Payload
-      REGISTRATION = 2,		// Registration Response Payload
-      NOTIFICATION = 3, // Notification/Interaction Response Payload
-      Reserved = 255,		// Reserved
+      UPDATE = 1,		                         // Firmware Update Response Payload
+      REGISTRATION = 2,		                   // Registration Response Payload
+      NOTIFICATION = 3,                      // Notification/Interaction Response Payload
+      Reserved = 255,		                     // Reserved
     };
 
     // Public API
@@ -44,30 +48,20 @@ class THiNX {
     void publish();
     void loop();
 
-    // Internal public API
-    String thx_connected_response = "{ \"status\" : \"connected\" }";
-    String thx_disconnected_response = "{ \"status\" : \"disconnected\" }";
-    String thx_reboot_response = "{ \"status\" : \"rebooting\" }";
-    String thx_update_question = "{ title: \"Update Available\", body: \"There is an update available for this device. Do you want to install it now?\", type: \"actionable\", response_type: \"bool\" }";
+    String checkin_body();                  // TODO: Refactor to C-string
 
-    String checkin_body();
-
-    // WiFi Client
-    EAVManager *manager;
-    EAVManagerParameter *api_key_param;
+#ifdef __USE_WIFI_MANAGER__
+    WiFiManager *manager;
+    WiFiManagerParameter *api_key_param;
+#endif
 
     // MQTT
-
     PubSubClient *mqtt_client;
 
     uint8_t buf[MQTT_BUFFER_SIZE];
 
-    String thinx_mqtt_channel();
-    String thinx_mqtt_status_channel();
-
-    // Response parsers
-    //void parse_registration(JSONObject);
-    //void parse_update(JSONObject);
+    const char* thinx_mqtt_channel();
+    const char* thinx_mqtt_status_channel();
 
     // Import build-time values from thinx.h
     const char* app_version;                  // max 80 bytes
@@ -91,56 +85,62 @@ class THiNX {
     char* thinx_udid;
     char* thinx_api_key;
 
+    bool connected;                         // WiFi connected in station mode
+
     private:
 
       // WiFi Manager
-      WiFiClient *thx_wifi_client;      
-      int status;                 // global WiFi status
-      bool once;
-      bool connected;
-      //void configModeCallback(EAVManager*);
-      void saveConfigCallback();
+      WiFiClient *thx_wifi_client;
+      int status;                             // global WiFi status
+      bool once;                              // once token for initialization
+      void saveConfigCallback();              // when user sets new API Key in AP mode
 
       // THiNX API
-      char thx_api_key[64];     // new firmware requires 64 bytes
-      char thx_udid[64];        // new firmware requires 64 bytes
+      char thx_api_key[64];                   // for EAVManager/WiFiManager callback
+      char mac_string[16] = {0};
+      const char * thinx_mac();
 
       StaticJsonBuffer<1024> jsonBuffer;
-      StaticJsonBuffer<2048> wrapperBuffer;
+      StaticJsonBuffer<1280> wrapperBuffer;
 
-      void checkin();
-      void senddata(String);
-      void parse(String);
-      bool connect();
-      void update_and_reboot(String);
+      // In order of appearance
+      bool fsck();                            // check filesystem if using SPIFFS
+      void connect();                         // start the connect loop
+      void connect_wifi();                    // start connecting
+      void checkin();                         // checkin when connected
+      void senddata(String);                  // TODO: Refactor to C-string
+      void parse(String);                     // TODO: Refactor to C-string
+      void update_and_reboot(String);         // TODO: Refactor to C-string
 
       // MQTT
-      int last_mqtt_reconnect;
-      bool start_mqtt();
-      bool mqtt_result;
-
-      String thinx_mqtt_shared_channel();
-      String thinx_mac();
+      bool start_mqtt();                      // connect to broker and subscribe
+      bool mqtt_result;                       // success or failure on connection
+      bool mqtt_connected;                    // success or failure on subscription
+      String mqtt_payload;                    // mqtt_payload store for parsing
+      int last_mqtt_reconnect;                // interval
 
       // Data Storage
-      void import_build_time_constants();
-
-      bool shouldSaveConfig;
-      bool restore_device_info();
-      void save_device_info();
-      String deviceInfo();
+      bool should_save_config;                // after autoconnect, may provide new API Key
+      void import_build_time_constants();     // sets variables from thinx.h file
+      void save_device_info();                // saves variables to SPIFFS or EEPROM
+      bool restore_device_info();             // reads variables from SPIFFS or EEPROM
+      String deviceInfo();                    // TODO: Refactor to C-string
 
       // Updates
-      void notify_on_successful_update();
+      void notify_on_successful_update();     // send a MQTT notification back to Web UI
 
-      // THiNX Client
+      // Event Queue / States
+      bool checked_in;
+      bool mqtt_started;
+      bool connection_in_progress;
+      bool complete;
+      void evt_save_api_key();
 
-      // Consistency checks
-      String realSize;
-      String ideSize;
-      bool flashCorrectlyConfigured;
-      bool fileSystemReady;
-      bool fsck();
-
-      //void strcp(const char* from, char [] to);
+      // Local WiFi Impl
+      bool wifi_wait_for_connect;
+      unsigned long wifi_wait_start;
+      unsigned long wifi_wait_timeout;
+      int wifi_retry;
+      uint8_t wifi_status;
+      bool wifi_connection_in_progress;
 };
