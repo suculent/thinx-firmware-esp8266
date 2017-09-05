@@ -14,7 +14,9 @@ THiNX::THiNX() {
 
 THiNX::THiNX(const char * __apikey) {
 
-  wdt_disable();
+  // see lines ../hardware/cores/esp8266/Esp.cpp:80..100
+  wdt_disable(); // causes wdt reset after 8 seconds!
+  wdt_enable(65535); // must be called from wdt_disable() state!
 
   status = WL_IDLE_STATUS;
   once = true;
