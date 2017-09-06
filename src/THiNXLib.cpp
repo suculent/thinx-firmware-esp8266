@@ -16,6 +16,9 @@ THiNX::THiNX() {
 
 THiNX::THiNX(const char * __apikey) {
 
+  Serial.print("\nTHiNXLib rev");
+  Serial.println(String(THX_REVISION)); // should be generated using platformio.ini pre-build
+
   // see lines ../hardware/cores/esp8266/Esp.cpp:80..100
   wdt_disable(); // causes wdt reset after 8 seconds!
   wdt_enable(65535); // must be called from wdt_disable() state!
@@ -108,6 +111,8 @@ void THiNX::initWithAPIKey(const char * __apikey) {
 
   bool success = restore_device_info();
 
+  Serial.println("*TH: Device info restored.");
+
   // FS may deprecate in favour of EEPROM
 #ifdef __USE_SPIFFS__
   Serial.println("*TH: Checking FS...");
@@ -125,16 +130,28 @@ void THiNX::initWithAPIKey(const char * __apikey) {
 }
 
 void THiNX::connect() {
-  Serial.println("THiNX > LOOP > START()");
-  if (connected) return;
+
+  if (connected) {
+    Serial.println("*TH: connected");
+    return;
+  }
+
+  Serial.print("*TH: connecting: "); Serial.println(wifi_retry);
 
   if (WiFi.SSID()) {
+
+
     if (!wifi_connection_in_progress) {
 
+      Serial.print("*TH: SSID "); Serial.println(WiFi.SSID());
+
       if (WiFi.getMode() == WIFI_AP) {
+
         Serial.print("THiNX > LOOP > START() > AP SSID");
         Serial.print(WiFi.SSID());
+
       } else {
+
         Serial.println("*TH: LOOP > CONNECT > STATION DISCONNECT");
         ETS_UART_INTR_DISABLE();
         wifi_station_disconnect();
@@ -142,8 +159,10 @@ void THiNX::connect() {
         Serial.println("*TH: LOOP > CONNECT > STATION RECONNECT");
         //WiFi.begin(THINX_ENV_SSID, THINX_ENV_PASS);
         WiFi.begin();
-        wifi_connection_in_progress = true; // prevents re-entering connect_wifi(); should timeout
+
       }
+
+      wifi_connection_in_progress = true; // prevents re-entering connect_wifi(); should timeout
     }
   }
 
@@ -152,10 +171,8 @@ void THiNX::connect() {
     connected = true; // prevents re-entering start() [this method]
     wifi_connection_in_progress = false;
   } else {
-    if (!wifi_connection_in_progress) {
-      Serial.println("THiNX > LOOP > CONNECTING WiFi:");
-      connect_wifi();
-    }
+    Serial.println("THiNX > LOOP > CONNECTING WiFi:");
+    connect_wifi();
   }
 }
 
@@ -182,10 +199,18 @@ void THiNX::connect_wifi() {
     return;
   }
 
+  wifi_retry++;
+
+  //Serial.printf("THiNXLib::connect_wifi(): unmodified stack   = %4d\n", cont_get_free_stack(&g_cont));
+  //Serial.printf("THiNXLib::connect_wifi(): current free stack = %4d\n", 4 * (sp - g_cont.stack));
+  //Serial.print("*THiNXLib::connect_wifi(SKIP): heap = "); Serial.println(system_get_free_heap_size());
+
   // 84, 176; 35856
 
-  if (wifi_retry > 1000) {
+  if (wifi_retry > 100) {
+    Serial.printf("*TH: WiFi Retry timeout.");
     wifi_connection_in_progress = false;
+    WiFi.disconnect();
     Serial.println("*TH: Starting THiNX-AP with PASSWORD...");
     WiFi.mode(WIFI_AP);
     WiFi.softAP("THiNX-AP", "PASSWORD");
@@ -195,11 +220,7 @@ void THiNX::connect_wifi() {
   }
 
   if (wifi_connection_in_progress) {
-    // Serial.println("*TH: Connection in progress...");
-    //Serial.printf("THiNXLib::connect_wifi(): unmodified stack   = %4d\n", cont_get_free_stack(&g_cont));
-    //Serial.printf("THiNXLib::connect_wifi(): current free stack = %4d\n", 4 * (sp - g_cont.stack));
-    Serial.print("*THiNXLib::connect_wifi(SKIP): heap = "); Serial.println(system_get_free_heap_size());
-    wifi_retry++;
+    Serial.println("*TH: Connection in progress...");
     return;
   }
 
@@ -210,7 +231,6 @@ void THiNX::connect_wifi() {
       WiFi.begin(strdup(THINX_ENV_SSID), strdup(THINX_ENV_PASS));
       wifi_connection_in_progress = true; // prevents re-entering connect_wifi()
     }
-    wifi_retry++;
     // exit loop here to prevent wdt lock
   }
 #endif
@@ -756,7 +776,7 @@ bool THiNX::restore_device_info() {
   for (long a = 0; a < buf_len; a++) {
     value = EEPROM.read(a);
     if (value == 0) {
-      Serial.print("*TH: "); Serial.print(a); Serial.print(" bytes read from EEPROM: ");
+      Serial.print("*TH: "); Serial.print(a); Serial.print(" bytes read from EEPROM.");
       break;
     }
     // validate at least data start
@@ -769,8 +789,8 @@ bool THiNX::restore_device_info() {
     info[a] = value;
   }
 
-  String data = String(info);
-  Serial.println("'"+data+"'");
+  String data = String(info) + "\n"; // \n helps the JSON parser not to crash
+  //Serial.println("'"+data+"'");
 
 #else
   if (!SPIFFS.exists("/thx.cfg")) {
@@ -790,13 +810,18 @@ bool THiNX::restore_device_info() {
    String data = f.readStringUntil('\n');
 #endif
 
+   Serial.println("*TH: Parsing JSON...");
+
    JsonObject& config = jsonBuffer.parseObject(data.c_str());
    if (!config.success()) {
      Serial.println("*TH: parsing JSON failed.");
      return false;
    } else {
 
-     // Serial.println("*TH: Parsing saved data..."); // may crash: Serial.flush();
+    Serial.println("*TH: Parsing saved data..."); // may crash: Serial.flush();
+    Serial.print("'");
+    Serial.print(data);
+    Serial.println("'");
 
      const char* alias = config["alias"];
      if (strlen(alias) > 1) {
@@ -1029,14 +1054,13 @@ void THiNX::loop() {
   //Serial.printf("THiNXLib::connect_wifi(): unmodified stack   = %4d\n", cont_get_free_stack(&g_cont));
   //Serial.printf("THiNXLib::connect_wifi(): current free stack = %4d\n", 4 * (sp - g_cont.stack));
 
-  Serial.print("*THiNXLib::connect_wifi(SKIP): heap = "); Serial.println(system_get_free_heap_size());
+  // Serial.print("*THiNXLib::connect_wifi(SKIP): heap = "); Serial.println(system_get_free_heap_size());
 
   //
   // If not connected, start connection in progress...
   //
 
   if (!connected) {
-    //Serial.println("THiNX > LOOP > START..."); Serial.flush();
     if (WiFi.status() == WL_CONNECTED) {
       connected = true;
     } else {
@@ -1107,7 +1131,7 @@ void THiNX::setFinalizeCallback( void (*func)(void) ) {
 
 void THiNX::finalize() {
   Serial.println("*TH: Checkin completed.");
-  Serial.print("*THiNXLib::connect_wifi(SKIP): heap = "); Serial.println(system_get_free_heap_size());
+  Serial.print("*THiNXLib::finalize heap = "); Serial.println(system_get_free_heap_size());
   if (_finalize_callback) {
     _finalize_callback();
   }

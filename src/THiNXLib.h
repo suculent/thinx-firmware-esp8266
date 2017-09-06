@@ -3,7 +3,8 @@
 #define __DEBUG__
 #define __DEBUG_JSON__
 
-#define __USE_WIFI_MANAGER__
+//#define __USE_WIFI_MANAGER__
+//#define __USE_SPIFFS__
 
 #ifdef __USE_WIFI_MANAGER__
 #include <WiFiManager.h>
@@ -25,6 +26,16 @@
 //#include <PubSubClient.h> // Arduino Library
 
 #define MQTT_BUFFER_SIZE 512
+
+#ifdef THINX_FIRMWARE_VERSION_SHORT
+#ifndef THX_REVISION
+#define THX_REVISION THINX_FIRMWARE_VERSION_SHORT
+#endif
+#else
+#ifndef THX_REVISION
+#define THX_REVISION String(0)
+#endif
+#endif
 
 class THiNX {
 
