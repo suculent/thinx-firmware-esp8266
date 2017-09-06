@@ -1,71 +1,67 @@
-# thinx-esp8266-firmware
+# THiNX Lib (ESP)
 
-Firmware for automatic device registration and OTA updates.
-
-Provides example implementations in Arduino C, LUA and Micropython.
-
-* This is a work in progress.
-* 100% functionality is not guaranteed for all the time.
-* Contents of thinx-lib-esp is not working yet.
-
-# Requirements
-
-### Arduino C development
-
-- Arduino IDE or Platform.io
-- Arduino libraries: ArduinoJSON, EAVManager, ESP8266httpUpdate (to be replaced)
-- Open this folder using Atom with installed Platform.io or thinx-firmware-esp8266/thinx-firmware-esp8266.ino using Arduino IDE.
-- Run prerelease.sh to bake your commit ID into the Thinx.h file.
-
-### Micropython/LUA development
-
-- ESPlorer
-- ESPTool
-
-## Arduino C
-
-## Micropython
-
-## LUA
-
-Requires following modules: wifi,websocket,uart,tmr,node,net,mqtt,http,file,cjson
-
-### Manual installation
-
-• Edit config.lua, set your WiFi SSID and password
-• Upload config.lua, thinx.lua and init.lua 
-• Reboot
-
-### Forced Update
-
-• Not yet implemented, will be possible in future. 
-
-Tested with:
-
-    NodeMCU custom build by frightanic.com
-    	branch: master
-    	commit: ec265a6c21db22640795f190bdcb8a4f014cdced
-    	SSL: false
-    	modules: adc,bit,cjson,coap,crypto,dht,enduser_setup,file,gpio,http,i2c,mdns,mqtt,net,node,ow,pcm,pwm,struct,tmr,u8g,uart,websocket,wifi
-     build 	built on: 2016-12-04 22:54
-     powered by Lua 5.1.4 on SDK 1.5.4.1(39cb9a32)
+An Arduino/ESP8266 library to wrap client for OTA updates and RTM (Remote Things Management) based on THiNX platform.
 
 # Usage
+## Include
 
-1. Create account on the [http://rtm.thinx.cloud/](http://rtm.thinx.cloud/) site
-2. Create an API Key
-3. Clone [vanilla NodeMCU app repository](https://github.com/suculent/thinx-firmware-esp8266) 
-4. Run the bash ./prerelease.sh to create Thinx.h file; you can edit this with your custom information but the file will be overwritten when building on the server
-5. You can store API Key in Thinx.h file in case your project is not stored in public repository.
-6. Build and upload the code to your device.
-7. After restart, connect with some device to WiFi AP 'AP-THiNX' with password 'PASSWORD' and enter the API Key
-8. Device will connect to WiFi and register itself. Check your thinx.cloud dashboard for new device.
+```c
+#include "THiNXLib.h"
+```
 
-... Then you can theoretically add own git source, add ssh-keys to access those sources if not public, attach the source to device to dashboard and click the last icon in row to build/update the device. But that's not tested at time of updating this readme.
+## Definition
+### THiNX Library
 
+The singleton class started by library should not require any additional parameters except for optional API Key.
+Connects to WiFI and reports to main THiNX server; otherwise starts WiFI in AP mode (AP-THiNX with password PASSWORD by default)
+and awaits optionally new API Key (security hole? FIXME: In case the API Key is saved (and validated) do not allow change from AP mode!!!).
 
-Note: In case you'll build/upload your project (e.g. the library) using thinx.cloud, API key will be injected automatically and you should not need to set it up anymore.
+* if not defined, defaults to thinx.cloud platform
+* TODO: either your local `thinx-device-api` instance or [currently non-existent at the time of this writing] `thinx-secure-gateway` which does not exist now, but is planned to provide HTTP to HTTPS bridging from local network to
 
-# Security
+```c
+#include "Arduino.h"
+#include "FS.h"
+#include <THiNXLib.h>
+#include "Settings.h" // ssid, pass and API Key
 
-Because all the traffic from ESP8266 is usually HTTP-only and not all devices can handle SSL, you can install our side-kick project [THiNX-Connect](https://github.com/suculent/thinx-connect). Install this proxy to your home environment and it will encrypt HTTP traffic to HTTPS and will tunnell your device communication directly to thinx.cloud.
+THiNX thx;
+
+bool once = false;
+
+void setup() {
+  Serial.begin(115200);
+  while (!Serial);
+  Serial.setDebugOutput(true);
+
+  wdt_disable(); // causes wdt reset after 8 seconds!
+  wdt_enable(65535); // must be called from wdt_disable() state!
+  delay(3000);
+  Serial.print("THiNXLib v");
+  Serial.println(VERSION);
+
+  // Force override WiFi before attempting to connect
+  WiFi.mode(WIFI_STA);
+  WiFi.disconnect();
+  WiFi.begin();
+
+  if (WiFi.status() != WL_CONNECTED) {
+    WiFi.begin(ssid, pass);
+  }
+}
+
+void loop()
+{
+    if (once) {
+      thx.loop(); // calling the loop is important to let MQTT work in background
+    } else {
+      once = true;
+      thx = THiNX(apikey);
+      if (WiFi.status() == WL_CONNECTED) {
+        thx.connected = true; // force checkin
+      }
+    }
+    Serial.println(millis());
+    delay(100);
+}
+```

@@ -110,6 +110,7 @@ void EAVManager::setupConfigPortal() {
 
   /* Setup web pages: root, wifi config pages, SO captive portal detectors and not found. */
   server->on("/", std::bind(&EAVManager::handleRoot, this));
+  server->on("/favicon.ico", std::bind(&EAVManager::handleFavicon, this));
   server->on("/wifi", std::bind(&EAVManager::handleWifi, this, true));
   server->on("/0wifi", std::bind(&EAVManager::handleWifi, this, false));
   server->on("/wifisave", std::bind(&EAVManager::handleWifiSave, this));
@@ -176,7 +177,6 @@ boolean  EAVManager::startConfigPortal(char const *apName, char const *apPasswor
     //HTTP
     server->handleClient();
 
-
     if (connect) {
       connect = false;
       delay(2000);
@@ -206,7 +206,6 @@ boolean  EAVManager::startConfigPortal(char const *apName, char const *apPasswor
         break;
       }
     }
-    yield();
   }
 
   server.reset();
@@ -215,19 +214,13 @@ boolean  EAVManager::startConfigPortal(char const *apName, char const *apPasswor
   return  WiFi.status() == WL_CONNECTED;
 }
 
-
 int EAVManager::connectWifi(String ssid, String pass) {
-  DEBUG_WM(F("Connecting as wifi client..."));
-
   // check if we've got static_ip settings, if we do, use those.
   if (_sta_static_ip) {
-    DEBUG_WM(F("Custom STA IP/GW/Subnet"));
     WiFi.config(_sta_static_ip, _sta_static_gw, _sta_static_sn);
-    DEBUG_WM(WiFi.localIP());
   }
   //fix for auto connect racing issue
   if (WiFi.status() == WL_CONNECTED) {
-    DEBUG_WM("Already connected.");
     return WL_CONNECTED;
   }
   //check if we have ssid and pass and force those, if not, try with last saved values
@@ -235,15 +228,11 @@ int EAVManager::connectWifi(String ssid, String pass) {
     WiFi.begin(ssid.c_str(), pass.c_str());
   } else {
     if (WiFi.SSID()) {
-      DEBUG_WM("Using credentials stored to EEPROM");
       //trying to fix connection in progress hanging
       ETS_UART_INTR_DISABLE();
       wifi_station_disconnect();
       ETS_UART_INTR_ENABLE();
-
       WiFi.begin();
-    } else {
-      DEBUG_WM("No saved credentials");
     }
   }
 
@@ -370,7 +359,7 @@ void EAVManager::handleRoot() {
   page += "<h1>";
   page += _apName;
   page += "</h1>";
-  page += F("<h3>EAVManager</h3>");
+  page += F("<h3>WiFi Setup</h3>");
   page += FPSTR(HTTP_PORTAL_OPTIONS);
   page += FPSTR(HTTP_END);
 
@@ -382,7 +371,7 @@ void EAVManager::handleRoot() {
 void EAVManager::handleWifi(boolean scan) {
 
   String page = FPSTR(HTTP_HEAD);
-  page.replace("{v}", "Config EAV");
+  page.replace("{v}", "Config WiFi");
   page += FPSTR(HTTP_SCRIPT);
   page += FPSTR(HTTP_STYLE);
   page += _customHeadElement;
@@ -518,7 +507,6 @@ void EAVManager::handleWifi(boolean scan) {
     item.replace("{v}", _sta_static_sn.toString());
 
     page += item;
-
     page += "<br/>";
   }
 
@@ -589,6 +577,13 @@ void EAVManager::handleWifiSave() {
   DEBUG_WM(F("Sent wifi save page"));
 
   connect = true; //signal ready to connect/reset
+}
+
+/** Handle the favicon */
+void EAVManager::handleFavicon() {
+  DEBUG_WM(F("Favicon"));
+  String icon = FPSTR(HTTP_FAVICON); // TODO: FIXME: maybe does not need the base64 prefix inside const then?
+  server->send(200, "data:image/x-icon;base64", icon);
 }
 
 /** Handle the info page */
