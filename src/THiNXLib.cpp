@@ -207,7 +207,8 @@ void THiNX::connect_wifi() {
 
   // 84, 176; 35856
 
-  if (wifi_retry > 100) {
+  // reported to crash at 1000!
+  if (wifi_retry > 1000) {
     Serial.printf("*TH: WiFi Retry timeout.");
     wifi_connection_in_progress = false;
     WiFi.disconnect();
