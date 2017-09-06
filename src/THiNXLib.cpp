@@ -1,5 +1,7 @@
 #include "THiNXLib.h"
 
+#ifndef UNIT_TEST  // IMPORTANT LINE!
+
 extern "C" {
   #include "user_interface.h"
   #include "thinx.h"
@@ -1098,3 +1100,5 @@ void THiNX::loop() {
 
   //Serial.println("THiNX < LOOP."); Serial.flush();
 }
+
+#endif    // IMPORTANT LINE!

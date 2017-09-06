@@ -1,5 +1,9 @@
 #include <Arduino.h>
 
+#ifndef VERSION
+#define VERSION "2.0.50"
+#endif
+
 #define __DEBUG__
 #define __DEBUG_JSON__
 
