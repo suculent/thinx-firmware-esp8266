@@ -59,7 +59,25 @@ THiNX::THiNX(const char * __apikey) {
   manager->addParameter(api_key_param);
   manager->setTimeout(5000);
   manager->setDebugOutput(false); // does some logging on mode set
-  manager->setSaveConfigCallback( saveConfigCallback );
+
+  // TODO: FIXME:
+  // manager->setSaveConfigCallback(  saveConfigCallback );
+
+  /*
+  lib/thinx-lib-esp8266-arduino/src/THiNXLib.cpp:64:55: error: no matching function for call to 'WiFiMana
+  ger::setSaveConfigCallback(<unresolved overloaded function type>)'
+  manager->setSaveConfigCallback(  saveConfigCallback );
+  ^
+  lib/thinx-lib-esp8266-arduino/src/THiNXLib.cpp:64:55: note: candidate is:
+  In file included from lib/thinx-lib-esp8266-arduino/src/THiNXLib.h:9:0,
+  from lib/thinx-lib-esp8266-arduino/src/THiNXLib.cpp:1:
+  lib/WiFiManager/WiFiManager.h:101:19: note: void WiFiManager::setSaveConfigCallback(void (*)())
+  void          setSaveConfigCallback( void (*func)(void) );
+  ^
+  lib/WiFiManager/WiFiManager.h:101:19: note:   no known conversion for argument 1 from '<unresolved over
+  loaded function type>' to 'void (*)()'
+  */
+
 #else
   if (WiFi.status() == WL_CONNECTED) {
     connected = true;
@@ -69,7 +87,6 @@ THiNX::THiNX(const char * __apikey) {
 
   EEPROM.begin(512); // should be SPI_FLASH_SEC_SIZE
 
-  // Read constants and possibly stored UDID/API Key
   import_build_time_constants();
 
   if (strlen(thinx_api_key) > 4) {

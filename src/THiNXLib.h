@@ -3,7 +3,7 @@
 #define __DEBUG__
 #define __DEBUG_JSON__
 
-// #define __USE_WIFI_MANAGER__
+#define __USE_WIFI_MANAGER__
 
 #ifdef __USE_WIFI_MANAGER__
 #include <WiFiManager.h>
@@ -87,7 +87,7 @@ class THiNX {
     WiFiManagerParameter *api_key_param;
 
     // when user sets new API Key in AP mode
-    ICACHE_RAM_ATTR void saveConfigCallback() {
+    void saveConfigCallback() {
       Serial.println("saveConfigCallback!!!");
       should_save_config = true;
       strcpy(thx_api_key, api_key_param->getValue());
