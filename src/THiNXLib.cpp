@@ -148,15 +148,14 @@ void THiNX::connect() {
       if (WiFi.getMode() == WIFI_AP) {
 
         Serial.print("THiNX > LOOP > START() > AP SSID");
-        Serial.print(WiFi.SSID());
+        Serial.println(WiFi.SSID());
 
       } else {
 
-        Serial.println("*TH: LOOP > CONNECT > STATION DISCONNECT");
         ETS_UART_INTR_DISABLE();
         wifi_station_disconnect();
         ETS_UART_INTR_ENABLE();
-        Serial.println("*TH: LOOP > CONNECT > STATION RECONNECT");
+        Serial.println("*TH: LOOP > CONNECT > STA RECONNECT");
         //WiFi.begin(THINX_ENV_SSID, THINX_ENV_PASS);
         WiFi.begin();
 
@@ -171,7 +170,7 @@ void THiNX::connect() {
     connected = true; // prevents re-entering start() [this method]
     wifi_connection_in_progress = false;
   } else {
-    Serial.println("THiNX > LOOP > CONNECTING WiFi:");
+    //Serial.println("THiNX > LOOP > CONNECTING WiFi:");
     connect_wifi();
   }
 }
@@ -201,38 +200,36 @@ void THiNX::connect_wifi() {
 
   wifi_retry++;
 
-  //Serial.printf("THiNXLib::connect_wifi(): unmodified stack   = %4d\n", cont_get_free_stack(&g_cont));
-  //Serial.printf("THiNXLib::connect_wifi(): current free stack = %4d\n", 4 * (sp - g_cont.stack));
-  //Serial.print("*THiNXLib::connect_wifi(SKIP): heap = "); Serial.println(system_get_free_heap_size());
+  Serial.printf("THiNXLib::connect_wifi(): unmodified stack   = %4d\n", cont_get_free_stack(&g_cont));
+  Serial.printf("THiNXLib::connect_wifi(): current free stack = %4d\n", 4 * (sp - g_cont.stack));
+  Serial.print("*THiNXLib::connect_wifi(): heap               = "); Serial.println(system_get_free_heap_size());
 
   // 84, 176; 35856
 
   // reported to crash at 1000!
   if (wifi_retry > 1000) {
     Serial.printf("*TH: WiFi Retry timeout.");
-    wifi_connection_in_progress = false;
     WiFi.disconnect();
     Serial.println("*TH: Starting THiNX-AP with PASSWORD...");
     WiFi.mode(WIFI_AP);
     WiFi.softAP("THiNX-AP", "PASSWORD");
     wifi_retry = 0;
-    connection_in_progress = false;
+    wifi_connection_in_progress = true;
     return;
   }
 
   if (wifi_connection_in_progress) {
-    Serial.println("*TH: Connection in progress...");
-    return;
-  }
-
-  if (strlen(THINX_ENV_SSID) > 2) {
-    if (wifi_retry == 0) {
-      Serial.println("*TH: Connecting to AP with pre-defined credentials...");
-      WiFi.mode(WIFI_STA);
-      WiFi.begin(strdup(THINX_ENV_SSID), strdup(THINX_ENV_PASS));
-      wifi_connection_in_progress = true; // prevents re-entering connect_wifi()
+    // Serial.println("*TH: Connection in progress...");
+  } else {
+    if (strlen(THINX_ENV_SSID) > 2) {
+      if (wifi_retry == 0) {
+        Serial.println("*TH: Connecting to AP with pre-defined credentials...");
+        WiFi.mode(WIFI_STA);
+        WiFi.begin(strdup(THINX_ENV_SSID), strdup(THINX_ENV_PASS));
+        wifi_connection_in_progress = true; // prevents re-entering connect_wifi()
+      }
+      // exit loop here to prevent wdt lock
     }
-    // exit loop here to prevent wdt lock
   }
 #endif
  }
