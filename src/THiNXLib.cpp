@@ -200,9 +200,9 @@ void THiNX::connect_wifi() {
 
   wifi_retry++;
 
-  Serial.printf("THiNXLib::connect_wifi(): unmodified stack   = %4d\n", cont_get_free_stack(&g_cont));
-  Serial.printf("THiNXLib::connect_wifi(): current free stack = %4d\n", 4 * (sp - g_cont.stack));
-  Serial.print("*THiNXLib::connect_wifi(): heap               = "); Serial.println(system_get_free_heap_size());
+  //Serial.printf("THiNXLib::connect_wifi(): unmodified stack   = %4d\n", cont_get_free_stack(&g_cont));
+  //Serial.printf("THiNXLib::connect_wifi(): current free stack = %4d\n", 4 * (sp - g_cont.stack));
+  //Serial.print("*THiNXLib::connect_wifi(): heap               = "); Serial.println(system_get_free_heap_size());
 
   // 84, 176; 35856
 
@@ -301,7 +301,7 @@ void THiNX::senddata(String body) {
     long interval = 10000;
     unsigned long currentMillis = millis(), previousMillis = millis();
 
-    Serial.print("*THiNXLib::senddata(): waiting for response...");
+    Serial.println("*THiNXLib::senddata(): waiting for response...");
     // TODO: FIXME: Drop the loop here, wait for response!
 
     // Wait until client available or timeout...
@@ -325,7 +325,7 @@ void THiNX::senddata(String body) {
       }
     }
 
-    Serial.print("*THiNXLib::senddata(): parsing payload...");
+    Serial.println("*THiNXLib::senddata(): parsing payload...");
     parse(payload);
 
   } else {
@@ -774,7 +774,7 @@ bool THiNX::restore_device_info() {
   for (long a = 0; a < buf_len; a++) {
     value = EEPROM.read(a);
     if (value == 0) {
-      Serial.print("*TH: "); Serial.print(a); Serial.print(" bytes read from EEPROM.");
+      Serial.print("*TH: "); Serial.print(a); Serial.println(" bytes read from EEPROM.");
       break;
     }
     // validate at least data start
