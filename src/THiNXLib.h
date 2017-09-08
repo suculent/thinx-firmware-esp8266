@@ -7,30 +7,39 @@
 #define __DEBUG__
 #define __DEBUG_JSON__
 
-#include <stdio.h>
-#include "ArduinoJson/ArduinoJson.h"
+//#define __USE_WIFI_MANAGER__
+//#define __USE_SPIFFS__
 
-#include <FS.h>
-#include <EEPROM.h>
+#ifdef __USE_WIFI_MANAGER__
+#include <WiFiManager.h>
 //#include "EAVManager/EAVManager.h"
 //#include <EAVManager.h>
-#include <WiFiManager.h>
+#endif
+
+#include <stdio.h>
+#include <FS.h>
+#include <EEPROM.h>
+#include <ESP8266WiFi.h>
+#include <ESP8266HTTPClient.h>
+#include <ESP8266httpUpdate.h>
+
+#include "ArduinoJson/ArduinoJson.h"
 
 // Using better than Arduino-bundled version of MQTT https://github.com/Imroy/pubsubclient
 #include "PubSubClient/PubSubClient.h" // Local checkout
 //#include <PubSubClient.h> // Arduino Library
 
-// TODO: Add UDP AT&U= responder like in EAV? Considered unsafe. Device will notify available update and download/install it on its own (possibly throught THiNX Security Gateway (THiNX )
-// IN PROGRESS: Add MQTT client (target IP defined using Thinx.h) and forced firmware update responder (will update on force or save in-memory state from new or retained mqtt notification)
-// TODO: Add UDP responder AT&U only to update to next available firmware (from save in-memory state)
-
-#include <ESP8266WiFi.h>
-#include <ESP8266HTTPClient.h>
-#include <ESP8266httpUpdate.h>
-
 #define MQTT_BUFFER_SIZE 512
 
-//#define __USE_WIFI_MANAGER__
+#ifdef THINX_FIRMWARE_VERSION_SHORT
+#ifndef THX_REVISION
+#define THX_REVISION THINX_FIRMWARE_VERSION_SHORT
+#endif
+#else
+#ifndef THX_REVISION
+#define THX_REVISION String(0)
+#endif
+#endif
 
 class THiNX {
 
@@ -53,11 +62,6 @@ class THiNX {
     void loop();
 
     String checkin_body();                  // TODO: Refactor to C-string
-
-#ifdef __USE_WIFI_MANAGER__
-    WiFiManager *manager;
-    WiFiManagerParameter *api_key_param;
-#endif
 
     // MQTT
     PubSubClient *mqtt_client;
@@ -91,13 +95,27 @@ class THiNX {
 
     bool connected;                         // WiFi connected in station mode
 
+    void setFinalizeCallback( void (*func)(void) );
+
+#ifdef __USE_WIFI_MANAGER__
+    WiFiManager *manager;
+    WiFiManagerParameter *api_key_param;
+
+    // when user sets new API Key in AP mode
+    void saveConfigCallback() {
+      Serial.println("saveConfigCallback!!!");
+      should_save_config = true;
+      strcpy(thx_api_key, api_key_param->getValue());
+    }
+#endif
+
     private:
 
       // WiFi Manager
       WiFiClient *thx_wifi_client;
       int status;                             // global WiFi status
       bool once;                              // once token for initialization
-      void saveConfigCallback();              // when user sets new API Key in AP mode
+
 
       // THiNX API
       char thx_api_key[64];                   // for EAVManager/WiFiManager callback
@@ -139,6 +157,10 @@ class THiNX {
       bool connection_in_progress;
       bool complete;
       void evt_save_api_key();
+
+      // Finalize
+      void (*_finalize_callback)(void) = NULL;
+      void finalize();                        // Complete the checkin, schedule, callback...
 
       // Local WiFi Impl
       bool wifi_wait_for_connect;
