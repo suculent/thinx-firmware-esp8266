@@ -101,7 +101,7 @@ THiNX::THiNX(const char * __apikey) {
     if (strlen(__apikey) > 4) {
       // Serial.print("*TH: With custom API Key: ");
       thinx_api_key = strdup(__apikey);
-      Serial.println(thinx_api_key);
+      //Serial.println(thinx_api_key);
     } else {
       Serial.println("*TH: Init without AK (captive portal)...");
     }
@@ -871,8 +871,8 @@ bool THiNX::restore_device_info() {
      delay(1); // yield some cpu time for saving
    }
 #else
-  Serial.println("*TH: saving configuration to EEPROM...");
-  Serial.println(info);
+  //Serial.println("*TH: saving configuration to EEPROM...");
+  //Serial.println(info);
   for (long addr = 0; addr <= info.length(); addr++) {
     EEPROM.put(addr, info.charAt(addr));
   }
