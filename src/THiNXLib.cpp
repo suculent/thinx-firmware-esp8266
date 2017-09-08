@@ -18,6 +18,9 @@ THiNX::THiNX(const char * __apikey) {
 
   Serial.print("\nTHiNXLib rev");
   Serial.println(String(THX_REVISION)); // should be generated using platformio.ini pre-build
+  //Serial.print(" (");
+  //Serial.print(String(THX_CID)); // returned string is "not declared in expansion of THX_CID, why?
+  //Serial.println(" )");
 
   // see lines ../hardware/cores/esp8266/Esp.cpp:80..100
   wdt_disable(); // causes wdt reset after 8 seconds!
@@ -96,7 +99,7 @@ THiNX::THiNX(const char * __apikey) {
     //Serial.print("*TH: Init with stored API Key: ");
   } else {
     if (strlen(__apikey) > 4) {
-      Serial.print("*TH: With custom API Key: ");
+      // Serial.print("*TH: With custom API Key: ");
       thinx_api_key = strdup(__apikey);
       Serial.println(thinx_api_key);
     } else {
@@ -808,7 +811,7 @@ bool THiNX::restore_device_info() {
    String data = f.readStringUntil('\n');
 #endif
 
-   Serial.println("*TH: Parsing JSON...");
+   // Serial.println("*TH: Parsing JSON...");
 
    JsonObject& config = jsonBuffer.parseObject(data.c_str());
    if (!config.success()) {
@@ -816,10 +819,10 @@ bool THiNX::restore_device_info() {
      return false;
    } else {
 
-    Serial.println("*TH: Parsing saved data..."); // may crash: Serial.flush();
-    Serial.print("'");
-    Serial.print(data);
-    Serial.println("'");
+    //Serial.println("*TH: Parsing saved data..."); // may crash: Serial.flush();
+    //Serial.print("'");
+    //Serial.print(data);
+    //Serial.println("'");
 
      const char* alias = config["alias"];
      if (strlen(alias) > 1) {

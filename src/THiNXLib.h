@@ -7,7 +7,7 @@
 #define __DEBUG__
 #define __DEBUG_JSON__
 
-//#define __USE_WIFI_MANAGER__
+#define __USE_WIFI_MANAGER__
 //#define __USE_SPIFFS__
 
 #ifdef __USE_WIFI_MANAGER__
@@ -38,6 +38,13 @@
 #else
 #ifndef THX_REVISION
 #define THX_REVISION String(0)
+#endif
+#endif
+
+
+#ifndef THX_CID
+#ifdef THINX_COMMIT_ID
+#define THX_CID THINX_COMMIT_ID
 #endif
 #endif
 
