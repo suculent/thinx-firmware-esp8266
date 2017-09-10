@@ -16,7 +16,7 @@ THiNX::THiNX() {
 
 THiNX::THiNX(const char * __apikey) {
 
-  Serial.print("\nTHiNXLib rev");
+  Serial.print(String("\nTHiNXLib rev. "));
   Serial.println(String(THX_REVISION)); // should be generated using platformio.ini pre-build
   //Serial.print(" (");
   //Serial.print(String(THX_CID)); // returned string is "not declared in expansion of THX_CID, why?
@@ -24,7 +24,7 @@ THiNX::THiNX(const char * __apikey) {
 
   // see lines ../hardware/cores/esp8266/Esp.cpp:80..100
   wdt_disable(); // causes wdt reset after 8 seconds!
-  wdt_enable(65535); // must be called from wdt_disable() state!
+  wdt_enable(16384); // must be called from wdt_disable() state!
 
   status = WL_IDLE_STATUS;
   once = true;
@@ -41,6 +41,7 @@ THiNX::THiNX(const char * __apikey) {
   mqtt_payload = "";
   mqtt_result = false;
   mqtt_connected = false;
+  perform_mqtt_checkin = false;
 
   wifi_connection_in_progress = false;
   thx_wifi_client = new WiFiClient();
@@ -67,7 +68,13 @@ THiNX::THiNX(const char * __apikey) {
   manager->setDebugOutput(false); // does some logging on mode set
 
   // TODO: FIXME:
-  // manager->setSaveConfigCallback(  saveConfigCallback );
+  /*
+  manager->setSaveConfigCallback( {
+    Serial.println("saveConfigCallback!!!");
+    should_save_config = true;
+    strcpy(thx_api_key, api_key_param->getValue());
+  } );
+  */
 
   /*
   lib/thinx-lib-esp8266-arduino/src/THiNXLib.cpp:64:55: error: no matching function for call to 'WiFiMana
@@ -85,9 +92,12 @@ THiNX::THiNX(const char * __apikey) {
   */
 
 #else
-  if (WiFi.status() == WL_CONNECTED) {
+
+  if ((WiFi.status() == WL_CONNECTED) && (WiFi.getMode() == WIFI_STA)) {
     connected = true;
     wifi_connection_in_progress = false;
+  } else {
+    WiFi.mode(WIFI_STA);
   }
 #endif
 
@@ -114,7 +124,7 @@ void THiNX::initWithAPIKey(const char * __apikey) {
 
   bool success = restore_device_info();
 
-  Serial.println("*TH: Device info restored.");
+  //Serial.println("*TH: Device info restored.");
 
   // FS may deprecate in favour of EEPROM
 #ifdef __USE_SPIFFS__
@@ -139,10 +149,9 @@ void THiNX::connect() {
     return;
   }
 
-  Serial.print("*TH: connecting: "); Serial.println(wifi_retry);
+  //Serial.print("*TH: connecting: "); Serial.println(wifi_retry); blocks
 
   if (WiFi.SSID()) {
-
 
     if (!wifi_connection_in_progress) {
 
@@ -159,9 +168,8 @@ void THiNX::connect() {
         wifi_station_disconnect();
         ETS_UART_INTR_ENABLE();
         Serial.println("*TH: LOOP > CONNECT > STA RECONNECT");
-        //WiFi.begin(THINX_ENV_SSID, THINX_ENV_PASS);
-        WiFi.begin();
-
+        WiFi.begin(THINX_ENV_SSID, THINX_ENV_PASS);
+        //WiFi.begin();
       }
 
       wifi_connection_in_progress = true; // prevents re-entering connect_wifi(); should timeout
@@ -188,20 +196,20 @@ void THiNX::connect_wifi() {
    // 4, 208!
 
 #ifdef __USE_WIFI_MANAGER__
-   Serial.setDebugOutput(true);
-   manager->setDebugOutput(true); // does some logging on mode set
+   Serial.setDebugOutput(false);
+   manager->setDebugOutput(false); // does some logging on mode set
+   ETS_UART_INTR_DISABLE();
    Serial.println("*TH: AutoConnecting..."); Serial.flush();
    //delay(1);
-   while ( !manager->autoConnect("AP-THiNX", "PASSWORD") ) {
-     Serial.println("*TH: AutoConnect loop...");
-     delay(1);
-   }
+   connected = manager->autoConnect("AP-THiNX", "PASSWORD");
+  Serial.println("*TH: AutoConnect connected...");
+
 #else
+
   if (connected) {
     return;
   }
 
-  wifi_retry++;
 
   //Serial.printf("THiNXLib::connect_wifi(): unmodified stack   = %4d\n", cont_get_free_stack(&g_cont));
   //Serial.printf("THiNXLib::connect_wifi(): current free stack = %4d\n", 4 * (sp - g_cont.stack));
@@ -209,21 +217,43 @@ void THiNX::connect_wifi() {
 
   // 84, 176; 35856
 
-  // reported to crash at 1000!
-  if (wifi_retry > 1000) {
-    Serial.printf("*TH: WiFi Retry timeout.");
-    WiFi.disconnect();
-    Serial.println("*TH: Starting THiNX-AP with PASSWORD...");
-    WiFi.mode(WIFI_AP);
-    WiFi.softAP("THiNX-AP", "PASSWORD");
-    wifi_retry = 0;
-    wifi_connection_in_progress = true;
-    return;
-  }
+
 
   if (wifi_connection_in_progress) {
+    if (wifi_retry > 1000) {
+
+      // Retry in AP mode...
+      if (WiFi.getMode() == WIFI_STA) {
+
+        Serial.printf("*TH: WiFi Retry timeout.");
+        ETS_UART_INTR_DISABLE();
+        wifi_station_disconnect();
+        ETS_UART_INTR_ENABLE();
+        Serial.println("*TH: Starting THiNX-AP with PASSWORD...");
+        WiFi.mode(WIFI_AP);
+        WiFi.softAP("THiNX-AP", "PASSWORD");
+        wifi_retry = 0;
+        wifi_connection_in_progress = false;
+        connected = true;
+        return;
+
+      } else {
+
+        // Retry in station mode...
+          Serial.println("*TH: Connecting to AP with pre-defined credentials...");
+          WiFi.mode(WIFI_STA);
+          WiFi.begin(strdup(THINX_ENV_SSID), strdup(THINX_ENV_PASS));
+          wifi_connection_in_progress = true; // prevents re-entering connect_wifi()
+          wifi_retry = 0; // waiting for sta...
+      }
+
+    } else {
+      wifi_retry++;
+    }
+
     // Serial.println("*TH: Connection in progress...");
   } else {
+
     if (strlen(THINX_ENV_SSID) > 2) {
       if (wifi_retry == 0) {
         Serial.println("*TH: Connecting to AP with pre-defined credentials...");
@@ -231,7 +261,6 @@ void THiNX::connect_wifi() {
         WiFi.begin(strdup(THINX_ENV_SSID), strdup(THINX_ENV_PASS));
         wifi_connection_in_progress = true; // prevents re-entering connect_wifi()
       }
-      // exit loop here to prevent wdt lock
     }
   }
 #endif
@@ -430,6 +459,7 @@ void THiNX::parse(String payload) {
             thinx_mqtt_channel(),
             "{ title: \"Update Available\", body: \"There is an update available for this device. Do you want to install it now?\", type: \"actionable\", response_type: \"bool\" }"
           );
+          mqtt_client->loop();
         }
 
       } else {
@@ -595,16 +625,21 @@ void THiNX::parse(String payload) {
  * MQTT
  */
 
+// TODO: Should be called only on init and update (and store result for later)
 const char* THiNX::thinx_mqtt_channel() {
-  String s = String("/") + String(thinx_owner) + String("/") + String(thinx_udid);
-  return s.c_str();
+  char * channel;
+  sprintf(channel, "/%s/%s", thinx_owner, thinx_udid);
+  return channel;
 }
 
+// TODO: Should be called only on init and update (and store result for later)
 const char* THiNX::thinx_mqtt_status_channel() {
-  String s = String("/") + String(thinx_owner) + String("/") + String(thinx_udid) + String("/status");
- return s.c_str();
+  char * channel;
+  sprintf(channel, "/%s/%s/status", thinx_owner, thinx_udid);
+  return channel;
 }
 
+// TODO: FIXME: Return real mac address through WiFi? Might solve compatibility issues.
 const char * THiNX::thinx_mac() {
  byte mac[] = {
    0x00, 0x00, 0x00, 0x00, 0x00, 0x00
@@ -637,6 +672,7 @@ void THiNX::publish() {
     mqtt_result = start_mqtt();
     if (mqtt_result && mqtt_client->connected()) {
       mqtt_client->publish(channel, response.c_str());
+      mqtt_client->loop();
       Serial.println("*TH: MQTT reconnected, published default message.");
     } else {
       Serial.println("*TH: MQTT Reconnect failed...");
@@ -650,6 +686,7 @@ void THiNX::notify_on_successful_update() {
       thinx_mqtt_status_channel(),
       "{ title: \"Update Successful\", body: \"The device has been successfully updated.\", type: \"success\" }"
     );
+    mqtt_client->loop();
   } else {
     Serial.println("Device updated but MQTT not active to notify. TODO: Store.");
   }
@@ -686,12 +723,21 @@ bool THiNX::start_mqtt() {
 
   last_mqtt_reconnect = 0;
 
-  Serial.println("*TH: Connecting to MQTT...");
+  String device_channel = thinx_mqtt_channel();
+  if (device_channel.length() < 5) {
+    Serial.println("*TH: Device channel invalid, exiting.");
+    return false;
+  }
+
+  if (strlen(thinx_api_key) < 5) {
+    Serial.println("*TH: API Key not set, exiting.");
+    return false;
+  }
 
   Serial.print("*TH: AK: ");
   Serial.println(thinx_api_key);
   Serial.print("*TH: DCH: ");
-  Serial.println(thinx_mqtt_channel());
+  Serial.println(device_channel);
 
   const char* id = thinx_mac();
   const char* user = thinx_udid;
@@ -702,6 +748,8 @@ bool THiNX::start_mqtt() {
 
   delay(1);
 
+  Serial.println("*TH: Connecting to MQTT...");
+
   if (mqtt_client->connect(MQTT::Connect(id)
                 .set_will(willTopic, "{ \"status\" : \"disconnected\" }")
                 .set_auth(user, pass)
@@ -709,6 +757,7 @@ bool THiNX::start_mqtt() {
               )) {
 
         mqtt_connected = true;
+        perform_mqtt_checkin = true;
 
         return true;
 
@@ -721,10 +770,14 @@ bool THiNX::start_mqtt() {
 
       mqtt_client->set_callback([this](const MQTT::Publish &pub){
 
+        delay(1);
+
+        /*
         if (pub.has_stream()) {
           Serial.println("*TH: MQTT Type: Stream...");
           uint32_t startTime = millis();
           uint32_t size = pub.payload_len();
+
           if ( ESP.updateSketch(*pub.payload_stream(), size, true, false) ) {
 
             // Notify on reboot for update
@@ -741,24 +794,24 @@ bool THiNX::start_mqtt() {
           Serial.println("stop.");
 
         } else {
+          */
 
-          Serial.println("*TH: MQTT Type: String or JSON...");
+          Serial.println("*TH: MQTT Type: String or JSON (NOT PARSED NOW!)...");
           Serial.println(pub.payload_string());
-          parse(pub.payload_string());
-
-        }
+          //parse(pub.payload_string());
+        // }
     }); // end-of-callback
 }
 
 #ifdef __USE_WIFI_MANAGER__
 /*
  * WiFiManager Setup Callback
-
-void THiNX::saveConfigCallback() {
+ */
+void THiNX::configCallback() {
   should_save_config = true;
   strcpy(thx_api_key, api_key_param->getValue());
 }
-*/
+
 #endif
 
 /*
@@ -777,7 +830,8 @@ bool THiNX::restore_device_info() {
   for (long a = 0; a < buf_len; a++) {
     value = EEPROM.read(a);
     if (value == 0) {
-      Serial.print("*TH: "); Serial.print(a); Serial.println(" bytes read from EEPROM.");
+      info[a] = value;
+      // Serial.print("*TH: "); Serial.print(a); Serial.println(" bytes read from EEPROM.");
       break;
     }
     // validate at least data start
@@ -790,8 +844,8 @@ bool THiNX::restore_device_info() {
     info[a] = value;
   }
 
-  String data = String(info) + "\n"; // \n helps the JSON parser not to crash
-  //Serial.println("'"+data+"'");
+  String data = String(info); // \n helps the JSON parser not to crash
+  // Serial.println("'"+data+"'");
 
 #else
   if (!SPIFFS.exists("/thx.cfg")) {
@@ -815,7 +869,7 @@ bool THiNX::restore_device_info() {
 
    JsonObject& config = jsonBuffer.parseObject(data.c_str());
    if (!config.success()) {
-     Serial.println("*TH: parsing JSON failed.");
+     //Serial.println("*TH: parsing JSON failed.");
      return false;
    } else {
 
@@ -835,7 +889,6 @@ bool THiNX::restore_device_info() {
      const char* apikey = config["apikey"];
      if (strlen(apikey) > 8) {
       thinx_api_key = strdup(apikey);
-      sprintf(thx_api_key, "%s", apikey); // 40 max; copy; should deprecate
      }
      const char* update = config["update"];
      if (strlen(update) > 4) {
@@ -1005,9 +1058,6 @@ void THiNX::import_build_time_constants() {
   thinx_firmware_version = strdup(THINX_FIRMWARE_VERSION);
   thinx_firmware_version_short = strdup(THINX_FIRMWARE_VERSION_SHORT);
   app_version = strdup(THINX_APP_VERSION);
-#ifdef __DEBUG__
-  Serial.println("*TH: Imported build-time constants...");
-#endif
 }
 
 bool THiNX::fsck() {
@@ -1049,48 +1099,61 @@ void THiNX::evt_save_api_key() {
  * Core loop
  */
 
+ //uint32_t memfree = system_get_free_heap_size(); Serial.print("THINX LOOP memfree                  = "); Serial.println(memfree);
+ //Serial.printf("THiNXLib::connect_wifi(): unmodified stack   = %4d\n", cont_get_free_stack(&g_cont));
+ //Serial.printf("THiNXLib::connect_wifi(): current free stack = %4d\n", 4 * (sp - g_cont.stack));
+ // Serial.print("*THiNXLib::connect_wifi(SKIP): heap = "); Serial.println(system_get_free_heap_size());
+
 void THiNX::loop() {
 
-  //uint32_t memfree = system_get_free_heap_size(); Serial.print("THINX LOOP memfree                  = "); Serial.println(memfree);
-  //Serial.printf("THiNXLib::connect_wifi(): unmodified stack   = %4d\n", cont_get_free_stack(&g_cont));
-  //Serial.printf("THiNXLib::connect_wifi(): current free stack = %4d\n", 4 * (sp - g_cont.stack));
-
-  // Serial.print("*THiNXLib::connect_wifi(SKIP): heap = "); Serial.println(system_get_free_heap_size());
-
-  //
   // If not connected, start connection in progress...
-  //
-
-  if (!connected) {
-    if (WiFi.status() == WL_CONNECTED) {
-      connected = true;
-    } else {
+  if (WiFi.status() == WL_CONNECTED) {
+    connected = true;
+  } else {
+    connected = false;
+    if (!wifi_connection_in_progress) {
       connect(); // blocking
     }
-  } else {
+  }
+
+  // If connected, perform the MQTT loop and bail out ASAP
+  if (connected) {
+
+    if (WiFi.getMode() == WIFI_AP) return;
+
+    if (mqtt_client) {
+      mqtt_client->loop();
+    }
+
+    if (all_done) return;
+
+    /*
 
     //
     // After MQTT gets connected:
     //
 
-    if (mqtt_connected && mqtt_client->connected()) {
-      // disable looping... should be done with something like mqtt_checked_in = true instead
-      mqtt_connected = false;
+    if (conencted && perform_mqtt_checkin) {
 
-      Serial.println("*TH: MQTT Publishing device status... ");
-      // Publish status on status channel
-      mqtt_client->publish(
-        thinx_mqtt_status_channel(),
-        "{ \"status\" : \"connected\" }"
-      );
+      perform_mqtt_checkin = true;
 
-      Serial.println("*TH: MQTT Subscribing device channel...");
-      if (mqtt_client->subscribe(thinx_mqtt_channel())) {
-        Serial.print("*TH: DCH ");
-        Serial.print(thinx_mqtt_channel());
-        Serial.println(" successfully subscribed.");
-        Serial.print("*THiNXLib::connect_wifi(SKIP): heap = "); Serial.println(system_get_free_heap_size());
-        finalize();
+      const char * channel = thinx_mqtt_channel();
+      if (strlen(channel) > 5) {
+        Serial.println("*TH: MQTT Subscribing device channel from loop...");
+        if (mqtt_client->subscribe(channel)) {
+          Serial.print("*TH: DCH ");
+          Serial.print(channel);
+          Serial.println(" successfully subscribed.");
+          Serial.print("*THiNXLib::connect_wifi(SKIP): heap = "); Serial.println(system_get_free_heap_size());
+
+          Serial.println("*TH: MQTT Publishing device status... ");
+          // Publish status on status channel
+          mqtt_client->publish(
+            thinx_mqtt_status_channel(),
+            "{ \"status\" : \"connected\" }"
+          );
+          finalize();
+        }
       }
     }
 
@@ -1098,31 +1161,35 @@ void THiNX::loop() {
     // After checked in, connect MQTT
     //
 
-    if (checked_in == true) {
-      if (mqtt_client != NULL) {
-        mqtt_client->loop();
-      } else {
+    if ( connected && checked_in ) {
+      if (mqtt_client) {
         Serial.println("*TH: WiFi connected, starting MQTT...");
         delay(1);
         mqtt_result = start_mqtt(); // requires valid udid and api_keys, and allocated WiFiClient; might be blocking
       }
     }
 
-    //
-    // If connected and not checked_in, perform check in.
-    //
+    */
 
-    if (checked_in == false) {
+    // If connected and not checked_in, perform check in.
+    if (connected && !checked_in) {
+      Serial.println("*TH: Will perform check in....");
       if (strlen(thinx_api_key) > 4) {
         Serial.println("*TH: WiFi connected, checking in...");
         checked_in = true;
         checkin(); // blocking
-        return; // init MQTT in next loop
+        delay(1);
+        finalize();
+        return; // finalize OR init MQTT in next loop
       }
     }
 
     // Save API key on change
-    evt_save_api_key(); // only happens on should_save_config
+    if (should_save_config) {
+      Serial.println("*TH: Saving API key on change...");
+      evt_save_api_key();
+      should_save_config = false;
+    }
   }
 }
 
@@ -1131,8 +1198,9 @@ void THiNX::setFinalizeCallback( void (*func)(void) ) {
 }
 
 void THiNX::finalize() {
-  Serial.println("*TH: Checkin completed.");
-  Serial.print("*THiNXLib::finalize heap = "); Serial.println(system_get_free_heap_size());
+  //Serial.println("*TH: Checkin completed.");
+  //Serial.print("*THiNXLib::finalize heap = "); Serial.println(system_get_free_heap_size());
+  all_done = true;
   if (_finalize_callback) {
     _finalize_callback();
   }

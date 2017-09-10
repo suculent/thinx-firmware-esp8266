@@ -109,7 +109,7 @@ class THiNX {
     WiFiManagerParameter *api_key_param;
 
     // when user sets new API Key in AP mode
-    void saveConfigCallback() {
+    inline void saveConfigCallback() {
       Serial.println("saveConfigCallback!!!");
       should_save_config = true;
       strcpy(thx_api_key, api_key_param->getValue());
@@ -117,6 +117,8 @@ class THiNX {
 #endif
 
     private:
+
+      void configCallback();
 
       // WiFi Manager
       WiFiClient *thx_wifi_client;
@@ -147,6 +149,8 @@ class THiNX {
       bool mqtt_connected;                    // success or failure on subscription
       String mqtt_payload;                    // mqtt_payload store for parsing
       int last_mqtt_reconnect;                // interval
+      bool perform_mqtt_checkin;              // one-time flag
+      bool all_done;                              // finalize flag
 
       // Data Storage
       bool should_save_config;                // after autoconnect, may provide new API Key
@@ -161,7 +165,7 @@ class THiNX {
       // Event Queue / States
       bool checked_in;
       bool mqtt_started;
-      bool connection_in_progress;
+      bool wifi_connection_in_progress;
       bool complete;
       void evt_save_api_key();
 
@@ -175,5 +179,4 @@ class THiNX {
       unsigned long wifi_wait_timeout;
       int wifi_retry;
       uint8_t wifi_status;
-      bool wifi_connection_in_progress;
 };

@@ -33,9 +33,7 @@ void setup() {
   Serial.begin(115200);
   while (!Serial);
   Serial.setDebugOutput(true);
-
-  wdt_disable(); // causes wdt reset after 8 seconds!
-  wdt_enable(65535); // must be called from wdt_disable() state!
+  
   delay(3000);
   Serial.print("THiNXLib v");
   Serial.println(VERSION);
