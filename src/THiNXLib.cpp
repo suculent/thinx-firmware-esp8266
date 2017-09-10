@@ -561,7 +561,7 @@ void THiNX::parse(String payload) {
         String udid = registration["udid"];
         if ( udid.length() > 4 ) {
           thinx_udid = strdup(udid.c_str());
-        }      
+        }
 
         save_device_info();
 
@@ -609,14 +609,16 @@ void THiNX::parse(String payload) {
 const char* THiNX::thinx_mqtt_channel() {
   char * channel;
   sprintf(channel, "/%s/%s", thinx_owner, thinx_udid);
-  return channel;
+  mqtt_device_channel = strdup(channel);
+  return mqtt_device_channel;
 }
 
 // TODO: Should be called only on init and update (and store result for later)
 const char* THiNX::thinx_mqtt_status_channel() {
   char * channel;
   sprintf(channel, "/%s/%s/status", thinx_owner, thinx_udid);
-  return channel;
+  mqtt_device_status_channel = strdup(channel);
+  return mqtt_device_status_channel;
 }
 
 // TODO: FIXME: Return real mac address through WiFi? Might solve compatibility issues.
