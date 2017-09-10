@@ -75,9 +75,9 @@ class THiNX {
 
     uint8_t buf[MQTT_BUFFER_SIZE];
 
-    const char* thinx_mqtt_channel();
+    String thinx_mqtt_channel();
     const char* mqtt_device_channel;
-    const char* thinx_mqtt_status_channel();
+    String thinx_mqtt_status_channel();
     const char* mqtt_device_status_channel;
 
     // Import build-time values from thinx.h

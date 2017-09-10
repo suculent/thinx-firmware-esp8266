@@ -202,7 +202,7 @@ void THiNX::connect_wifi() {
    Serial.println("*TH: AutoConnecting..."); Serial.flush();
    //delay(1);
    connected = manager->autoConnect("AP-THiNX", "PASSWORD");
-  Serial.println("*TH: AutoConnect connected...");
+   Serial.println("*TH: AutoConnect connected...");
 
 #else
 
@@ -455,8 +455,9 @@ void THiNX::parse(String payload) {
       // we must ask user to commence firmware update.
       if (THINX_AUTO_UPDATE == false) {
         if (mqtt_client) {
+          Serial.println("mqtt_client->publish");
           mqtt_client->publish(
-            thinx_mqtt_channel(),
+            thinx_mqtt_channel().c_str(),
             "{ title: \"Update Available\", body: \"There is an update available for this device. Do you want to install it now?\", type: \"actionable\", response_type: \"bool\" }"
           );
           mqtt_client->loop();
@@ -606,27 +607,27 @@ void THiNX::parse(String payload) {
  */
 
 // TODO: Should be called only on init and update (and store result for later)
-const char* THiNX::thinx_mqtt_channel() {
+String THiNX::thinx_mqtt_channel() {
   char * channel;
   sprintf(channel, "/%s/%s", thinx_owner, thinx_udid);
   mqtt_device_channel = strdup(channel);
-  return mqtt_device_channel;
+  return String(channel);
 }
 
 // TODO: Should be called only on init and update (and store result for later)
-const char* THiNX::thinx_mqtt_status_channel() {
+String THiNX::thinx_mqtt_status_channel() {
   char * channel;
   sprintf(channel, "/%s/%s/status", thinx_owner, thinx_udid);
   mqtt_device_status_channel = strdup(channel);
-  return mqtt_device_status_channel;
+  return String(channel);
 }
 
 // TODO: FIXME: Return real mac address through WiFi? Might solve compatibility issues.
 const char * THiNX::thinx_mac() {
- byte mac[] = {
-   0x00, 0x00, 0x00, 0x00, 0x00, 0x00
- };
- WiFi.macAddress(mac);
+ //byte mac[] = {
+ //   0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+ //};
+ //WiFi.macAddress(mac);
  sprintf(mac_string, "5CCF7F%6X", ESP.getChipId()); // ESP8266 only!
  /*
 #ifdef __ESP32__
@@ -643,11 +644,11 @@ void THiNX::publish() {
   if (!connected) return;
   if (mqtt_client == NULL) return;
   if (strlen(thinx_udid) < 4) return;
-  const char * channel = thinx_mqtt_status_channel();
+  String channel = thinx_mqtt_status_channel();
   String response = "{ \"status\" : \"connected\" }";
   if (mqtt_client->connected()) {
     Serial.println("*TH: MQTT connected...");
-    mqtt_client->publish(channel, response.c_str());
+    mqtt_client->publish(channel.c_str(), response.c_str());
     mqtt_client->loop();
   } else {
     Serial.println("*TH: MQTT not connected, reconnecting...");
@@ -664,6 +665,7 @@ void THiNX::publish() {
 
 void THiNX::notify_on_successful_update() {
   if (mqtt_client) {
+    Serial.println("mqtt_client->publish");
     mqtt_client->publish(
       thinx_mqtt_status_channel(),
       "{ title: \"Update Successful\", body: \"The device has been successfully updated.\", type: \"success\" }"
@@ -695,21 +697,16 @@ bool THiNX::start_mqtt() {
   Serial.println(thinx_mqtt_url);
 
   //PubSubClient mqtt_client(thx_wifi_client, thinx_mqtt_url.c_str());
-  Serial.print("*TH: Starting client");
+  Serial.print("*TH: MQTT client with URL ");
+  Serial.println(thinx_mqtt_url);
   if (mqtt_client == NULL) {
     mqtt_client = new PubSubClient(*thx_wifi_client, thinx_mqtt_url);
   }
 
-  Serial.print(" on port ");
+  Serial.print(" started on port ");
   Serial.println(thinx_mqtt_port);
 
   last_mqtt_reconnect = 0;
-
-  String device_channel = thinx_mqtt_channel();
-  if (device_channel.length() < 5) {
-    Serial.println("*TH: Device channel invalid, exiting.");
-    return false;
-  }
 
   if (strlen(thinx_api_key) < 5) {
     Serial.println("*TH: API Key not set, exiting.");
@@ -719,12 +716,12 @@ bool THiNX::start_mqtt() {
   Serial.print("*TH: AK: ");
   Serial.println(thinx_api_key);
   Serial.print("*TH: DCH: ");
-  Serial.println(device_channel);
+  Serial.println(thinx_mqtt_channel());
 
   const char* id = thinx_mac();
   const char* user = thinx_udid;
   const char* pass = thinx_api_key;
-  const char* willTopic = thinx_mqtt_status_channel();
+  String willTopic = thinx_mqtt_status_channel();
   int willQos = 0;
   bool willRetain = false;
 
@@ -733,13 +730,49 @@ bool THiNX::start_mqtt() {
   Serial.println("*TH: Connecting to MQTT...");
 
   if (mqtt_client->connect(MQTT::Connect(id)
-                .set_will(willTopic, "{ \"status\" : \"disconnected\" }")
+                .set_will(willTopic.c_str(), "{ \"status\" : \"disconnected\" }")
                 .set_auth(user, pass)
                 .set_keepalive(30)
               )) {
 
+        Serial.println("mqtt_client->connected()!");
+
         mqtt_connected = true;
         perform_mqtt_checkin = true;
+
+        mqtt_client->set_callback([this](const MQTT::Publish &pub){
+
+          delay(1);
+
+          /*
+          if (pub.has_stream()) {
+            Serial.println("*TH: MQTT Type: Stream...");
+            uint32_t startTime = millis();
+            uint32_t size = pub.payload_len();
+
+            if ( ESP.updateSketch(*pub.payload_stream(), size, true, false) ) {
+
+              // Notify on reboot for update
+              mqtt_client->publish(
+                thinx_mqtt_status_channel(),
+                "{ \"status\" : \"rebooting\" }"
+              );
+              mqtt_client->disconnect();
+              pub.payload_stream()->stop();
+              Serial.printf("Update Success: %u\nRebooting...\n", millis() - startTime);
+              ESP.restart();
+            }
+
+            Serial.println("stop.");
+
+          } else {
+            */
+
+            //Serial.println("*TH: MQTT Type: String or JSON (NOT PARSED NOW!)...");
+            Serial.println(pub.payload_string());
+            //parse(pub.payload_string());
+          // }
+      }); // end-of-callback
 
         return true;
 
@@ -747,42 +780,7 @@ bool THiNX::start_mqtt() {
 
         Serial.println("*TH: MQTT Not connected.");
         return false;
-
       }
-
-      mqtt_client->set_callback([this](const MQTT::Publish &pub){
-
-        delay(1);
-
-        /*
-        if (pub.has_stream()) {
-          Serial.println("*TH: MQTT Type: Stream...");
-          uint32_t startTime = millis();
-          uint32_t size = pub.payload_len();
-
-          if ( ESP.updateSketch(*pub.payload_stream(), size, true, false) ) {
-
-            // Notify on reboot for update
-            mqtt_client->publish(
-              thinx_mqtt_status_channel(),
-              "{ \"status\" : \"rebooting\" }"
-            );
-            mqtt_client->disconnect();
-            pub.payload_stream()->stop();
-            Serial.printf("Update Success: %u\nRebooting...\n", millis() - startTime);
-            ESP.restart();
-          }
-
-          Serial.println("stop.");
-
-        } else {
-          */
-
-          Serial.println("*TH: MQTT Type: String or JSON (NOT PARSED NOW!)...");
-          Serial.println(pub.payload_string());
-          //parse(pub.payload_string());
-        // }
-    }); // end-of-callback
 }
 
 #ifdef __USE_WIFI_MANAGER__
@@ -1143,15 +1141,17 @@ void THiNX::loop() {
     // After checked in, connect MQTT
     //
 
+      */
+
     if ( connected && checked_in ) {
-      if (mqtt_client) {
-        Serial.println("*TH: WiFi connected, starting MQTT...");
+      Serial.println("*TH: WiFi connected, starting MQTT..."); Serial.flush();
+      if (!mqtt_result) {
         delay(1);
-        mqtt_result = start_mqtt(); // requires valid udid and api_keys, and allocated WiFiClient; might be blocking
+        // mqtt_result = start_mqtt(); // connect only, do not subscribe
+        finalize();
       }
     }
 
-    */
 
     // If connected and not checked_in, perform check in.
     if (connected && !checked_in) {
@@ -1161,7 +1161,7 @@ void THiNX::loop() {
         checked_in = true;
         checkin(); // blocking
         delay(1);
-        finalize();
+        //finalize();
         return; // finalize OR init MQTT in next loop
       }
     }
