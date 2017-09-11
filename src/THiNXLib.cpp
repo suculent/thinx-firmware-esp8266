@@ -17,10 +17,7 @@ THiNX::THiNX() {
 THiNX::THiNX(const char * __apikey) {
 
   Serial.print(String("\nTHiNXLib rev. "));
-  Serial.println(String(THX_REVISION)); // should be generated using platformio.ini pre-build
-  //Serial.print(" (");
-  //Serial.print(String(THX_CID)); // returned string is "not declared in expansion of THX_CID, why?
-  //Serial.println(" )");
+  Serial.print(String(THX_REVISION));
 
   // see lines ../hardware/cores/esp8266/Esp.cpp:80..100
   wdt_disable(); // causes wdt reset after 8 seconds!
@@ -76,6 +73,12 @@ THiNX::THiNX(const char * __apikey) {
   } );
   */
 
+  // void WiFiManager::setSaveConfigCallback( void (*func)(void) )
+  // manager->setSaveConfigCallback( &this->saveConfigCallback );
+  // https://stackoverflow.com/questions/29065943/how-can-i-pass-a-member-function-pointer-into-a-function-that-takes-a-regular-fu
+  // https://stackoverflow.com/questions/29691055/pointer-to-member-function-error
+  // https://stackoverflow.com/questions/2374847/passing-member-function-pointer-to-member-object-in-c
+
   /*
   lib/thinx-lib-esp8266-arduino/src/THiNXLib.cpp:64:55: error: no matching function for call to 'WiFiMana
   ger::setSaveConfigCallback(<unresolved overloaded function type>)'
@@ -102,8 +105,15 @@ THiNX::THiNX(const char * __apikey) {
 #endif
 
   EEPROM.begin(512); // should be SPI_FLASH_SEC_SIZE
-
   import_build_time_constants();
+
+  Serial.print(" (");
+  Serial.print(String(THINX_COMMIT_ID)); // returned string is "not declared in expansion of THX_CID, why?
+  Serial.println(")");
+
+  #ifdef __USE_WIFI_MANAGER__
+    manager->setDebugOutput(true); // does some logging on mode set
+  #endif
 
   if (strlen(thinx_api_key) > 4) {
     //Serial.print("*TH: Init with stored API Key: ");
@@ -313,6 +323,20 @@ void THiNX::connect_wifi() {
 
 void THiNX::senddata(String body) {
 
+  // Solution using the HTTPClient has no response parser yet:
+  /*
+  HTTPClient http;
+  http.begin(String(thinx_cloud_url) + ":" + String(7442));
+  http.addHeader("Content-Type", "application/json");
+  http.addHeader("User-Agent", "THiNX-Client");
+  http.addHeader("Origin", "device");
+  http.addHeader("Authentication", thinx_api_key);
+  http.POST(body);
+  http.writeToStream(&Serial);
+  http.end();
+  */
+
+//#ifdef HTTPS_WIFI_CLIENT
   if (thx_wifi_client->connect(thinx_cloud_url, 7442)) {
     Serial.println("*THiNXLib::senddata(): with api key...");
 
@@ -364,6 +388,7 @@ void THiNX::senddata(String body) {
     Serial.println("*TH: API connection failed.");
     return;
   }
+//#endif
 }
 
 /*
@@ -797,6 +822,7 @@ void THiNX::configCallback() {
  */
 
 // Calles (private): initWithAPIKey; save_device_info()
+// Provides: alias, owner, update, udid, (apikey)
 bool THiNX::restore_device_info() {
 
 #ifndef __USE_SPIFFS__
@@ -815,7 +841,7 @@ bool THiNX::restore_device_info() {
     // validate at least data start
     if (a == 0) {
       if (value != '{') {
-        Serial.println("Data is not a JSON string, exiting.");
+        Serial.println("*TH: Data is not a JSON string, exiting.");
         return false;
       }
     }
@@ -899,7 +925,7 @@ bool THiNX::restore_device_info() {
      f.println(info); // String instead of const char* due to LoadStoreAlignmentCause...
      Serial.println("*TH: closing file...");
      f.close();
-     delay(1); // yield some cpu time for saving
+     delay(1);
    }
 #else
   //Serial.println("*TH: saving configuration to EEPROM...");
@@ -1036,6 +1062,11 @@ void THiNX::import_build_time_constants() {
   thinx_firmware_version = strdup(THINX_FIRMWARE_VERSION);
   thinx_firmware_version_short = strdup(THINX_FIRMWARE_VERSION_SHORT);
   app_version = strdup(THINX_APP_VERSION);
+
+  //Serial.println(THINX_ENV_SSID);
+  //Serial.println(THINX_ENV_PASS);
+
+  //Serial.println("Loaded build-time constants...");
 }
 
 bool THiNX::fsck() {
@@ -1108,10 +1139,10 @@ void THiNX::loop() {
     /*
 
     //
-    // After MQTT gets connected:
+    // TODO: After MQTT gets connected:
     //
 
-    if (conencted && perform_mqtt_checkin) {
+    if (connected && perform_mqtt_checkin) {
 
       perform_mqtt_checkin = true;
 
@@ -1133,14 +1164,9 @@ void THiNX::loop() {
           finalize();
         }
       }
-    }
+    }  */
 
-    //
-    // After checked in, connect MQTT
-    //
-
-      */
-
+    // TODO: FIXME: After checked in, connect MQTT
     if ( connected && checked_in ) {
       Serial.println("*TH: WiFi connected, starting MQTT..."); Serial.flush();
       if (!mqtt_result) {
@@ -1151,7 +1177,6 @@ void THiNX::loop() {
         }
       }
     }
-
 
     // If connected and not checked_in, perform check in.
     if (connected && !checked_in) {

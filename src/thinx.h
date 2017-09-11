@@ -20,5 +20,5 @@ const long THINX_API_PORT = 7442;
 const bool THINX_AUTO_UPDATE = true;
 const bool THINX_FORCED_UPDATE = false;
 
-const char * THINX_ENV_SSID = "HAVANA";     //  your network SSID (name)
-const char * THINX_ENV_PASS = "1234567890";  // your network password
+const char * THINX_ENV_SSID = "THiNX-IoT+";     //  your network SSID (name)
+const char * THINX_ENV_PASS = "<enter-your-ssid-password>";  // your network password

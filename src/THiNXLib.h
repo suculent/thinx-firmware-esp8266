@@ -1,7 +1,7 @@
 #include <Arduino.h>
 
 #ifndef VERSION
-#define VERSION "2.0.50"
+#define VERSION "2.0.63"
 #endif
 
 #define __DEBUG__
@@ -37,14 +37,15 @@
 #endif
 #else
 #ifndef THX_REVISION
-#define THX_REVISION String(0)
+#define THX_REVISION String(63)
 #endif
 #endif
-
 
 #ifndef THX_CID
 #ifdef THINX_COMMIT_ID
 #define THX_CID THINX_COMMIT_ID
+#else
+#define THINX_COMMIT_ID THINX_CID
 #endif
 #endif
 
@@ -111,7 +112,7 @@ class THiNX {
     WiFiManagerParameter *api_key_param;
 
     // when user sets new API Key in AP mode
-    inline void saveConfigCallback() {
+    inline void saveConfigCallback( void ) {
       Serial.println("saveConfigCallback!!!");
       should_save_config = true;
       strcpy(thx_api_key, api_key_param->getValue());
