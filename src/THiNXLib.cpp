@@ -43,7 +43,7 @@ THiNX::THiNX(const char * __apikey) {
   wifi_connection_in_progress = false;
   thx_wifi_client = new WiFiClient();
 
-  thinx_udid = strdup("");
+  thinx_udid = strdup(THINX_UDID);
   app_version = strdup("");
   available_update_url = strdup("");
   thinx_cloud_url = strdup("thinx.cloud");
@@ -112,7 +112,7 @@ THiNX::THiNX(const char * __apikey) {
   Serial.println(")");
 
   #ifdef __USE_WIFI_MANAGER__
-    manager->setDebugOutput(true); // does some logging on mode set
+    manager->setDebugOutput(false); // does some logging on mode set
   #endif
 
   if (strlen(thinx_api_key) > 4) {
@@ -132,9 +132,10 @@ THiNX::THiNX(const char * __apikey) {
 // Designated initializer
 void THiNX::initWithAPIKey(const char * __apikey) {
 
-  bool success = restore_device_info();
+  // may cause LoadStoreError(3)
+  //bool success = restore_device_info();
 
-  //Serial.println("*TH: Device info restored.");
+  Serial.println("*TH: Device info restored.");
 
   // FS may deprecate in favour of EEPROM
 #ifdef __USE_SPIFFS__
@@ -159,7 +160,7 @@ void THiNX::connect() {
     return;
   }
 
-  //Serial.print("*TH: connecting: "); Serial.println(wifi_retry); blocks
+  Serial.print("*TH: connecting: "); Serial.println(wifi_retry);
 
   if (WiFi.SSID()) {
 
@@ -178,12 +179,14 @@ void THiNX::connect() {
         wifi_station_disconnect();
         ETS_UART_INTR_ENABLE();
         Serial.println("*TH: LOOP > CONNECT > STA RECONNECT");
-        WiFi.begin(THINX_ENV_SSID, THINX_ENV_PASS);
-        //WiFi.begin();
+        //WiFi.begin(THINX_ENV_SSID, THINX_ENV_PASS);
+        WiFi.begin();
       }
 
       wifi_connection_in_progress = true; // prevents re-entering connect_wifi(); should timeout
     }
+  } else {
+    Serial.print("*TH: No SSID.");
   }
 
   if (WiFi.status() == WL_CONNECTED) {
@@ -191,7 +194,7 @@ void THiNX::connect() {
     connected = true; // prevents re-entering start() [this method]
     wifi_connection_in_progress = false;
   } else {
-    //Serial.println("THiNX > LOOP > CONNECTING WiFi:");
+    Serial.println("THiNX > LOOP > CONNECTING WiFi:");
     connect_wifi();
   }
 }
@@ -210,7 +213,7 @@ void THiNX::connect_wifi() {
    manager->setDebugOutput(false); // does some logging on mode set
    ETS_UART_INTR_DISABLE();
    Serial.println("*TH: AutoConnecting..."); Serial.flush();
-   //delay(1);
+   delay(1); // prevent crash on autoconnect
    connected = manager->autoConnect("AP-THiNX", "PASSWORD");
    Serial.println("*TH: AutoConnect connected...");
 
@@ -220,14 +223,10 @@ void THiNX::connect_wifi() {
     return;
   }
 
-
   //Serial.printf("THiNXLib::connect_wifi(): unmodified stack   = %4d\n", cont_get_free_stack(&g_cont));
   //Serial.printf("THiNXLib::connect_wifi(): current free stack = %4d\n", 4 * (sp - g_cont.stack));
   //Serial.print("*THiNXLib::connect_wifi(): heap               = "); Serial.println(system_get_free_heap_size());
-
   // 84, 176; 35856
-
-
 
   if (wifi_connection_in_progress) {
     if (wifi_retry > 1000) {
@@ -826,7 +825,7 @@ void THiNX::configCallback() {
 bool THiNX::restore_device_info() {
 
 #ifndef __USE_SPIFFS__
-  // Serial.println("*TH: restoring configuration from EEPROM...");
+  Serial.println("*TH: restoring configuration from EEPROM...");
   int value;
   long buf_len = 512;
   char info[512] = {0};
@@ -835,13 +834,14 @@ bool THiNX::restore_device_info() {
     value = EEPROM.read(a);
     if (value == 0) {
       info[a] = value;
-      // Serial.print("*TH: "); Serial.print(a); Serial.println(" bytes read from EEPROM.");
+      Serial.print("*TH: "); Serial.print(a); Serial.println(" bytes read from EEPROM.");
       break;
     }
     // validate at least data start
     if (a == 0) {
       if (value != '{') {
-        Serial.println("*TH: Data is not a JSON string, exiting.");
+        Serial.println("*TH: Data is not a JSON string, restoring...");
+        save_device_info();
         return false;
       }
     }
@@ -849,7 +849,6 @@ bool THiNX::restore_device_info() {
   }
 
   String data = String(info); // \n helps the JSON parser not to crash
-  // Serial.println("'"+data+"'");
 
 #else
   if (!SPIFFS.exists("/thx.cfg")) {
@@ -869,8 +868,7 @@ bool THiNX::restore_device_info() {
    String data = f.readStringUntil('\n');
 #endif
 
-   // Serial.println("*TH: Parsing JSON...");
-
+   Serial.println(data);
    JsonObject& config = jsonBuffer.parseObject(data.c_str());
    if (!config.success()) {
      //Serial.println("*TH: parsing JSON failed.");
@@ -907,7 +905,9 @@ bool THiNX::restore_device_info() {
 #ifdef __USE_SPIFFS__
     Serial.print("*TH: Closing SPIFFS file.");
     f.close();
+#else
 #endif
+
    }
    return true;
  }
@@ -1115,13 +1115,18 @@ void THiNX::evt_save_api_key() {
 
 void THiNX::loop() {
 
+  //Serial.println("*TH: LOOP »");
+
   // If not connected, start connection in progress...
   if (WiFi.status() == WL_CONNECTED) {
     connected = true;
   } else {
     connected = false;
     if (!wifi_connection_in_progress) {
+      Serial.println("*TH: LOOP «÷»");
       connect(); // blocking
+      Serial.println("*TH: LOOP «");
+      return;
     }
   }
 
