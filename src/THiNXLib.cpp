@@ -133,7 +133,7 @@ THiNX::THiNX(const char * __apikey) {
 void THiNX::initWithAPIKey(const char * __apikey) {
 
   // may cause LoadStoreError(3)
-  //bool success = restore_device_info();
+  restore_device_info();
 
   Serial.println("*TH: Device info restored.");
 
@@ -194,7 +194,7 @@ void THiNX::connect() {
     connected = true; // prevents re-entering start() [this method]
     wifi_connection_in_progress = false;
   } else {
-    Serial.println("THiNX > LOOP > CONNECTING WiFi:");
+    Serial.println(F("THiNX > LOOP > CONNECTING WiFi:"));
     connect_wifi();
   }
 }
@@ -210,12 +210,11 @@ void THiNX::connect_wifi() {
 
 #ifdef __USE_WIFI_MANAGER__
    Serial.setDebugOutput(false);
-   manager->setDebugOutput(false); // does some logging on mode set
-   ETS_UART_INTR_DISABLE();
-   Serial.println("*TH: AutoConnecting..."); Serial.flush();
-   delay(1); // prevent crash on autoconnect
+   manager->setDebugOutput(true); // does some logging on mode set
+   Serial.println(F("*TH: AutoConnecting..."));
+   delay(0); // prevent crash on autoconnect?
    connected = manager->autoConnect("AP-THiNX", "PASSWORD");
-   Serial.println("*TH: AutoConnect connected...");
+   Serial.println(F("*TH: AutoConnect connected..."));
 
 #else
 
@@ -223,9 +222,6 @@ void THiNX::connect_wifi() {
     return;
   }
 
-  //Serial.printf("THiNXLib::connect_wifi(): unmodified stack   = %4d\n", cont_get_free_stack(&g_cont));
-  //Serial.printf("THiNXLib::connect_wifi(): current free stack = %4d\n", 4 * (sp - g_cont.stack));
-  //Serial.print("*THiNXLib::connect_wifi(): heap               = "); Serial.println(system_get_free_heap_size());
   // 84, 176; 35856
 
   if (wifi_connection_in_progress) {
@@ -251,7 +247,7 @@ void THiNX::connect_wifi() {
         // Retry in station mode...
           Serial.println("*TH: Connecting to AP with pre-defined credentials...");
           WiFi.mode(WIFI_STA);
-          WiFi.begin(strdup(THINX_ENV_SSID), strdup(THINX_ENV_PASS));
+          WiFi.begin(THINX_ENV_SSID, THINX_ENV_PASS);
           wifi_connection_in_progress = true; // prevents re-entering connect_wifi()
           wifi_retry = 0; // waiting for sta...
       }
@@ -267,7 +263,7 @@ void THiNX::connect_wifi() {
       if (wifi_retry == 0) {
         Serial.println("*TH: Connecting to AP with pre-defined credentials...");
         WiFi.mode(WIFI_STA);
-        WiFi.begin(strdup(THINX_ENV_SSID), strdup(THINX_ENV_PASS));
+        WiFi.begin(THINX_ENV_SSID, THINX_ENV_PASS);
         wifi_connection_in_progress = true; // prevents re-entering connect_wifi()
       }
     }
@@ -822,100 +818,141 @@ void THiNX::configCallback() {
 
 // Calles (private): initWithAPIKey; save_device_info()
 // Provides: alias, owner, update, udid, (apikey)
-bool THiNX::restore_device_info() {
+void THiNX::restore_device_info() {
 
 #ifndef __USE_SPIFFS__
-  Serial.println("*TH: restoring configuration from EEPROM...");
+
   int value;
   long buf_len = 512;
   char info[512] = {0};
+  int json_end = 0;
+  String data = "";
+
+  Serial.println("*TH: restoring configuration from EEPROM...");
 
   for (long a = 0; a < buf_len; a++) {
     value = EEPROM.read(a);
-    if (value == 0) {
-      info[a] = value;
-      Serial.print("*TH: "); Serial.print(a); Serial.println(" bytes read from EEPROM.");
-      break;
-    }
     // validate at least data start
     if (a == 0) {
       if (value != '{') {
         Serial.println("*TH: Data is not a JSON string, restoring...");
         save_device_info();
-        return false;
+        return;
       }
     }
-    info[a] = value;
+    if (value == '{') {
+      json_end++;
+    }
+    if (value == '}') {
+      json_end--;
+    }
+    if (value == 0) {
+      info[a] = value;
+      //info[a+1] = value;
+      Serial.print("*TH: "); Serial.print(a); Serial.println(" bytes read from EEPROM.");
+      // Validate JSON
+      break;
+    } else {
+      info[a] = value;
+    }
+    //Serial.print(value); // to debug reading EEPROM bytes
   }
 
-  String data = String(info); // \n helps the JSON parser not to crash
+  data = String(info); // + String("\n"); // LAST ADDED LINE, CRASHES
+  // data = String(info); // crashed with \n (?) // LAST ADDED LINE, CRASHES
+  // Serial.println(data)
 
 #else
   if (!SPIFFS.exists("/thx.cfg")) {
     Serial.println("*TH: No persistent data found.");
-    return false;
+    return;
   }
    File f = SPIFFS.open("/thx.cfg", "r");
    Serial.println("*TH: Found persistent data...");
    if (!f) {
        Serial.println("*TH: No remote configuration found so far...");
-       return false;
+       return;
    }
    if (f.size() == 0) {
         Serial.println("*TH: Remote configuration file empty...");
-       return false;
+       return;
    }
    String data = f.readStringUntil('\n');
 #endif
 
-   Serial.println(data);
-   JsonObject& config = jsonBuffer.parseObject(data.c_str());
+  if (json_end != 0) {
+    Serial.println("*TH: JSON invalid... bailing out.");
+    return;
+  } else {
+    Serial.println("*TH: JSON seems valid...");
+  }
+
+   //Serial.println(data);
+   //Serial.println(info);
+
+   Serial.print("*TH: Parsing JSON data: ");
+   //const char *json = strdup(data.c_str());
+   Serial.println(info);
+
+   JsonObject& config = jsonBuffer.parseObject(info); // must not be String!
    if (!config.success()) {
-     //Serial.println("*TH: parsing JSON failed.");
-     return false;
+     Serial.println("*TH: Parsing JSON data failed...");
+     save_device_info(); // Only sometimes causes crash,
+     Serial.println("*TH: Fixed data storage...");
+     return;
    } else {
 
-    //Serial.println("*TH: Parsing saved data..."); // may crash: Serial.flush();
+    //Serial.println("*TH: NOT!!! Saving parsed data:");
     //Serial.print("'");
-    //Serial.print(data);
+    // Serial.print(json); // causes crash with String!?
     //Serial.println("'");
+
+    //return;
 
      const char* alias = config["alias"];
      if (strlen(alias) > 1) {
        thinx_alias = strdup(alias);
+       Serial.print("alias: ");
+       Serial.println(alias);
      }
      const char* owner = config["owner"];
      if (strlen(owner) > 4) {
        thinx_owner = strdup(owner);
+       Serial.print("owner: ");
+       Serial.println(owner);
      }
      const char* apikey = config["apikey"];
      if (strlen(apikey) > 8) {
       thinx_api_key = strdup(apikey);
+      Serial.print("apikey: ");
+      Serial.println(apikey);
      }
      const char* update = config["update"];
      if (strlen(update) > 4) {
        available_update_url = strdup(update);
+       Serial.print("available_update_url: ");
+       Serial.println(available_update_url);
      }
      const char* udid = config["udid"];
-     if ((strlen(udid) > 4)) {
+     if (strlen(udid) > 4) {
       thinx_udid = strdup(udid);
      } else {
       thinx_udid = strdup(THINX_UDID);
      }
+     //Serial.print("udid: ");
+     //Serial.println(udid); Serial.flush(); may cause crash
 #ifdef __USE_SPIFFS__
     Serial.print("*TH: Closing SPIFFS file.");
     f.close();
 #else
 #endif
-
    }
-   return true;
  }
 
  /* Stores mutable device data (alias, owner) retrieved from API */
  void THiNX::save_device_info()
  {
-   String info = deviceInfo() + "\n";
+   String info = deviceInfo();
 
    // disabled for it crashes when closing the file (LoadStoreAlignmentCause) when using String
 #ifdef __USE_SPIFFS__
@@ -928,13 +965,13 @@ bool THiNX::restore_device_info() {
      delay(1);
    }
 #else
-  //Serial.println("*TH: saving configuration to EEPROM...");
-  //Serial.println(info);
+  Serial.println("*TH: saving configuration to EEPROM...");
+  Serial.println(info);
   for (long addr = 0; addr <= info.length(); addr++) {
     EEPROM.put(addr, info.charAt(addr));
   }
   EEPROM.commit();
-  Serial.println("*TH: EEPROM data committed..."); // works until here so far...
+  Serial.println("*TH: EEPROM data committed...");
 #endif
 }
 
@@ -945,9 +982,16 @@ String THiNX::deviceInfo() {
   JsonObject& root = jsonBuffer.createObject();
   root["alias"] = thinx_alias; // allow alias change
   root["owner"] = thinx_owner; // allow owner change
-  root["update"] = available_update_url; // allow update
-  root["apikey"] = thinx_api_key; // allow changing API Key
-  root["udid"] = thinx_udid; // allow setting UDID
+
+  if (strlen(available_update_url) > 0) {
+    root["update"] = available_update_url; // allow update
+  }
+
+  root["apikey"] = thinx_api_key; // allow dynamic API Key
+
+  if (strlen(thinx_udid) > 1) {
+    root["udid"] = thinx_udid; // allow setting UDID
+  }
 
   //Serial.print("*TH: thinx_alias: ");
   //Serial.println(thinx_alias);
@@ -1132,6 +1176,10 @@ void THiNX::loop() {
 
   // If connected, perform the MQTT loop and bail out ASAP
   if (connected) {
+
+    Serial.printf("THiNXLib::restore_device_info(): unmodified stack   = %4d\n", cont_get_free_stack(&g_cont));
+    Serial.printf("THiNXLib::restore_device_info(): current free stack = %4d\n", 4 * (sp - g_cont.stack));
+    Serial.print("*THiNXLib::restore_device_info(): heap               = "); Serial.println(system_get_free_heap_size());
 
     if (WiFi.getMode() == WIFI_AP) return;
 

@@ -159,7 +159,7 @@ class THiNX {
       bool should_save_config;                // after autoconnect, may provide new API Key
       void import_build_time_constants();     // sets variables from thinx.h file
       void save_device_info();                // saves variables to SPIFFS or EEPROM
-      bool restore_device_info();             // reads variables from SPIFFS or EEPROM
+      void restore_device_info();             // reads variables from SPIFFS or EEPROM
       String deviceInfo();                    // TODO: Refactor to C-string
 
       // Updates
