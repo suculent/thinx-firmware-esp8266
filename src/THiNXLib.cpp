@@ -132,6 +132,8 @@ THiNX::THiNX(const char * __apikey) {
 // Designated initializer
 void THiNX::initWithAPIKey(const char * __apikey) {
 
+  Serial.println("*TH: initWithAPIKey...");
+
   // may cause LoadStoreError(3)
   restore_device_info();
 
@@ -820,24 +822,29 @@ void THiNX::configCallback() {
 // Provides: alias, owner, update, udid, (apikey)
 void THiNX::restore_device_info() {
 
+  int json_end = 0;
+
 #ifndef __USE_SPIFFS__
 
   int value;
   long buf_len = 512;
-  char info[512] = {0};
-  int json_end = 0;
-  String data = "";
+  uint8_t info[512] = {0};
+  long data_len = 0;
 
   Serial.println("*TH: restoring configuration from EEPROM...");
 
   for (long a = 0; a < buf_len; a++) {
     value = EEPROM.read(a);
+    //Serial.print(value);
     // validate at least data start
     if (a == 0) {
       if (value != '{') {
-        Serial.println("*TH: Data is not a JSON string, restoring...");
-        save_device_info();
-        return;
+
+        Serial.println("*TH: Data is not a JSON string...");
+#ifdef TEST_MODE
+        // save_device_info();
+#endif
+        break;
       }
     }
     if (value == '{') {
@@ -848,19 +855,31 @@ void THiNX::restore_device_info() {
     }
     if (value == 0) {
       info[a] = value;
-      //info[a+1] = value;
-      Serial.print("*TH: "); Serial.print(a); Serial.println(" bytes read from EEPROM.");
+      data_len++;
+      // Serial.print("*TH: "); Serial.print(a); Serial.println(" bytes read from EEPROM.");
       // Validate JSON
       break;
     } else {
       info[a] = value;
+      data_len++;
     }
-    //Serial.print(value); // to debug reading EEPROM bytes
+    // Serial.flush(); // to debug reading EEPROM bytes
   }
 
-  data = String(info); // + String("\n"); // LAST ADDED LINE, CRASHES
+  Serial.println("*TH: Validating bracket count...");
+  if (json_end != 0) {
+    Serial.println("*TH: JSON invalid... bailing out.");
+    return;
+  } else {
+    Serial.println("*TH: JSON seems valid...");
+  }
+
+  Serial.println("*TH: NOT Converting data to string...");  // flush may crash
+  //Serial.println((char*)info);
+
+  String data = ""; // String((char*)info); // + String("\n"); // LAST ADDED LINE, CRASHES
   // data = String(info); // crashed with \n (?) // LAST ADDED LINE, CRASHES
-  // Serial.println(data)
+  //Serial.println(data)
 
 #else
   if (!SPIFFS.exists("/thx.cfg")) {
@@ -880,35 +899,24 @@ void THiNX::restore_device_info() {
    String data = f.readStringUntil('\n');
 #endif
 
-  if (json_end != 0) {
-    Serial.println("*TH: JSON invalid... bailing out.");
-    return;
-  } else {
-    Serial.println("*TH: JSON seems valid...");
-  }
-
    //Serial.println(data);
    //Serial.println(info);
 
    Serial.print("*TH: Parsing JSON data: ");
-   //const char *json = strdup(data.c_str());
-   Serial.println(info);
+   //const char *json = data.c_str();
+   //Serial.println(data); Serial.flush();
 
-   JsonObject& config = jsonBuffer.parseObject(info); // must not be String!
+   Serial.print("*TH: Parsing...");
+   JsonObject& config = jsonBuffer.parseObject(data.c_str()); // must not be String!
    if (!config.success()) {
      Serial.println("*TH: Parsing JSON data failed...");
      save_device_info(); // Only sometimes causes crash,
-     Serial.println("*TH: Fixed data storage...");
+     Serial.println("*TH: Fixed data storage, re-reading...");
+     restore_device_info();
      return;
    } else {
 
-    //Serial.println("*TH: NOT!!! Saving parsed data:");
-    //Serial.print("'");
-    // Serial.print(json); // causes crash with String!?
-    //Serial.println("'");
-
-    //return;
-
+     Serial.print("*TH: Reading JSON values...");
      const char* alias = config["alias"];
      if (strlen(alias) > 1) {
        thinx_alias = strdup(alias);
@@ -953,6 +961,8 @@ void THiNX::restore_device_info() {
  void THiNX::save_device_info()
  {
    String info = deviceInfo();
+   Serial.print("Saving: ");
+   Serial.println(info); Serial.flush();
 
    // disabled for it crashes when closing the file (LoadStoreAlignmentCause) when using String
 #ifdef __USE_SPIFFS__
@@ -965,48 +975,52 @@ void THiNX::restore_device_info() {
      delay(1);
    }
 #else
-  Serial.println("*TH: saving configuration to EEPROM...");
-  Serial.println(info);
+  Serial.println("*TH: saving configuration to EEPROM: ");
+  Serial.println(info); Serial.flush();
   for (long addr = 0; addr <= info.length(); addr++) {
     EEPROM.put(addr, info.charAt(addr));
   }
+  EEPROM.put(info.length()+1, '\0');
   EEPROM.commit();
-  Serial.println("*TH: EEPROM data committed...");
+  Serial.println("*TH: EEPROM data committed..."); Serial.flush();
 #endif
 }
 
 String THiNX::deviceInfo() {
 
-  //Serial.println("*TH: building device info:");
+  Serial.println("*TH: building device info:");
 
   JsonObject& root = jsonBuffer.createObject();
-  root["alias"] = thinx_alias; // allow alias change
-  root["owner"] = thinx_owner; // allow owner change
 
-  if (strlen(available_update_url) > 0) {
-    root["update"] = available_update_url; // allow update
+  if (strlen(thinx_alias) > 0) {
+    root["alias"] = thinx_alias; // allow alias change
+      Serial.print("*TH: thinx_alias: ");
+      Serial.println(thinx_alias);
   }
 
-  root["apikey"] = thinx_api_key; // allow dynamic API Key
+  if (strlen(thinx_owner) > 0) {
+    root["owner"] = thinx_owner; // allow owner change
+      Serial.print("*TH: thinx_owner: ");
+      Serial.println(thinx_owner);
+  }
+
+  if (strlen(thinx_api_key) > 1) {
+    root["apikey"] = thinx_api_key; // allow dynamic API Key
+      Serial.print("*TH: thinx_api_key: ");
+      Serial.println(thinx_api_key);
+  }
 
   if (strlen(thinx_udid) > 1) {
     root["udid"] = thinx_udid; // allow setting UDID
+      Serial.print("*TH: thinx_udid: ");
+      Serial.println(thinx_udid);
   }
 
-  //Serial.print("*TH: thinx_alias: ");
-  //Serial.println(thinx_alias);
-
-  //Serial.print("*TH: thinx_owner: ");
-  //Serial.println(thinx_owner);
-
-  //Serial.print("*TH: thinx_api_key: ");
-  //Serial.println(thinx_api_key);
-
-  //Serial.print("*TH: thinx_udid: ");
-  //Serial.println(thinx_udid);
-
-  //Serial.print("*TH: available_update_url: ");
-  //Serial.println(available_update_url);
+    if (strlen(available_update_url) > 0) {
+        root["update"] = available_update_url; // allow update
+        Serial.print("*TH: available_update_url: ");
+        Serial.println(available_update_url);
+    }
 
   String jsonString;
   root.printTo(jsonString);

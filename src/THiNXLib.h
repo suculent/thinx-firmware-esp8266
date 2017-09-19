@@ -7,7 +7,7 @@
 #define __DEBUG__
 #define __DEBUG_JSON__
 
-#define __USE_WIFI_MANAGER__
+//#define __USE_WIFI_MANAGER__
 //#define __USE_SPIFFS__
 
 #ifdef __USE_WIFI_MANAGER__
