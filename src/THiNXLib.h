@@ -1,13 +1,13 @@
 #include <Arduino.h>
 
 #ifndef VERSION
-#define VERSION "2.0.50"
+#define VERSION "2.0.63"
 #endif
 
 #define __DEBUG__
 #define __DEBUG_JSON__
 
-//#define __USE_WIFI_MANAGER__
+#define __USE_WIFI_MANAGER__
 //#define __USE_SPIFFS__
 
 #ifdef __USE_WIFI_MANAGER__
@@ -37,7 +37,15 @@
 #endif
 #else
 #ifndef THX_REVISION
-#define THX_REVISION String(0)
+#define THX_REVISION String(63)
+#endif
+#endif
+
+#ifndef THX_CID
+#ifdef THINX_COMMIT_ID
+#define THX_CID THINX_COMMIT_ID
+#else
+#define THINX_COMMIT_ID THINX_CID
 #endif
 #endif
 
@@ -68,8 +76,10 @@ class THiNX {
 
     uint8_t buf[MQTT_BUFFER_SIZE];
 
-    const char* thinx_mqtt_channel();
-    const char* thinx_mqtt_status_channel();
+    String thinx_mqtt_channel();
+    char mqtt_device_channel[128]; //  = {0}
+    String thinx_mqtt_status_channel();
+    char mqtt_device_status_channel[128]; //  = {0}
 
     // Import build-time values from thinx.h
     const char* app_version;                  // max 80 bytes
@@ -102,7 +112,7 @@ class THiNX {
     WiFiManagerParameter *api_key_param;
 
     // when user sets new API Key in AP mode
-    void saveConfigCallback() {
+    inline void saveConfigCallback( void ) {
       Serial.println("saveConfigCallback!!!");
       should_save_config = true;
       strcpy(thx_api_key, api_key_param->getValue());
@@ -110,6 +120,8 @@ class THiNX {
 #endif
 
     private:
+
+      void configCallback();
 
       // WiFi Manager
       WiFiClient *thx_wifi_client;
@@ -140,12 +152,14 @@ class THiNX {
       bool mqtt_connected;                    // success or failure on subscription
       String mqtt_payload;                    // mqtt_payload store for parsing
       int last_mqtt_reconnect;                // interval
+      bool perform_mqtt_checkin;              // one-time flag
+      bool all_done;                              // finalize flag
 
       // Data Storage
       bool should_save_config;                // after autoconnect, may provide new API Key
       void import_build_time_constants();     // sets variables from thinx.h file
       void save_device_info();                // saves variables to SPIFFS or EEPROM
-      bool restore_device_info();             // reads variables from SPIFFS or EEPROM
+      void restore_device_info();             // reads variables from SPIFFS or EEPROM
       String deviceInfo();                    // TODO: Refactor to C-string
 
       // Updates
@@ -154,7 +168,7 @@ class THiNX {
       // Event Queue / States
       bool checked_in;
       bool mqtt_started;
-      bool connection_in_progress;
+      bool wifi_connection_in_progress;
       bool complete;
       void evt_save_api_key();
 
@@ -168,5 +182,4 @@ class THiNX {
       unsigned long wifi_wait_timeout;
       int wifi_retry;
       uint8_t wifi_status;
-      bool wifi_connection_in_progress;
 };
