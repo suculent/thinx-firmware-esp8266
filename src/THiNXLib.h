@@ -42,11 +42,13 @@
 #endif
 
 #ifndef THX_CID
-#ifdef THINX_COMMIT_ID
-#define THX_CID THINX_COMMIT_ID
+  #ifdef THINX_COMMIT_ID
+    #define THX_CID THINX_COMMIT_ID
+  #else
+    #define THINX_COMMIT_ID THINX_CID
+  #endif
 #else
 #define THINX_COMMIT_ID THINX_CID
-#endif
 #endif
 
 class THiNX {
@@ -128,14 +130,19 @@ class THiNX {
       int status;                             // global WiFi status
       bool once;                              // once token for initialization
 
-
       // THiNX API
       char thx_api_key[64];                   // for EAVManager/WiFiManager callback
-      char mac_string[16] = {0};
+      char mac_string[16]; // = {0};
       const char * thinx_mac();
 
       StaticJsonBuffer<1024> jsonBuffer;
       StaticJsonBuffer<1280> wrapperBuffer;
+
+#ifndef __USE_SPIFFS__
+      char json_info[512] = {0};           // statically allocated to prevent fragmentation
+#endif
+
+      String json_output;
 
       // In order of appearance
       bool fsck();                            // check filesystem if using SPIFFS
@@ -160,7 +167,7 @@ class THiNX {
       void import_build_time_constants();     // sets variables from thinx.h file
       void save_device_info();                // saves variables to SPIFFS or EEPROM
       void restore_device_info();             // reads variables from SPIFFS or EEPROM
-      String deviceInfo();                    // TODO: Refactor to C-string
+      void deviceInfo();                    // TODO: Refactor to C-string
 
       // Updates
       void notify_on_successful_update();     // send a MQTT notification back to Web UI
