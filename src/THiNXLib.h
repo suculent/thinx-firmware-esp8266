@@ -126,7 +126,7 @@ class THiNX {
       void configCallback();
 
       // WiFi Manager
-      WiFiClient *thx_wifi_client;
+      WiFiClient thx_wifi_client;
       int status;                             // global WiFi status
       bool once;                              // once token for initialization
 

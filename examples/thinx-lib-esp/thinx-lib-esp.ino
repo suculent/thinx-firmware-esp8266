@@ -27,11 +27,11 @@ void setup() {
   Serial.println("*TH: Initializing in 5 seconds...");
   delay(5000);
   thx = THiNX(apikey); // 4. initialize with API Key
+  Serial.println("*TH: Initialization completed.");
 }
 
 void loop()
-{
-  delay(10000);
+{  
   // 5. Waits for WiFI, register, check MQTT, reconnect, update...
   thx.loop();
   Serial.printf("Free size: %u\n", ESP.getFreeSketchSpace());

@@ -70,7 +70,7 @@ THiNX::THiNX(const char * __apikey) {
   restore_device_info();
   Serial.println("*TH: Device info restored...");
 
-  thx_wifi_client = new WiFiClient();
+  // thx_wifi_client = new WiFiClient();
 
 #ifdef __USE_WIFI_MANAGER__
   manager = new WiFiManager;
@@ -350,21 +350,21 @@ void THiNX::senddata(String body) {
   */
 
 //#ifdef HTTPS_WIFI_CLIENT
-  if (thx_wifi_client->connect(thinx_cloud_url, 7442)) {
+  if (thx_wifi_client.connect(thinx_cloud_url, 7442)) {
     Serial.println("*THiNXLib::senddata(): with api key...");
 
-    thx_wifi_client->println("POST /device/register HTTP/1.1");
-    thx_wifi_client->print("Host: "); thx_wifi_client->println(thinx_cloud_url);
-    thx_wifi_client->print("Authentication: "); thx_wifi_client->println(thinx_api_key);
-    thx_wifi_client->println("Accept: application/json"); // application/json
-    thx_wifi_client->println("Origin: device");
-    thx_wifi_client->println("Content-Type: application/json");
-    thx_wifi_client->println("User-Agent: THiNX-Client");
-    thx_wifi_client->print("Content-Length: ");
-    thx_wifi_client->println(body.length());
-    thx_wifi_client->println();
+    thx_wifi_client.println("POST /device/register HTTP/1.1");
+    thx_wifi_client.print("Host: "); thx_wifi_client.println(thinx_cloud_url);
+    thx_wifi_client.print("Authentication: "); thx_wifi_client.println(thinx_api_key);
+    thx_wifi_client.println("Accept: application/json"); // application/json
+    thx_wifi_client.println("Origin: device");
+    thx_wifi_client.println("Content-Type: application/json");
+    thx_wifi_client.println("User-Agent: THiNX-Client");
+    thx_wifi_client.print("Content-Length: ");
+    thx_wifi_client.println(body.length());
+    thx_wifi_client.println();
     //Serial.println("Headers set...");
-    thx_wifi_client->println(body);
+    thx_wifi_client.println(body);
     //Serial.println("Body sent...");
 
     long interval = 10000;
@@ -374,11 +374,11 @@ void THiNX::senddata(String body) {
     // TODO: FIXME: Drop the loop here, wait for response!
 
     // Wait until client available or timeout...
-    while(!thx_wifi_client->available()){
+    while(!thx_wifi_client.available()){
       delay(1);
       if( (currentMillis - previousMillis) > interval ){
         //Serial.println("Response Timeout. TODO: Should retry later.");
-        thx_wifi_client->stop();
+        thx_wifi_client.stop();
         return;
       }
       currentMillis = millis();
@@ -386,10 +386,10 @@ void THiNX::senddata(String body) {
 
     // Read while connected
     String payload = "";
-    while ( thx_wifi_client->connected() ) {
+    while ( thx_wifi_client.connected() ) {
       delay(1);
-      if ( thx_wifi_client->available() ) {
-        char str = thx_wifi_client->read();
+      if ( thx_wifi_client.available() ) {
+        char str = thx_wifi_client.read();
         payload = payload + String(str);
       }
     }
@@ -689,6 +689,10 @@ void THiNX::publish() {
     mqtt_client->publish(mqtt_device_status_channel, response.c_str());
     //mqtt_client->loop();
   } else {
+
+    Serial.println("*TH: MQTT disabled, seems like memory issues with incoming messages...");
+
+    /*
     Serial.println("*TH: MQTT not connected, reconnecting...");
     mqtt_result = start_mqtt();
     if (mqtt_result && mqtt_client->connected()) {
@@ -698,6 +702,7 @@ void THiNX::publish() {
     } else {
       Serial.println("*TH: MQTT Reconnect failed...");
     }
+    */
   }
 }
 
@@ -732,7 +737,7 @@ bool THiNX::start_mqtt() {
   Serial.print("*TH: Contacting MQTT server "); Serial.println(thinx_mqtt_url);
   Serial.print("*TH: MQTT client with URL "); Serial.println(thinx_mqtt_url);
 
-  mqtt_client = new PubSubClient(*thx_wifi_client, thinx_mqtt_url);
+  mqtt_client = new PubSubClient(thx_wifi_client, thinx_mqtt_url);
 
   Serial.print(" started on port ");
   Serial.println(thinx_mqtt_port);
@@ -770,8 +775,6 @@ bool THiNX::start_mqtt() {
 
         mqtt_connected = true;
         perform_mqtt_checkin = true;
-
-
 
         mqtt_client->set_callback([this](const MQTT::Publish &pub){
 
@@ -1268,6 +1271,9 @@ void THiNX::loop() {
 
     // TODO: FIXME: After checked in, connect MQTT
     if ( connected && checked_in ) {
+      Serial.println("*TH: MQTT disabled, seems like memory issues with incoming messages...");
+
+      /*
       Serial.println("*TH: WiFi connected, starting MQTT...");
       if (!mqtt_result) {
         delay(1);
@@ -1277,6 +1283,7 @@ void THiNX::loop() {
         }
         return;
       }
+      */
     }
 
     // If connected and not checked_in, perform check in.
