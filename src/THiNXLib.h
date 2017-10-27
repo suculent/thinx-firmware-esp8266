@@ -1,7 +1,7 @@
 #include <Arduino.h>
 
 #ifndef VERSION
-#define VERSION "2.0.65"
+#define VERSION "2.0.68"
 #endif
 
 #define __DEBUG__
@@ -12,8 +12,6 @@
 
 #ifdef __USE_WIFI_MANAGER__
 #include <WiFiManager.h>
-//#include "EAVManager/EAVManager.h"
-//#include <EAVManager.h>
 #endif
 
 #include <stdio.h>
@@ -29,25 +27,18 @@
 #include "PubSubClient/PubSubClient.h" // Local checkout
 //#include <PubSubClient.h> // Arduino Library
 
-#ifdef THINX_FIRMWARE_VERSION_SHORT
+// cannot be DEF, is a VAR! #ifdef THINX_FIRMWARE_VERSION_SHORT is a (const char*)
 #ifndef THX_REVISION
-#define THX_REVISION THINX_FIRMWARE_VERSION_SHORT
-#endif
-#else
-#ifndef THX_REVISION
-#define THX_REVISION String(65)
-#endif
+  #ifdef THINX_FIRMWARE_VERSION_SHORT
+    #define THX_REVISION THINX_FIRMWARE_VERSION_SHORT
+  #endif
 #endif
 
-#ifndef THX_CID
-  #ifdef THINX_COMMIT_ID
-    #define THX_CID THINX_COMMIT_ID
-  #else
-    #define THINX_COMMIT_ID THINX_CID
-  #endif
-#else
-#define THINX_COMMIT_ID THINX_CID
+#ifdef THX_CID
+//#define THINX_COMMIT_ID (const char *) THX_CID
 #endif
+
+// THINX_COMMIT_ID must be generated from platformio.ini or using thinx
 
 class THiNX {
 
@@ -119,6 +110,32 @@ class THiNX {
 
     private:
 
+      //
+      // Build-specific constants
+      //
+
+      #ifdef THX_REVISION
+        const char* thx_revision = strdup(String(THX_REVISION).c_str());
+      #else
+        const char* thx_revision = "revision";
+      #endif
+
+      #ifdef THINX_COMMIT_ID
+        const char* commit_id = THINX_COMMIT_ID;
+      #else
+        const char* commit_id = "commit-id";
+      #endif
+
+      #ifdef THINX_FIRMWARE_VERSION_SHORT
+        const char* firmware_version_short = THINX_FIRMWARE_VERSION_SHORT;
+      #else
+        const char* firmware_version_short = "firmware-version-short";
+      #endif
+
+      //
+      // THiNXLib
+      //
+
       void configCallback();
 
       // WiFi Manager
@@ -127,12 +144,12 @@ class THiNX {
       bool once;                              // once token for initialization
 
       // THiNX API
-      char thx_api_key[65];                   // for EAVManager/WiFiManager callback
-      char mac_string[17]; // = {0};
+      char thx_api_key[65];
+      char mac_string[17];
       const char * thinx_mac();
 
 #ifndef __USE_SPIFFS__
-      char json_info[512] = {0};           // statically allocated to prevent fragmentation
+      char json_info[512] = {0};           // statically allocated to prevent fragmentation (?)
 #endif
 
       String json_output;
@@ -142,9 +159,9 @@ class THiNX {
       void connect();                         // start the connect loop
       void connect_wifi();                    // start connecting
       void checkin();                         // checkin when connected
-      void senddata(String);                  // TODO: Refactor to C-string
-      void parse(const char*);                     // TODO: Refactor to C-string
-      void update_and_reboot(String);         // TODO: Refactor to C-string
+      void senddata(String);
+      void parse(String);
+      void update_and_reboot(String);
 
       // MQTT
       bool start_mqtt();                      // connect to broker and subscribe
