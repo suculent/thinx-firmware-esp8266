@@ -27,25 +27,12 @@
 #include "PubSubClient/PubSubClient.h" // Local checkout
 //#include <PubSubClient.h> // Arduino Library
 
-#ifdef THINX_FIRMWARE_VERSION_SHORT
+// cannot be DEF, is a VAR! #ifdef THINX_FIRMWARE_VERSION_SHORT is a (const char*)
 #ifndef THX_REVISION
 #define THX_REVISION THINX_FIRMWARE_VERSION_SHORT
 #endif
-#else
-#ifndef THX_REVISION
-#define THX_REVISION String(65)
-#endif
-#endif
 
-#ifndef THX_CID
-  #ifdef THINX_COMMIT_ID
-    #define THX_CID THINX_COMMIT_ID
-  #else
-    #define THINX_COMMIT_ID THINX_CID
-  #endif
-#else
-#define THINX_COMMIT_ID THINX_CID
-#endif
+// THINX_COMMIT_ID must be generated from platformio.ini or using thinx
 
 class THiNX {
 

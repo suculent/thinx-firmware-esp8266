@@ -1169,7 +1169,7 @@ void THiNX::import_build_time_constants() {
   Serial.println(THINX_ENV_SSID);
   Serial.println(THINX_ENV_PASS);
 
-  Serial.println("Loaded build-time constants...");
+  Serial.println(F("Loaded build-time constants..."));
 }
 
 bool THiNX::fsck() {
@@ -1178,16 +1178,16 @@ bool THiNX::fsck() {
   bool flashCorrectlyConfigured = realSize.equals(ideSize);
   bool fileSystemReady = false;
   if(flashCorrectlyConfigured) {
-    Serial.println("* TH: Starting SPIFFS...");
+    Serial.println(F("* TH: Starting SPIFFS..."));
     fileSystemReady = SPIFFS.begin();
     if (!fileSystemReady) {
-      Serial.println("* TH: Formatting SPIFFS...");
+      Serial.println(F("* TH: Formatting SPIFFS..."));
       fileSystemReady = SPIFFS.format();;
-      Serial.println("* TH: Format complete, rebooting..."); Serial.flush();
+      Serial.println(F("* TH: Format complete, rebooting...")); Serial.flush();
       ESP.restart();
       return false;
     }
-    Serial.println("* TH: SPIFFS Initialization completed.");
+    Serial.println(F("* TH: SPIFFS Initialization completed."));
   }  else {
     Serial.println("flash incorrectly configured, SPIFFS cannot start, IDE size: " + ideSize + ", real size: " + realSize);
   }
@@ -1199,7 +1199,7 @@ void THiNX::evt_save_api_key() {
   if (should_save_config) {
     if (strlen(thx_api_key) > 4) {
       thinx_api_key = thx_api_key;
-      Serial.print("Saving thx_api_key from Captive Portal: ");
+      Serial.print(F("Saving thx_api_key from Captive Portal: "));
       Serial.println(thinx_api_key);
       save_device_info();
       should_save_config = false;
@@ -1212,8 +1212,8 @@ void THiNX::setFinalizeCallback( void (*func)(void) ) {
 }
 
 void THiNX::finalize() {
-  Serial.println("*TH: Checkin completed.");
-  Serial.print("*THiNXLib::finalize heap = "); Serial.println(system_get_free_heap_size());
+  Serial.println(F("*TH: Checkin completed."));
+  Serial.print(F("*THiNXLib::finalize heap = ")); Serial.println(system_get_free_heap_size());
   all_done = true;
   if (_finalize_callback) {
     _finalize_callback();
@@ -1233,15 +1233,12 @@ void printStackHeap(String tag) {
 }
 
 void THiNX::loop() {
-
-
-
   // If not connected, start connection in progress...
   if (WiFi.status() == WL_CONNECTED) {
     connected = true;
-    Serial.println("*TH: CONNECTED »");
+    Serial.println(F("*TH: CONNECTED »"));
   } else {
-    Serial.println("*TH: DISCONNECTED »");
+    Serial.println(F("*TH: DISCONNECTED »"));
     connected = false;
     if (!wifi_connection_in_progress) {
       Serial.println(F("*TH: LOOP «÷»"));
