@@ -16,6 +16,8 @@ THiNX::THiNX() {
 
 THiNX::THiNX(const char * __apikey) {
 
+  all_done = false;
+
   Serial.print(F("\nTHiNXLib rev. "));
   Serial.print(THX_REVISION);
 
@@ -239,7 +241,7 @@ void THiNX::connect_wifi() {
         //ETS_UART_INTR_ENABLE();
         Serial.println(F("*TH: Starting THiNX-AP with PASSWORD..."));
         WiFi.mode(WIFI_AP);
-        WiFi.softAP("THiNX-AP", "PASSWORD");
+        WiFi.softAP("THiNX-AP", "PASSWORD"); // setup the AP on channel 1, not hidden, and allow 8 clients
         wifi_retry = 0;
         wifi_connection_in_progress = false;
         connected = true;
@@ -1238,12 +1240,16 @@ void THiNX::loop() {
     connected = true;
     Serial.println(F("*TH: CONNECTED »"));
   } else {
-    Serial.println(F("*TH: DISCONNECTED »"));
     connected = false;
     if (!wifi_connection_in_progress) {
+      Serial.println(F("*TH: CONNECTING »"));
       Serial.println(F("*TH: LOOP «÷»"));
       connect(); // blocking
       Serial.println(F("*TH: LOOP «"));
+      return;
+    } else {
+      Serial.println(F("*TH: PROGRESS..."));
+      delay(1000); // wait for WiFi connection
       return;
     }
   }
@@ -1261,11 +1267,9 @@ void THiNX::loop() {
     }
 
     if (all_done) {
-      Serial.println(F("*TH: LOOP « (DONE)"));
+      //Serial.println(F("*TH: ALL_DONE « EXITLOOP"));
       return;
     }
-
-
 
     //
     // TODO: After MQTT gets connected:
