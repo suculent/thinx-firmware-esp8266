@@ -131,9 +131,9 @@ class THiNX {
       void connect();                         // start the connect loop
       void connect_wifi();                    // start connecting
       void checkin();                         // checkin when connected
-      void senddata(String);                  // TODO: Refactor to C-string
-      void parse(const char*);                     // TODO: Refactor to C-string
-      void update_and_reboot(String);         // TODO: Refactor to C-string
+      void senddata(String);
+      void parse(String);
+      void update_and_reboot(String);
 
       // MQTT
       bool start_mqtt();                      // connect to broker and subscribe

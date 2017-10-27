@@ -9,7 +9,16 @@ extern "C" {
   extern cont_t g_cont;
 }
 
+/* Debug tools (should be extradited from Release builds) */
 register uint32_t *sp asm("a1");
+
+void printStackHeap(String tag) {
+  uint32_t memfree = system_get_free_heap_size(); Serial.print(F("*TH: memfree = ")); Serial.println(memfree);
+  Serial.printf("*TH: loop(): unmodified stack   = %4d\n", cont_get_free_stack(&g_cont));
+  Serial.printf("*TH: loop(): current free stack = %4d\n", 4 * (sp - g_cont.stack));
+  Serial.print("*TH: loop(): heap = "); Serial.println(system_get_free_heap_size());
+  Serial.print("*TH: loop(): tag = "); Serial.println(tag);
+}
 
 THiNX::THiNX() {
 }
@@ -349,20 +358,6 @@ void THiNX::connect_wifi() {
 
 void THiNX::senddata(String body) {
 
-  // Solution using the HTTPClient has no response parser yet:
-  /*
-  HTTPClient http;
-  http.begin(String(thinx_cloud_url) + ":" + String(7442));
-  http.addHeader("Content-Type", "application/json");
-  http.addHeader("User-Agent", "THiNX-Client");
-  http.addHeader("Origin", "device");
-  http.addHeader("Authentication", thinx_api_key);
-  http.POST(body);
-  http.writeToStream(&Serial);
-  http.end();
-  */
-
-//#ifdef HTTPS_WIFI_CLIENT
   if (thx_wifi_client.connect(thinx_cloud_url, 7442)) {
     Serial.println(F("*THiNXLib::senddata(): with api key..."));
 
@@ -376,14 +371,13 @@ void THiNX::senddata(String body) {
     thx_wifi_client.print(F("Content-Length: "));
     thx_wifi_client.println(body.length());
     thx_wifi_client.println();
-    //Serial.println("Headers set...");
     thx_wifi_client.println(body);
-    //Serial.println("Body sent...");
 
-    long interval = 10000;
+    long interval = 30000;
     unsigned long currentMillis = millis(), previousMillis = millis();
 
     Serial.println(F("*THiNXLib::senddata(): waiting for response..."));
+
     // TODO: FIXME: Drop the loop here, wait for response!
 
     // Wait until client available or timeout...
@@ -398,7 +392,7 @@ void THiNX::senddata(String body) {
     }
 
     // Read while connected
-    String payload = "";
+    String payload;
     while ( thx_wifi_client.connected() ) {
       delay(1);
       if ( thx_wifi_client.available() ) {
@@ -408,54 +402,57 @@ void THiNX::senddata(String body) {
     }
 
     Serial.println(F("*THiNXLib::senddata(): parsing payload..."));
-    parse(payload.c_str());
+    parse(payload);
 
   } else {
     Serial.println(F("*TH: API connection failed."));
     return;
   }
-//#endif
 }
 
 /*
  * Response Parser
  */
 
-void THiNX::parse(const char* p_load) {
-
-  String payload = String(p_load);
+ void THiNX::parse(String payload) {
 
   // TODO: Should parse response only for this device_id (which must be internal and not a mac)
 
-  Serial.print(F("*TH: Parsing JSON payload with heap = ")); Serial.println(system_get_free_heap_size());
+  printStackHeap("json-parser");
 
   payload_type ptype = Unknown;
 
-  int startIndex = 0;
+  int start_index = 0;
   int endIndex = payload.length();
 
   int reg_index = payload.indexOf("{\"registration\"");
   int upd_index = payload.indexOf("{\"update\"");
   int not_index = payload.indexOf("{\"notification\"");
+  int undefined_owner = payload.indexOf("old_protocol_owner:-undefined-");
 
-  if (upd_index > startIndex) {
-    startIndex = upd_index;
+  if (upd_index > start_index) {
+    start_index = upd_index;
     ptype = UPDATE;
   }
 
-  if (reg_index > startIndex) {
-    startIndex = reg_index;
+  if (reg_index > start_index) {
+    start_index = reg_index;
     endIndex = payload.indexOf("}}") + 2;
     ptype = REGISTRATION;
   }
 
-  if (not_index > startIndex) {
-    startIndex = not_index;
+  if (not_index > start_index) {
+    start_index = not_index;
     endIndex = payload.indexOf("}}") + 2; // is this still needed?
     ptype = NOTIFICATION;
   }
 
-  String body = payload.substring(startIndex, endIndex);
+  if (undefined_owner > start_index) {
+    Serial.println(F("ERROR: Not authorized. Please copy your owner_id into thinx.h from RTM Console > User Profile."));
+    return;
+  }
+
+  String body = payload.substring(start_index, endIndex);
 
   //delete &payload;
 
@@ -465,11 +462,11 @@ void THiNX::parse(const char* p_load) {
     Serial.println("'");
 #endif
 
-  DynamicJsonBuffer jsonBuffer(512);
+  DynamicJsonBuffer jsonBuffer(1024);
   JsonObject& root = jsonBuffer.parseObject(body.c_str());
 
   if ( !root.success() ) {
-  Serial.println(F("Failed parsing root node."));
+    Serial.println(F("Failed parsing root node."));
     return;
   }
 
@@ -1226,19 +1223,11 @@ void THiNX::finalize() {
  * Core loop
  */
 
-void printStackHeap(String tag) {
-  uint32_t memfree = system_get_free_heap_size(); Serial.print(F("*TH: memfree = ")); Serial.println(memfree);
-  Serial.printf("*TH: loop(): unmodified stack   = %4d\n", cont_get_free_stack(&g_cont));
-  Serial.printf("*TH: loop(): current free stack = %4d\n", 4 * (sp - g_cont.stack));
-  Serial.print("*TH: loop(): heap = "); Serial.println(system_get_free_heap_size());
-  Serial.print("*TH: loop(): tag = "); Serial.println(tag);
-}
-
 void THiNX::loop() {
   // If not connected, start connection in progress...
   if (WiFi.status() == WL_CONNECTED) {
     connected = true;
-    Serial.println(F("*TH: CONNECTED »"));
+    // Serial.println(F("*TH: CONNECTED »"));
   } else {
     connected = false;
     if (!wifi_connection_in_progress) {
