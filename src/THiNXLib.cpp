@@ -1,6 +1,6 @@
 #include "THiNXLib.h"
 
-#ifndef UNIT_TEST  // IMPORTANT LINE!
+#ifndef UNIT_TEST // IMPORTANT LINE FOR UNIT-TESTING!
 
 extern "C" {
   #include "user_interface.h"
@@ -305,8 +305,6 @@ void THiNX::connect_wifi() {
  String THiNX::checkin_body() {
 
    Serial.println("*TH: Building request...");
-   //Serial.print("*THiNXLib::checkin_body(): heap = ");
-   //Serial.println(system_get_free_heap_size());
 
    DynamicJsonBuffer jsonBuffer(512);
    JsonObject& root = jsonBuffer.createObject();
@@ -359,7 +357,6 @@ void THiNX::connect_wifi() {
 void THiNX::senddata(String body) {
 
   if (thx_wifi_client.connect(thinx_cloud_url, 7442)) {
-    Serial.println(F("*THiNXLib::senddata(): with api key..."));
 
     thx_wifi_client.println(F("POST /device/register HTTP/1.1"));
     thx_wifi_client.print(F("Host: ")); thx_wifi_client.println(thinx_cloud_url);
@@ -376,7 +373,7 @@ void THiNX::senddata(String body) {
     long interval = 30000;
     unsigned long currentMillis = millis(), previousMillis = millis();
 
-    Serial.println(F("*THiNXLib::senddata(): waiting for response..."));
+    Serial.println(F("*TH: waiting for response..."));
 
     // TODO: FIXME: Drop the loop here, wait for response!
 
@@ -401,7 +398,6 @@ void THiNX::senddata(String body) {
       }
     }
 
-    Serial.println(F("*THiNXLib::senddata(): parsing payload..."));
     parse(payload);
 
   } else {
@@ -417,8 +413,7 @@ void THiNX::senddata(String body) {
  void THiNX::parse(String payload) {
 
   // TODO: Should parse response only for this device_id (which must be internal and not a mac)
-
-  printStackHeap("json-parser");
+  // printStackHeap("json-parser");
 
   payload_type ptype = Unknown;
 
@@ -993,10 +988,6 @@ void THiNX::restore_device_info() {
  void THiNX::save_device_info()
  {
    deviceInfo(); // update json_output
-   Serial.print(F("NOT Saving json_output: "));
-   Serial.println(json_output);
-
-   return;
 
    // disabled for it crashes when closing the file (LoadStoreAlignmentCause) when using String
 #ifdef __USE_SPIFFS__
@@ -1023,7 +1014,7 @@ void THiNX::restore_device_info() {
 
 void THiNX::deviceInfo() {
 
-  Serial.println(F("*TH: building device info:"));
+  Serial.println(F("*TH: Building device info:"));
 
   DynamicJsonBuffer jsonBuffer(512);
   JsonObject& root = jsonBuffer.createObject();
@@ -1049,22 +1040,15 @@ void THiNX::deviceInfo() {
   Serial.println(thinx_udid);
 
   // Optionals
-
   if (strlen(available_update_url) > 1) {
       root["update"] = available_update_url; // allow update
       Serial.print(F("*TH: available_update_url: "));
       Serial.println(available_update_url);
   }
 
-  // root.printTo(jsonString);
-
-  Serial.println(F("NOT Building JSON..."));
-
+  // Output
+  Serial.println(F("*TH: Building JSON..."));
   root.printTo(json_output);
-  //root.printTo((char*)json_info, 512);
-
-  //Serial.print("JSON String has length of: ");
-  //Serial.println(root.measureLength());
 }
 
 
@@ -1188,7 +1172,8 @@ bool THiNX::fsck() {
     }
     Serial.println(F("* TH: SPIFFS Initialization completed."));
   }  else {
-    Serial.println("flash incorrectly configured, SPIFFS cannot start, IDE size: " + ideSize + ", real size: " + realSize);
+    Serial.print(F("*TH: Flash incorrectly configured, SPIFFS cannot start, IDE size: "));
+    Serial.println(ideSize + ", real size: " + realSize);
   }
 
   return fileSystemReady ? true : false;
@@ -1211,11 +1196,12 @@ void THiNX::setFinalizeCallback( void (*func)(void) ) {
 }
 
 void THiNX::finalize() {
-  Serial.println(F("*TH: Checkin completed."));
-  Serial.print(F("*THiNXLib::finalize heap = ")); Serial.println(system_get_free_heap_size());
   all_done = true;
   if (_finalize_callback) {
+    Serial.println(F("*TH: Checkin completed, calling finalize_callback()"));
     _finalize_callback();
+  } else {
+    Serial.println(F("*TH: Checkin completed (no _finalize_callback set)."));
   }
 }
 
@@ -1271,20 +1257,19 @@ void THiNX::loop() {
       thinx_mqtt_channel(); // initialize channel variable
 
       if (strlen(mqtt_device_channel) > 5) {
-        Serial.println("*TH: MQTT Subscribing device channel from loop...");
+        Serial.println(F("*TH: MQTT Subscribing device channel from loop..."));
         if (mqtt_client->subscribe(mqtt_device_channel)) {
-          Serial.print("*TH: DCH ");
+          Serial.print(F("*TH: DCH "));
           Serial.print(mqtt_device_channel);
-          Serial.println(" successfully subscribed.");
-          Serial.print("*THiNXLib::connect_wifi(SKIP): heap = "); Serial.println(system_get_free_heap_size());
+          Serial.println(F(" successfully subscribed."));
 
-          Serial.println("*TH: MQTT Publishing device status... ");
+          Serial.println(F("*TH: MQTT Publishing device status... "));
           // Publish status on status channel
           mqtt_client->publish(
             mqtt_device_status_channel,
             F("{ \"status\" : \"connected\" }")
           );
-          Serial.println("*TH: Calling finalize()... ");
+          Serial.println(F("*TH: Calling finalize()... "));
           finalize();
         }
       }
@@ -1292,10 +1277,8 @@ void THiNX::loop() {
 
     // TODO: FIXME: After checked in, connect MQTT
     if ( connected && checked_in ) {
-      Serial.println("*TH: MQTT disabled, seems like memory issues with incoming messages...");
-
-
-      Serial.println("*TH: WiFi connected, starting MQTT...");
+      Serial.println(F("*TH: MQTT disabled, seems like memory issues with incoming messages..."));
+      Serial.println(F("*TH: WiFi connected, starting MQTT..."));
       if (!mqtt_result) {
         delay(1);
         mqtt_result = start_mqtt(); // connect only, do not subscribe
@@ -1308,9 +1291,9 @@ void THiNX::loop() {
 
     // If connected and not checked_in, perform check in.
     if (connected && !checked_in) {
-      Serial.println("*TH: Will perform check in....");
+      Serial.println(F("*TH: Will perform check in...."));
       if (strlen(thinx_api_key) > 4) {
-        Serial.println("*TH: WiFi connected, checking in...");
+        Serial.println(F("*TH: WiFi connected, checking in..."));
         checked_in = true;
         checkin(); // blocking
         delay(1);
@@ -1321,11 +1304,11 @@ void THiNX::loop() {
 
     // Save API key on change
     if (should_save_config) {
-      Serial.println("*TH: Saving API key on change...");
+      Serial.println(F("*TH: Saving API key on change..."));
       evt_save_api_key();
       should_save_config = false;
     }
   }
 }
 
-#endif    // IMPORTANT LINE!
+#endif // IMPORTANT LINE FOR UNIT-TESTING!
