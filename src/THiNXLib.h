@@ -32,6 +32,10 @@
 #define THX_REVISION THINX_FIRMWARE_VERSION_SHORT
 #endif
 
+#ifdef THX_CID
+//#define THINX_COMMIT_ID (const char *) THX_CID
+#endif
+
 // THINX_COMMIT_ID must be generated from platformio.ini or using thinx
 
 class THiNX {
