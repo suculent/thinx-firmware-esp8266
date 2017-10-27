@@ -1,7 +1,7 @@
 #include <Arduino.h>
 
 #ifndef VERSION
-#define VERSION "2.0.67"
+#define VERSION "2.0.68"
 #endif
 
 #define __DEBUG__
