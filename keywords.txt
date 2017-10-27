@@ -8,8 +8,6 @@
 
 THiNX KEYWORD1
 THiNXLib  KEYWORD1
-EAVManager  KEYWORD2
-EAVManagerParameter KEYWORD2
 
 #######################################
 # Methods and Functions (KEYWORD2)

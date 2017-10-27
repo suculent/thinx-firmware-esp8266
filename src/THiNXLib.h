@@ -12,8 +12,6 @@
 
 #ifdef __USE_WIFI_MANAGER__
 #include <WiFiManager.h>
-//#include "EAVManager/EAVManager.h"
-//#include <EAVManager.h>
 #endif
 
 #include <stdio.h>
@@ -127,12 +125,12 @@ class THiNX {
       bool once;                              // once token for initialization
 
       // THiNX API
-      char thx_api_key[65];                   // for EAVManager/WiFiManager callback
-      char mac_string[17]; // = {0};
+      char thx_api_key[65];
+      char mac_string[17];
       const char * thinx_mac();
 
 #ifndef __USE_SPIFFS__
-      char json_info[512] = {0};           // statically allocated to prevent fragmentation
+      char json_info[512] = {0};           // statically allocated to prevent fragmentation (?)
 #endif
 
       String json_output;
