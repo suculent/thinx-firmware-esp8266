@@ -29,7 +29,9 @@
 
 // cannot be DEF, is a VAR! #ifdef THINX_FIRMWARE_VERSION_SHORT is a (const char*)
 #ifndef THX_REVISION
-#define THX_REVISION THINX_FIRMWARE_VERSION_SHORT
+  #ifdef THINX_FIRMWARE_VERSION_SHORT
+    #define THX_REVISION THINX_FIRMWARE_VERSION_SHORT
+  #endif
 #endif
 
 #ifdef THX_CID
@@ -107,6 +109,32 @@ class THiNX {
 #endif
 
     private:
+
+      //
+      // Build-specific constants
+      //
+
+      #ifdef THX_REVISION
+        const char* thx_revision = strdup(String(THX_REVISION).c_str());
+      #else
+        const char* thx_revision = "revision";
+      #endif
+
+      #ifdef THINX_COMMIT_ID
+        const char* commit_id = THINX_COMMIT_ID;
+      #else
+        const char* commit_id = "commit-id";
+      #endif
+
+      #ifdef THINX_FIRMWARE_VERSION_SHORT
+        const char* firmware_version_short = THINX_FIRMWARE_VERSION_SHORT;
+      #else
+        const char* firmware_version_short = "firmware-version-short";
+      #endif
+
+      //
+      // THiNXLib
+      //
 
       void configCallback();
 

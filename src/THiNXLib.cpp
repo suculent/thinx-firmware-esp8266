@@ -32,10 +32,11 @@ THiNX::THiNX(const char * __apikey) {
   all_done = false;
 
   Serial.print(F("\nTHiNXLib rev. "));
-  Serial.print(THX_REVISION);
+
+  Serial.print(thx_revision);
 
   Serial.print(" (");
-  Serial.print(THINX_COMMIT_ID); // returned string is "not declared in expansion of THX_CID, why?
+  Serial.print(commit_id); // returned string is "not declared in expansion of THX_CID, why?
   Serial.println(")");
 
   // see lines ../hardware/cores/esp8266/Esp.cpp:80..100
@@ -322,12 +323,12 @@ void THiNX::connect_wifi() {
      root["firmware"] = strdup(THINX_FIRMWARE_VERSION);
    }
 
-   if (strlen(THINX_FIRMWARE_VERSION_SHORT) > 1) {
-     root["version"] = strdup(THINX_FIRMWARE_VERSION_SHORT);
+   if (strlen(firmware_version_short) > 1) {
+     root["version"] = strdup(firmware_version_short);
    }
 
-   if (strlen(THINX_COMMIT_ID) > 1) {
-      root["commit"] = strdup(THINX_COMMIT_ID);
+   if (strlen(commit_id) > 1) {
+      root["commit"] = strdup(commit_id);
    }
 
    if (strlen(thinx_owner) > 1) {
@@ -1158,7 +1159,7 @@ void THiNX::import_build_time_constants() {
     thinx_udid = strdup("");
   }
 
-  thinx_commit_id = strdup(THINX_COMMIT_ID);
+  thinx_commit_id = strdup(commit_id);
   thinx_mqtt_url = strdup(THINX_MQTT_URL);
   thinx_cloud_url = strdup(THINX_CLOUD_URL);
   thinx_alias = strdup(THINX_ALIAS);
@@ -1168,7 +1169,7 @@ void THiNX::import_build_time_constants() {
   thinx_auto_update = THINX_AUTO_UPDATE;
   thinx_forced_update = THINX_FORCED_UPDATE;
   thinx_firmware_version = strdup(THINX_FIRMWARE_VERSION);
-  thinx_firmware_version_short = strdup(THINX_FIRMWARE_VERSION_SHORT);
+  thinx_firmware_version_short = strdup(firmware_version_short);
   app_version = strdup(THINX_APP_VERSION);
 
   // Logging disabled for security reasons
