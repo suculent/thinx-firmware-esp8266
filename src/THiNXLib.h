@@ -1,7 +1,7 @@
 #include <Arduino.h>
 
 #ifndef VERSION
-#define VERSION "2.0.63"
+#define VERSION "2.0.65"
 #endif
 
 #define __DEBUG__
@@ -29,15 +29,13 @@
 #include "PubSubClient/PubSubClient.h" // Local checkout
 //#include <PubSubClient.h> // Arduino Library
 
-#define MQTT_BUFFER_SIZE 512
-
 #ifdef THINX_FIRMWARE_VERSION_SHORT
 #ifndef THX_REVISION
 #define THX_REVISION THINX_FIRMWARE_VERSION_SHORT
 #endif
 #else
 #ifndef THX_REVISION
-#define THX_REVISION String(63)
+#define THX_REVISION String(65)
 #endif
 #endif
 
@@ -75,8 +73,6 @@ class THiNX {
 
     // MQTT
     PubSubClient *mqtt_client;
-
-    uint8_t buf[MQTT_BUFFER_SIZE];
 
     String thinx_mqtt_channel();
     char mqtt_device_channel[128]; //  = {0}
@@ -131,12 +127,9 @@ class THiNX {
       bool once;                              // once token for initialization
 
       // THiNX API
-      char thx_api_key[64];                   // for EAVManager/WiFiManager callback
-      char mac_string[16]; // = {0};
+      char thx_api_key[65];                   // for EAVManager/WiFiManager callback
+      char mac_string[17]; // = {0};
       const char * thinx_mac();
-
-      StaticJsonBuffer<1024> jsonBuffer;
-      StaticJsonBuffer<1280> wrapperBuffer;
 
 #ifndef __USE_SPIFFS__
       char json_info[512] = {0};           // statically allocated to prevent fragmentation
@@ -150,7 +143,7 @@ class THiNX {
       void connect_wifi();                    // start connecting
       void checkin();                         // checkin when connected
       void senddata(String);                  // TODO: Refactor to C-string
-      void parse(String);                     // TODO: Refactor to C-string
+      void parse(const char*);                     // TODO: Refactor to C-string
       void update_and_reboot(String);         // TODO: Refactor to C-string
 
       // MQTT
