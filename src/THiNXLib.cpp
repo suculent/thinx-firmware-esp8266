@@ -59,6 +59,8 @@ THiNX::THiNX() {
 
 THiNX::THiNX(const char * __apikey) {
 
+  thinx_phase = INIT;
+
   #ifdef __USE_WIFI_MANAGER__
     should_save_config = false;
     WiFiManager wifiManager;
@@ -92,15 +94,13 @@ THiNX::THiNX(const char * __apikey, const char * __owner_id) {
     once = true;
   }
 
-  all_done = false;
   status = WL_IDLE_STATUS;
   connected = false;
   mqtt_client = NULL;
-  checked_in = false;
   mqtt_payload = "";
   mqtt_result = false;
   mqtt_connected = false;
-  perform_mqtt_checkin = false;
+  performed_mqtt_checkin = false;
   wifi_connection_in_progress = false;
   wifi_retry = 0;
 
@@ -167,6 +167,7 @@ void THiNX::initWithAPIKey(const char * __apikey) {
   }
   Serial.println(F("*TH: Initialization completed..."));
   wifi_connection_in_progress = false;
+  thinx_phase = CONNECT_WIFI;
 }
 
 /*
@@ -267,7 +268,7 @@ void THiNX::connect_wifi() {
           WiFi.mode(WIFI_STA);
         } else {
           WiFi.begin(THINX_ENV_SSID, THINX_ENV_PASS);
-          Serial.println(F("*TH: Enabling connection state (306)"));
+          Serial.println(F("*TH: Enabling connection state (272)"));
           wifi_connection_in_progress = true; // prevents re-entering connect_wifi()
         }
       }
@@ -344,6 +345,8 @@ void THiNX::connect_wifi() {
  */
 
 void THiNX::senddata(String body) {
+
+  Serial.print("Connecting to: "); Serial.println(thinx_cloud_url);
 
   if (thx_wifi_client.connect(thinx_cloud_url, 7442)) {
 
@@ -676,34 +679,6 @@ const char * THiNX::thinx_mac() {
  return mac_string;
 }
 
-
-/*
- * Sends a MQTT message
- */
-
-void THiNX::publish() {
-  if (!connected) return;
-  if (mqtt_client == NULL) return;
-  if (strlen(thinx_udid) < 4) return;
-  String channel = thinx_mqtt_status_channel();
-  String response = "{ \"status\" : \"connected\" }";
-  if (mqtt_client->connected()) {
-    Serial.println(F("*TH: MQTT connected, publishing status..."));
-    mqtt_client->publish(mqtt_device_status_channel, response.c_str());
-    mqtt_client->loop();
-  } else {
-    Serial.println("*TH: MQTT not connected, reconnecting...");
-    mqtt_result = start_mqtt();
-    if (mqtt_result && mqtt_client->connected()) {
-      mqtt_client->publish(channel, response.c_str());
-      //mqtt_client->loop();
-      Serial.println("*TH: MQTT reconnected, published default message.");
-    } else {
-      Serial.println("*TH: MQTT Reconnect failed...");
-    }
-  }
-}
-
 /*
  * Sends a MQTT message on successful update (should be used after boot).
  */
@@ -726,6 +701,8 @@ void THiNX::notify_on_successful_update() {
  */
 
 bool THiNX::start_mqtt() {
+
+  Serial.println(F("*TH: start_mqtt()")); Serial.flush();
 
   if (mqtt_client != NULL) {
     if (mqtt_client->connected()) {
@@ -781,7 +758,7 @@ bool THiNX::start_mqtt() {
         Serial.println(F("mqtt_client->connected()!"));
 
         mqtt_connected = true;
-        perform_mqtt_checkin = true;
+        performed_mqtt_checkin = true;
 
         mqtt_client->set_callback([this](const MQTT::Publish &pub){
 
@@ -1193,7 +1170,7 @@ void THiNX::setFinalizeCallback( void (*func)(void) ) {
 }
 
 void THiNX::finalize() {
-  all_done = true;
+  thinx_phase = COMPLETED;
   if (_finalize_callback) {
     Serial.println(F("*TH: Checkin completed, calling finalize_callback()"));
     _finalize_callback();
@@ -1208,109 +1185,104 @@ void THiNX::finalize() {
 
 void THiNX::loop() {
 
-  // If not connected, start connection in progress...
-  if (WiFi.status() == WL_CONNECTED) {
-    connected = true;
-  } else {
-    connected = false;
-    Serial.println(F("*TH: wifi_connection_in_progress »"));
-    if (wifi_connection_in_progress != true) {
-      Serial.println(F("*TH: FALSE"));
+  // Save API key on change
+  if (should_save_config) {
+    Serial.println(F("*TH: Saving API key on change..."));
+    evt_save_api_key();
+    should_save_config = false;
+  }
+
+  if (thinx_phase < COMPLETED) {
+    Serial.print("Phase: "); Serial.println(thinx_phase);
+  }
+
+  // CASE thinx_phase == CONNECT_WIFI
+
+  if (thinx_phase == CONNECT_WIFI) {
+    // If not connected manually or using WiFiManager, start connection in progress...
+    if (WiFi.status() != WL_CONNECTED) {
+      connected = false;
+      Serial.println(F("*TH: wifi_connection_in_progress »"));
+      if (wifi_connection_in_progress != true) {
+        Serial.println(F("*TH: FALSE"));
+      } else {
+        Serial.println(F("*TH: TRUE"));
+      }
+      if (wifi_connection_in_progress != true) {
+        Serial.println(F("*TH: CONNECTING »"));
+        Serial.println(F("*TH: LOOP «÷»")); Serial.flush();
+        connect(); // blocking
+        Serial.println(F("*TH: Enabling connection state (1283)"));
+        wifi_connection_in_progress = true;
+        Serial.println(F("*TH: LOOP «"));
+        wifi_connection_in_progress = true;
+        return;
+      } else {
+        Serial.println(F("*TH: PROGRESS..."));
+        delay(1000); // wait for WiFi connection
+        return;
+      }
     } else {
-      Serial.println(F("*TH: TRUE"));
-    }
-    if (wifi_connection_in_progress != true) {
-      Serial.println(F("*TH: CONNECTING »"));
-      Serial.println(F("*TH: LOOP «÷»")); Serial.flush();
-      connect(); // blocking
-      Serial.println(F("*TH: Enabling connection state (1283)"));
-      wifi_connection_in_progress = true;
-      Serial.println(F("*TH: LOOP «"));
-      wifi_connection_in_progress = true;
-      return;
-    } else {
-      Serial.println(F("*TH: PROGRESS..."));
-      delay(1000); // wait for WiFi connection
-      return;
+      connected = true;
+      thinx_phase = CONNECT_API;
     }
   }
 
-  // If connected, perform the MQTT loop and bail out ASAP
-  if (connected) {
+  // After MQTT gets connected:
+  if (thinx_phase == CHECKIN_MQTT) {
+      thinx_mqtt_channel(); // initialize channel variable
+      if (strlen(mqtt_device_channel) > 5) {
+        Serial.println(F("*TH: MQTT Subscribing device channel from loop..."));
+        if (mqtt_client->subscribe(mqtt_device_channel)) {
+          Serial.print(F("*TH: DCH "));
+          Serial.print(mqtt_device_channel);
+          Serial.println(F(" successfully subscribed."));
+          Serial.println(F("*TH: MQTT Publishing device status... "));
+          // Publish status on status channel
+          mqtt_client->publish(
+            mqtt_device_status_channel,
+            F("{ \"status\" : \"connected\" }")
+          );
+          mqtt_client->loop();
+          thinx_phase = FINALIZE;
+        }
+      }
+  }
 
+  if ( thinx_phase == CONNECT_MQTT ) {
+    Serial.println(F("*TH: WiFi connected, starting MQTT..."));
+    mqtt_result = start_mqtt(); // connect only, do not subscribe
+    if (mqtt_result == true) {
+      thinx_phase = CHECKIN_MQTT;
+      mqtt_client->loop();
+    }
+  }
+
+  // CASE thinx_phase == CONNECT_API
+
+  // If connected, perform the MQTT loop and bail out ASAP
+  if (thinx_phase == CONNECT_API) {
     if (WiFi.getMode() == WIFI_AP) {
       Serial.println(F("*TH: LOOP « (AP_MODE)"));
       return;
     }
-
-    if (mqtt_client != NULL) {
-      if (mqtt_client->connected()) {
-        Serial.println(F("*TH: MQTT LOOP »"));
-        mqtt_client->loop();
-        Serial.println(F("*TH: MQTT LOOP «"));
-      }
-    }
-
-    if (all_done) return;
-
-    // After MQTT gets connected:
-    if (mqtt_client != NULL) {
-       if (connected && perform_mqtt_checkin) {
-        perform_mqtt_checkin = true;
-        thinx_mqtt_channel(); // initialize channel variable
-        if (strlen(mqtt_device_channel) > 5) {
-          Serial.println(F("*TH: MQTT Subscribing device channel from loop..."));
-          if (mqtt_client->subscribe(mqtt_device_channel)) {
-            Serial.print(F("*TH: DCH "));
-            Serial.print(mqtt_device_channel);
-            Serial.println(F(" successfully subscribed."));
-            Serial.println(F("*TH: MQTT Publishing device status... "));
-            // Publish status on status channel
-            mqtt_client->publish(
-              mqtt_device_status_channel,
-              F("{ \"status\" : \"connected\" }")
-            );
-            Serial.println(F("*TH: Calling finalize()... "));
-            finalize();
-          }
-        }
-      }
-    }
-
-    // TODO: FIXME: After checked in, connect MQTT
-    if ( mqtt_client && connected && checked_in ) {
-      Serial.println(F("*TH: MQTT disabled, seems like memory issues with incoming messages..."));
-      Serial.println(F("*TH: WiFi connected, starting MQTT..."));
-      if (!mqtt_result) {
-        delay(1);
-        mqtt_result = start_mqtt(); // connect only, do not subscribe
-        if (mqtt_result) {
-          finalize();
-        }
-        return;
-      }
-    }
-
-    // If connected and not checked_in, perform check in.
-    if (connected && !checked_in) {
-      Serial.println(F("*TH: Will perform check in...."));
-      if (strlen(thinx_api_key) > 4) {
-        Serial.println(F("*TH: WiFi connected, checking in..."));
-        checked_in = true;
-        checkin(); // blocking
-        delay(1);
-        finalize();
-        return; // finalize OR init MQTT in next loop
-      }
-    }
-
-    // Save API key on change
-    if (should_save_config) {
-      Serial.println(F("*TH: Saving API key on change..."));
-      evt_save_api_key();
-      should_save_config = false;
+    if (strlen(thinx_api_key) > 4) {
+      checkin(); // warning, this blocking and takes time, thus return...
+      thinx_phase = CONNECT_MQTT;
     }
   }
+
+  if ( thinx_phase == FINALIZE ) {
+    Serial.println(F("*TH: Calling finalize()... "));
+    finalize();
+  }
+
+  if ( thinx_phase == COMPLETED ) {
+    if (mqtt_result == true) {
+      mqtt_client->loop();
+    }
+  }
+
 }
 
 #endif // IMPORTANT LINE FOR UNIT-TESTING!
