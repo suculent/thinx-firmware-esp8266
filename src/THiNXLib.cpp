@@ -9,6 +9,18 @@ extern "C" {
   extern cont_t g_cont;
 }
 
+#ifndef VERSION
+#define VERSION "2.0.94"
+#endif
+
+#ifndef THINX_FIRMWARE_VERSION_SHORT
+#define THINX_FIRMWARE_VERSION_SHORT "2.0.94"
+#endif
+
+#ifndef THINX_COMMIT_ID
+#define THINX_COMMIT_ID "4cc948484eb97256842035f1857d869da18ad7a2"
+#endif
+
 /* Debug tools (should be extradited from Release builds) */
 register uint32_t *sp asm("a1");
 
