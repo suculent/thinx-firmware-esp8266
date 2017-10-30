@@ -24,7 +24,8 @@ void setup() {
   Serial.println("\n");
   Serial.println("*TH: Initializing in 5 seconds...");
   delay(5000);
-  thx = THiNX("71679ca646c63d234e957e37e4f4069bf4eed14afca4569a0c74abf503076732"); // 4. initialize with API Key
+  // 4. initialize with API Key and Owner ID
+  thx = THiNX("71679ca646c63d234e957e37e4f4069bf4eed14afca4569a0c74abf503076732", "cedc16bb6bb06daaa3ff6d30666d91aacd6e3efbf9abbc151b4dcade59af7c12"); 
 }
 
 void loop()

@@ -54,9 +54,20 @@ class THiNX {
       Reserved = 255,		                     // Reserved
     };
 
+    enum phase {
+      INIT = 0,
+      CONNECT_WIFI = 1,
+      CONNECT_API = 2,
+      CONNECT_MQTT = 3,
+      CHECKIN_MQTT = 4,
+      FINALIZE = 5,
+      COMPLETED = 6
+    };
+
+    phase thinx_phase;
+
     // Public API
     void initWithAPIKey(const char *);
-    void publish();
     void loop();
 
     String checkin_body();                  // TODO: Refactor to C-string
@@ -90,13 +101,13 @@ class THiNX {
     char* thinx_owner;
     char* thinx_udid;
 
-    bool connected;                         // WiFi connected in station mode
-
     void setFinalizeCallback( void (*func)(void) );
 
     int wifi_connection_in_progress;
 
     private:
+
+      bool connected;                         // WiFi connected in station mode
 
       static char* thinx_api_key;
       static char* thinx_owner_key;
@@ -158,12 +169,12 @@ class THiNX {
 
       // MQTT
       bool start_mqtt();                      // connect to broker and subscribe
-      bool mqtt_result;                       // success or failure on connection
-      bool mqtt_connected;                    // success or failure on subscription
+      int mqtt_result;                       // success or failure on connection
+      int mqtt_connected;                    // success or failure on subscription
       String mqtt_payload;                    // mqtt_payload store for parsing
       int last_mqtt_reconnect;                // interval
-      bool perform_mqtt_checkin;              // one-time flag
-      bool all_done;                              // finalize flag
+      int performed_mqtt_checkin;              // one-time flag
+      int all_done;                              // finalize flag
 
       // Data Storage
       void import_build_time_constants();     // sets variables from thinx.h file
@@ -175,8 +186,7 @@ class THiNX {
       void notify_on_successful_update();     // send a MQTT notification back to Web UI
 
       // Event Queue / States
-      bool checked_in;
-      bool mqtt_started;
+      int mqtt_started;
       bool complete;
       void evt_save_api_key();
 
