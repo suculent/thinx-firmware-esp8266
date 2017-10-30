@@ -368,7 +368,7 @@ void THiNX::senddata(String body) {
     while(!thx_wifi_client.available()){
       delay(1);
       if( (currentMillis - previousMillis) > interval ){
-        //Serial.println("Response Timeout. TODO: Should retry later.");
+        //Serial.println("Response Timeeout. TODO: Should retry later.");
         thx_wifi_client.stop();
         return;
       }
@@ -488,7 +488,7 @@ void THiNX::senddata(String body) {
       // In case automatic updates are disabled,
       // we must ask user to commence firmware update.
       if (THINX_AUTO_UPDATE == false) {
-        if (mqtt_client) {
+        if (mqtt_client != NULL) {
           Serial.println("mqtt_client->publish");
           mqtt_client->publish(
             thinx_mqtt_channel().c_str(),
@@ -709,7 +709,7 @@ void THiNX::publish() {
  */
 
 void THiNX::notify_on_successful_update() {
-  if (mqtt_client) {
+  if (mqtt_client != NULL) {
     Serial.println("mqtt_client->publish");
     mqtt_client->publish(
       mqtt_device_status_channel,
@@ -736,12 +736,13 @@ bool THiNX::start_mqtt() {
   }
 
   if (strlen(thinx_udid) < 4) {
+    Serial.println(F("*TH: MQTT NO-UDID!")); Serial.flush();
     return false;
   }
 
   Serial.print(F("*TH: UDID: ")); Serial.println(thinx_udid);
   Serial.print(F("*TH: Contacting MQTT server ")); Serial.println(thinx_mqtt_url);
-  Serial.print(F("*TH: MQTT client with URL ")); Serial.println(thinx_mqtt_url);
+  Serial.print(F("*TH: MQTT client with URL ")); Serial.println(thinx_mqtt_url); Serial.flush();
 
   mqtt_client = new PubSubClient(thx_wifi_client, thinx_mqtt_url);
 
@@ -1055,7 +1056,7 @@ void THiNX::update_and_reboot(String url) {
     Serial.printf("Update Success: %u\nRebooting...\n", millis() - startTime);
 
     // Notify on reboot for update
-    if (mqtt_client) {
+    if (mqtt_client != NULL) {
       mqtt_client->publish(
         mqtt_device_status_channel,
         thx_reboot_response.c_str()
@@ -1220,7 +1221,7 @@ void THiNX::loop() {
     }
     if (wifi_connection_in_progress != true) {
       Serial.println(F("*TH: CONNECTING »"));
-      Serial.println(F("*TH: LOOP «÷»"));
+      Serial.println(F("*TH: LOOP «÷»")); Serial.flush();
       connect(); // blocking
       Serial.println(F("*TH: Enabling connection state (1283)"));
       wifi_connection_in_progress = true;
@@ -1242,40 +1243,42 @@ void THiNX::loop() {
       return;
     }
 
-    if (mqtt_client) {
-      mqtt_client->loop();
+    if (mqtt_client != NULL) {
+      if (mqtt_client->connected()) {
+        Serial.println(F("*TH: MQTT LOOP »"));
+        mqtt_client->loop();
+        Serial.println(F("*TH: MQTT LOOP «"));
+      }
     }
 
     if (all_done) return;
 
     // After MQTT gets connected:
-    if (connected && perform_mqtt_checkin) {
-
-      perform_mqtt_checkin = true;
-
-      thinx_mqtt_channel(); // initialize channel variable
-
-      if (strlen(mqtt_device_channel) > 5) {
-        Serial.println(F("*TH: MQTT Subscribing device channel from loop..."));
-        if (mqtt_client->subscribe(mqtt_device_channel)) {
-          Serial.print(F("*TH: DCH "));
-          Serial.print(mqtt_device_channel);
-          Serial.println(F(" successfully subscribed."));
-
-          Serial.println(F("*TH: MQTT Publishing device status... "));
-          // Publish status on status channel
-          mqtt_client->publish(
-            mqtt_device_status_channel,
-            F("{ \"status\" : \"connected\" }")
-          );
-          Serial.println(F("*TH: Calling finalize()... "));
-          finalize();
+    if (mqtt_client != NULL) {
+       if (connected && perform_mqtt_checkin) {
+        perform_mqtt_checkin = true;
+        thinx_mqtt_channel(); // initialize channel variable
+        if (strlen(mqtt_device_channel) > 5) {
+          Serial.println(F("*TH: MQTT Subscribing device channel from loop..."));
+          if (mqtt_client->subscribe(mqtt_device_channel)) {
+            Serial.print(F("*TH: DCH "));
+            Serial.print(mqtt_device_channel);
+            Serial.println(F(" successfully subscribed."));
+            Serial.println(F("*TH: MQTT Publishing device status... "));
+            // Publish status on status channel
+            mqtt_client->publish(
+              mqtt_device_status_channel,
+              F("{ \"status\" : \"connected\" }")
+            );
+            Serial.println(F("*TH: Calling finalize()... "));
+            finalize();
+          }
         }
       }
     }
 
     // TODO: FIXME: After checked in, connect MQTT
-    if ( connected && checked_in ) {
+    if ( mqtt_client && connected && checked_in ) {
       Serial.println(F("*TH: MQTT disabled, seems like memory issues with incoming messages..."));
       Serial.println(F("*TH: WiFi connected, starting MQTT..."));
       if (!mqtt_result) {
