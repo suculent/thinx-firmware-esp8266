@@ -20,14 +20,47 @@ void printStackHeap(String tag) {
   Serial.print("*TH: loop(): tag = "); Serial.println(tag);
 }
 
+#ifdef __USE_WIFI_MANAGER__
+  char* THiNX::thinx_api_key;
+  char THiNX::thx_api_key[65] = {0};
+  int THiNX::should_save_config = 0;
+  WiFiManagerParameter * THiNX::api_key_param;
+
+  void THiNX::saveConfigCallback() {
+    Serial.println("Should save config");
+    should_save_config = true;
+    strcpy(thx_api_key, api_key_param->getValue());
+  }
+#endif
+
 /* Constructor */
 
 THiNX::THiNX() {
+
 }
 
-/* Designated Initializer */
+/* Designated Initializers */
 
 THiNX::THiNX(const char * __apikey) {
+
+  #ifdef __USE_WIFI_MANAGER__
+    should_save_config = false;
+    WiFiManager wifiManager;
+    api_key_param = new WiFiManagerParameter("apikey", "API Key", thinx_api_key, 64);
+    wifiManager.addParameter(api_key_param);
+    wifiManager.setTimeout(5000);
+    wifiManager.setDebugOutput(true); // does some logging on mode set
+    wifiManager.setSaveConfigCallback(saveConfigCallback);
+    wifiManager.autoConnect("THiNX-AP");
+  #endif
+
+  Serial.println("THiNX::THiNX(const char * __apikey)");
+  THiNX(__apikey, "");
+}
+
+THiNX::THiNX(const char * __apikey, const char * __owner_id) {
+
+  Serial.println("THiNX::THiNX(const char * __apikey, const char * __owner_id)");
 
   all_done = false;
 
@@ -46,7 +79,7 @@ THiNX::THiNX(const char * __apikey) {
 
   status = WL_IDLE_STATUS;
   once = true;
-  should_save_config = false;
+
   connected = false;
 
   mqtt_client = NULL;
@@ -71,8 +104,12 @@ THiNX::THiNX(const char * __apikey) {
   thinx_firmware_version = strdup("");
   thinx_mqtt_url = strdup("thinx.cloud");
   thinx_version_id = strdup("");
-  thinx_owner = strdup("");
   thinx_api_key = strdup("");
+
+  // will be loaded from SPIFFS/EEPROM or retrieved on Registration later
+  if (strlen(__owner_id) == 0) {
+    thinx_owner = strdup("");
+  }
 
   wifi_retry = 0;
 
@@ -85,47 +122,10 @@ THiNX::THiNX(const char * __apikey) {
   restore_device_info();
   Serial.println(F("*TH: Device info restored..."));
 
-  // thx_wifi_client = new WiFiClient();
-
 #ifdef __USE_WIFI_MANAGER__
-  manager = new WiFiManager;
-  api_key_param = new WiFiManagerParameter("apikey", "API Key", thinx_api_key, 64);
-  manager->addParameter(api_key_param);
-  manager->setTimeout(5000);
-  manager->setDebugOutput(false); // does some logging on mode set
-
-  // TODO: FIXME:
-  /*
-  manager->setSaveConfigCallback( {
-    Serial.println("saveConfigCallback!!!");
-    should_save_config = true;
-    strcpy(thx_api_key, api_key_param->getValue());
-  } );
-  */
-
-  // void WiFiManager::setSaveConfigCallback( void (*func)(void) )
-  // manager->setSaveConfigCallback( &this->saveConfigCallback );
-  // https://stackoverflow.com/questions/29065943/how-can-i-pass-a-member-function-pointer-into-a-function-that-takes-a-regular-fu
-  // https://stackoverflow.com/questions/29691055/pointer-to-member-function-error
-  // https://stackoverflow.com/questions/2374847/passing-member-function-pointer-to-member-object-in-c
-
-  /*
-  lib/thinx-lib-esp8266-arduino/src/THiNXLib.cpp:64:55: error: no matching function for call to 'WiFiMana
-  ger::setSaveConfigCallback(<unresolved overloaded function type>)'
-  manager->setSaveConfigCallback(  saveConfigCallback );
-  ^
-  lib/thinx-lib-esp8266-arduino/src/THiNXLib.cpp:64:55: note: candidate is:
-  In file included from lib/thinx-lib-esp8266-arduino/src/THiNXLib.h:9:0,
-  from lib/thinx-lib-esp8266-arduino/src/THiNXLib.cpp:1:
-  lib/WiFiManager/WiFiManager.h:101:19: note: void WiFiManager::setSaveConfigCallback(void (*)())
-  void          setSaveConfigCallback( void (*func)(void) );
-  ^
-  lib/WiFiManager/WiFiManager.h:101:19: note:   no known conversion for argument 1 from '<unresolved over
-  loaded function type>' to 'void (*)()'
-  */
-
+  //
+  connected = true;
 #else
-
   if ((WiFi.status() == WL_CONNECTED) && (WiFi.getMode() == WIFI_STA)) {
     connected = true;
     wifi_connection_in_progress = false;
@@ -135,7 +135,7 @@ THiNX::THiNX(const char * __apikey) {
 #endif
 
 #ifdef __USE_WIFI_MANAGER__
-    manager->setDebugOutput(false); // does some logging on mode set
+    //
 #endif
 
   if (strlen(thinx_api_key) > 4) {
@@ -150,6 +150,8 @@ THiNX::THiNX(const char * __apikey) {
     }
   }
   initWithAPIKey(thinx_api_key);
+
+  wifi_connection_in_progress = false; // last
 }
 
 // Designated initializer
@@ -169,6 +171,12 @@ void THiNX::initWithAPIKey(const char * __apikey) {
     }
   }
   Serial.println(F("*TH: Initialization completed..."));
+  wifi_connection_in_progress = false;
+  if (wifi_connection_in_progress == false) {
+    Serial.println(F("*TH: false"));
+  } else {
+    Serial.println(F("*TH: true"));
+  }
 }
 
 /*
@@ -177,6 +185,8 @@ void THiNX::initWithAPIKey(const char * __apikey) {
 
 void THiNX::connect() {
 
+  Serial.println("THiNX::connect()");
+
   if (connected) {
     Serial.println(F("*TH: connected"));
     return;
@@ -184,9 +194,12 @@ void THiNX::connect() {
 
   Serial.print(F("*TH: connecting: ")); Serial.println(wifi_retry);
 
+#ifdef __USE_WIFI_MANAGER__
+  //
+#else
   if (WiFi.SSID()) {
 
-    if (!wifi_connection_in_progress) {
+    if (wifi_connection_in_progress != true) {
       Serial.print(F("*TH: SSID ")); Serial.println(WiFi.SSID());
       if (WiFi.getMode() == WIFI_AP) {
         Serial.print(F("THiNX > LOOP > START() > AP SSID"));
@@ -194,13 +207,15 @@ void THiNX::connect() {
       } else {
         Serial.println(F("*TH: LOOP > CONNECT > STA RECONNECT"));
         WiFi.begin(THINX_ENV_SSID, THINX_ENV_PASS);
+        Serial.println(F("*TH: Enabling connection state (212)"));
+        wifi_connection_in_progress = true; // prevents re-entering connect_wifi(); should timeout
       }
-
-      wifi_connection_in_progress = true; // prevents re-entering connect_wifi(); should timeout
+      //
     }
   } else {
     Serial.print(F("*TH: No SSID."));
   }
+#endif
 
   if (WiFi.status() == WL_CONNECTED) {
     Serial.println(F("THiNX > LOOP > ALREADY CONNECTED"));
@@ -209,27 +224,23 @@ void THiNX::connect() {
   } else {
     Serial.println(F("THiNX > LOOP > CONNECTING WiFi:"));
     connect_wifi();
+    Serial.println(F("*TH: Enabling connection state (237)"));
+    wifi_connection_in_progress = true;
   }
 }
 
 /*
- * Connection to WiFi
+ * Connection to WiFi, called from connect() [if SSID & connected]
  */
 
 void THiNX::connect_wifi() {
 
-   //Serial.printf("autoConnect: unmodified stack   = %4d\n", cont_get_free_stack(&g_cont));
-   //Serial.printf("autoConnect: current free stack = %4d\n", 4 * (sp - g_cont.stack));
-   // 4, 208!
+  Serial.println("THiNX::connect_wifi()");
+
+  printStackHeap("connect_wifi");
 
 #ifdef __USE_WIFI_MANAGER__
-   Serial.setDebugOutput(false);
-   manager->setDebugOutput(true); // does some logging on mode set
-   Serial.println(F("*TH: AutoConnecting..."));
-   delay(0); // prevent crash on autoconnect?
-   connected = manager->autoConnect("AP-THiNX", "PASSWORD");
-   Serial.println(F("*TH: AutoConnect connected..."));
-
+   return;
 #else
 
   if (connected) {
@@ -263,6 +274,7 @@ void THiNX::connect_wifi() {
 
           WiFi.mode(WIFI_STA);
           WiFi.begin(THINX_ENV_SSID, THINX_ENV_PASS);
+          Serial.println(F("*TH: Enabling connection state (283)"));
           wifi_connection_in_progress = true; // prevents re-entering connect_wifi()
           wifi_retry = 0; // waiting for sta...
       }
@@ -285,6 +297,7 @@ void THiNX::connect_wifi() {
         // hopefully next run... let's give some time to switch
         } else {
           WiFi.begin(THINX_ENV_SSID, THINX_ENV_PASS);
+          Serial.println(F("*TH: Enabling connection state (306)"));
           wifi_connection_in_progress = true; // prevents re-entering connect_wifi()
         }
       }
@@ -856,16 +869,6 @@ bool THiNX::start_mqtt() {
     }
 }
 
-#ifdef __USE_WIFI_MANAGER__
-/*
- * WiFiManager Setup Callback
- */
-void THiNX::configCallback() {
-  should_save_config = true;
-  strcpy(thx_api_key, api_key_param->getValue());
-}
-#endif
-
 /*
  * Restores Device Info. Calles (private): initWithAPIKey; save_device_info()
  * Provides: alias, owner, update, udid, (apikey)
@@ -1251,11 +1254,20 @@ void THiNX::loop() {
     connected = true;
   } else {
     connected = false;
-    if (!wifi_connection_in_progress) {
+    Serial.println(F("*TH: wifi_connection_in_progress »"));
+    if (wifi_connection_in_progress != true) {
+      Serial.println(F("*TH: FALSE"));
+    } else {
+      Serial.println(F("*TH: TRUE"));
+    }
+    if (wifi_connection_in_progress != true) {
       Serial.println(F("*TH: CONNECTING »"));
       Serial.println(F("*TH: LOOP «÷»"));
       connect(); // blocking
+      Serial.println(F("*TH: Enabling connection state (1283)"));
+      wifi_connection_in_progress = true;
       Serial.println(F("*TH: LOOP «"));
+      wifi_connection_in_progress = true;
       return;
     } else {
       Serial.println(F("*TH: PROGRESS..."));

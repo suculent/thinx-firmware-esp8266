@@ -1,16 +1,19 @@
 #include <Arduino.h>
 
 #ifndef VERSION
-#define VERSION "2.0.92"
+#define VERSION "2.0.93"
 #endif
 
 #define __DEBUG__
 #define __DEBUG_JSON__
 
-//#define __USE_WIFI_MANAGER__
+#define __USE_WIFI_MANAGER__
+
 //#define __USE_SPIFFS__
 
 #ifdef __USE_WIFI_MANAGER__
+#include <DNSServer.h>
+#include <ESP8266WebServer.h>
 #include <WiFiManager.h>
 #endif
 
@@ -44,8 +47,15 @@ class THiNX {
 
   public:
 
+    #ifdef __USE_WIFI_MANAGER__
+        static WiFiManagerParameter *api_key_param;
+        static int should_save_config;                // after autoconnect, may provide new API Key
+        static void saveConfigCallback();
+    #endif
+
     THiNX();
-    THiNX(const char *);
+    THiNX(const char *, const char *); // (const char * __apikey, const char * __owner_id)
+    THiNX(const char *);  // (const char * __apikey)
 
     enum payload_type {
       Unknown = 0,
@@ -90,25 +100,18 @@ class THiNX {
     char* thinx_alias;
     char* thinx_owner;
     char* thinx_udid;
-    char* thinx_api_key;
+
+
 
     bool connected;                         // WiFi connected in station mode
 
     void setFinalizeCallback( void (*func)(void) );
 
-#ifdef __USE_WIFI_MANAGER__
-    WiFiManager *manager;
-    WiFiManagerParameter *api_key_param;
-
-    // when user sets new API Key in AP mode
-    inline void saveConfigCallback( void ) {
-      Serial.println("saveConfigCallback!!!");
-      should_save_config = true;
-      strcpy(thx_api_key, api_key_param->getValue());
-    }
-#endif
+    int wifi_connection_in_progress;
 
     private:
+
+      static char* thinx_api_key;
 
       //
       // Build-specific constants
@@ -144,7 +147,7 @@ class THiNX {
       bool once;                              // once token for initialization
 
       // THiNX API
-      char thx_api_key[65];
+      static char thx_api_key[65];
       char mac_string[17];
       const char * thinx_mac();
 
@@ -173,7 +176,6 @@ class THiNX {
       bool all_done;                              // finalize flag
 
       // Data Storage
-      bool should_save_config;                // after autoconnect, may provide new API Key
       void import_build_time_constants();     // sets variables from thinx.h file
       void save_device_info();                // saves variables to SPIFFS or EEPROM
       void restore_device_info();             // reads variables from SPIFFS or EEPROM
@@ -185,7 +187,6 @@ class THiNX {
       // Event Queue / States
       bool checked_in;
       bool mqtt_started;
-      bool wifi_connection_in_progress;
       bool complete;
       void evt_save_api_key();
 
