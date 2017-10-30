@@ -22,14 +22,18 @@ void printStackHeap(String tag) {
 
 #ifdef __USE_WIFI_MANAGER__
   char* THiNX::thinx_api_key;
+  char* THiNX::thinx_owner_key;
   char THiNX::thx_api_key[65] = {0};
+  char THiNX::thx_owner_key[65] = {0};
   int THiNX::should_save_config = 0;
   WiFiManagerParameter * THiNX::api_key_param;
+  WiFiManagerParameter * THiNX::owner_param;
 
   void THiNX::saveConfigCallback() {
     Serial.println("Should save config");
     should_save_config = true;
     strcpy(thx_api_key, api_key_param->getValue());
+    strcpy(thx_owner_key, owner_param->getValue());
   }
 #endif
 
@@ -48,6 +52,8 @@ THiNX::THiNX(const char * __apikey) {
     WiFiManager wifiManager;
     api_key_param = new WiFiManagerParameter("apikey", "API Key", thinx_api_key, 64);
     wifiManager.addParameter(api_key_param);
+    owner_param = new WiFiManagerParameter("owner", "Owner ID", thinx_owner_key, 64);
+    wifiManager.addParameter(owner_param);
     wifiManager.setTimeout(5000);
     wifiManager.setDebugOutput(true); // does some logging on mode set
     wifiManager.setSaveConfigCallback(saveConfigCallback);
@@ -1219,9 +1225,14 @@ void THiNX::evt_save_api_key() {
       thinx_api_key = thx_api_key;
       Serial.print(F("Saving thx_api_key from Captive Portal: "));
       Serial.println(thinx_api_key);
-      save_device_info();
-      should_save_config = false;
     }
+    if (strlen(thx_owner_key) > 4) {
+      thinx_owner_key = thx_owner_key;
+      Serial.print(F("Saving thx_owner_key from Captive Portal: "));
+      Serial.println(thinx_owner_key);
+    }
+    save_device_info();
+    should_save_config = false;
   }
 }
 

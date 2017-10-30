@@ -1,14 +1,13 @@
 #include <Arduino.h>
 
 #ifndef VERSION
-#define VERSION "2.0.93"
+#define VERSION "2.0.94"
 #endif
 
 #define __DEBUG__
 #define __DEBUG_JSON__
 
 #define __USE_WIFI_MANAGER__
-
 //#define __USE_SPIFFS__
 
 #ifdef __USE_WIFI_MANAGER__
@@ -49,6 +48,7 @@ class THiNX {
 
     #ifdef __USE_WIFI_MANAGER__
         static WiFiManagerParameter *api_key_param;
+        static WiFiManagerParameter *owner_param;
         static int should_save_config;                // after autoconnect, may provide new API Key
         static void saveConfigCallback();
     #endif
@@ -101,8 +101,6 @@ class THiNX {
     char* thinx_owner;
     char* thinx_udid;
 
-
-
     bool connected;                         // WiFi connected in station mode
 
     void setFinalizeCallback( void (*func)(void) );
@@ -112,6 +110,7 @@ class THiNX {
     private:
 
       static char* thinx_api_key;
+      static char* thinx_owner_key;
 
       //
       // Build-specific constants
@@ -147,7 +146,9 @@ class THiNX {
       bool once;                              // once token for initialization
 
       // THiNX API
-      static char thx_api_key[65];
+      static char thx_api_key[65];            // static due to accesibility to WiFiManager
+      static char thx_owner_key[65];          // static due to accesibility to WiFiManager
+
       char mac_string[17];
       const char * thinx_mac();
 
