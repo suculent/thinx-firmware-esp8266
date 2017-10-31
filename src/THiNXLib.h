@@ -9,7 +9,7 @@
 #ifdef __USE_WIFI_MANAGER__
 #include <DNSServer.h>
 #include <ESP8266WebServer.h>
-#include "WiFiManager/WiFiManager.h"
+#include <WiFiManager.h>
 #endif
 
 #include <stdio.h>
