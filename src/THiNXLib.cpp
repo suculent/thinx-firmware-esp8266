@@ -1193,7 +1193,7 @@ void THiNX::loop() {
   }
 
   if (thinx_phase < COMPLETED) {
-    Serial.print("Phase: "); Serial.println(thinx_phase);
+    // Serial.print("Phase: "); Serial.println(thinx_phase);
   }
 
   // CASE thinx_phase == CONNECT_WIFI
@@ -1202,12 +1202,6 @@ void THiNX::loop() {
     // If not connected manually or using WiFiManager, start connection in progress...
     if (WiFi.status() != WL_CONNECTED) {
       connected = false;
-      Serial.println(F("*TH: wifi_connection_in_progress »"));
-      if (wifi_connection_in_progress != true) {
-        Serial.println(F("*TH: FALSE"));
-      } else {
-        Serial.println(F("*TH: TRUE"));
-      }
       if (wifi_connection_in_progress != true) {
         Serial.println(F("*TH: CONNECTING »"));
         Serial.println(F("*TH: LOOP «÷»")); Serial.flush();
@@ -1218,8 +1212,6 @@ void THiNX::loop() {
         wifi_connection_in_progress = true;
         return;
       } else {
-        Serial.println(F("*TH: PROGRESS..."));
-        delay(1000); // wait for WiFi connection
         return;
       }
     } else {
