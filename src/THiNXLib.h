@@ -101,6 +101,9 @@ class THiNX {
     char* thinx_owner;
     char* thinx_udid;
 
+    double latitude;
+    double longitude;    
+
     void setFinalizeCallback( void (*func)(void) );
 
     int wifi_connection_in_progress;
@@ -131,7 +134,12 @@ class THiNX {
       #ifdef THINX_FIRMWARE_VERSION_SHORT
         const char* firmware_version_short = THINX_FIRMWARE_VERSION_SHORT;
       #else
-        const char* firmware_version_short = "firmware-version-short";
+      #ifdef THX_REVISION
+        const char* firmware_version_short = "86"; // TEST FOR ALWAYS UPDATE strdup(String(THX_REVISION).c_str());
+      #else
+        const char* firmware_version_short = "1";
+      #endif
+
       #endif
 
       //
@@ -200,4 +208,7 @@ class THiNX {
       unsigned long wifi_wait_timeout;
       int wifi_retry;
       uint8_t wifi_status;
+
+      // Location Support
+      void setLocation(double,double);
 };

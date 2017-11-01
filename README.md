@@ -1,5 +1,7 @@
 # THiNX Lib (ESP)
 
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/8dded023f3d14a69b3c38c9f5fd66a40)](https://www.codacy.com/app/suculent/thinx-lib-esp8266-arduinoc?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=suculent/thinx-lib-esp8266-arduinoc&amp;utm_campaign=Badge_Grade)
+
 An Arduino/ESP8266 library to wrap client for OTA updates and RTM (Remote Things Management) based on THiNX platform.
 
 # Usage
@@ -34,8 +36,6 @@ void setup() {
   while (!Serial);
   Serial.setDebugOutput(true);
 
-  wdt_disable(); // causes wdt reset after 8 seconds!
-  wdt_enable(65535); // must be called from wdt_disable() state!
   delay(3000);
   Serial.print("THiNXLib v");
   Serial.println(VERSION);
@@ -65,3 +65,8 @@ void loop()
     delay(100);
 }
 ```
+
+### Location Support
+
+You can update your device's location aquired by WiFi library or GPS module using `thx.setLocation(double lat, double lon`) from version 2.0.103 (rev88).
+Device will be forced to checked in when you change those values.
