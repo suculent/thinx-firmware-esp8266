@@ -1267,12 +1267,12 @@ void THiNX::loop() {
   }
 
   if ( thinx_phase == CONNECT_MQTT ) {
-    if (strlen(thinx_udid) < 4) {
+    if (strlen(thinx_udid) > 4) {
       Serial.println(F("*TH: WiFi connected, starting MQTT..."));
       mqtt_result = start_mqtt(); // connect only, do not checkin (subscribe) yet...
+      mqtt_client->loop();
       if (mqtt_result == true) {
         thinx_phase = CHECKIN_MQTT;
-        mqtt_client->loop();
       }
     } else {
       thinx_phase = FINALIZE;
@@ -1306,7 +1306,7 @@ void THiNX::loop() {
   }
 }
 
-void setLocation(double lat, double lon) {
+void THiNX::setLocation(double lat, double lon) {
   latitude = lat;
   longitude = lon;
   if (connected) {
