@@ -502,7 +502,7 @@ void THiNX::senddata(String body) {
 
       } else {
 
-        Serial.println("Starting update...");
+        Serial.println(F("Starting update..."));
 
         // FROM LUA: update variants
         // local files = payload['files']
@@ -624,12 +624,21 @@ void THiNX::senddata(String body) {
         Serial.println(F("Starting update..."));
 
         String url = registration["url"];
-        if (url) {
+        if (url.length() > 2) {
           Serial.print(F("*TH: Running update with URL that should not contain http! :"));
           Serial.println(url);
           url.replace("http://", "");
           update_and_reboot(url);
         }
+
+        String ott = registration["ott"];
+        if (ott.length() > 2) {
+          String ott_url = "http://thinx.cloud:7442/device/firmware?ott="+ott;
+          Serial.println(ott_url);
+          url.replace("http://", "");
+          update_and_reboot(url);
+        }
+
       }
 
       } break;
