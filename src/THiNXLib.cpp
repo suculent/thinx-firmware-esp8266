@@ -517,7 +517,7 @@ void THiNX::senddata(String body) {
 
       } else {
 
-        Serial.println(F("Starting update..."));
+        Serial.println(F("*TH: Starting update A..."));
 
         // FROM LUA: update variants
         // local files = payload['files']
@@ -526,7 +526,7 @@ void THiNX::senddata(String body) {
         // local type  = payload['type']
 
         String type = update["type"];
-        Serial.print(F("Payload type: ")); Serial.println(type);
+        Serial.print(F("*TH: Payload type: ")); Serial.println(type);
 
         String files = update["files"];
 
@@ -557,7 +557,7 @@ void THiNX::senddata(String body) {
       JsonObject& notification = root["notification"];
 
       if ( !notification.success() ) {
-        Serial.println(F("Failed parsing notification node."));
+        Serial.println(F("*TH: Failed parsing notification node."));
         return;
       }
 
@@ -565,24 +565,24 @@ void THiNX::senddata(String body) {
       if ((type == "bool") || (type == "boolean")) {
         bool response = notification["response"];
         if (response == true) {
-          Serial.println(F("User allowed update using boolean."));
+          Serial.println(F("*TH: User allowed update using boolean."));
           if (strlen(available_update_url) > 4) {
             update_and_reboot(available_update_url);
           }
         } else {
-          Serial.println(F("User denied update using boolean."));
+          Serial.println(F("*TH: User denied update using boolean."));
         }
       }
 
       if ((type == "string") || (type == "String")) {
         String response = notification["response"];
         if (response == "yes") {
-          Serial.println(F("User allowed update using string."));
+          Serial.println(F("*TH: User allowed update using string."));
           if (strlen(available_update_url) > 4) {
             update_and_reboot(available_update_url);
           }
         } else if (response == "no") {
-          Serial.println(F("User denied update using string."));
+          Serial.println(F("*TH: User denied update using string."));
         }
       }
 
@@ -593,7 +593,7 @@ void THiNX::senddata(String body) {
       JsonObject& registration = root["registration"];
 
       if ( !registration.success() ) {
-        Serial.println(F("Failed parsing registration node."));
+        Serial.println(F("*TH: Failed parsing registration node."));
         return;
       }
 
@@ -622,11 +622,11 @@ void THiNX::senddata(String body) {
       } else if (status == "FIRMWARE_UPDATE") {
 
         String mac = registration["mac"];
-        Serial.println(String("mac: ") + mac);
+        Serial.println(String("*TH: Update for MAC: ") + mac);
         // TODO: must be current or 'ANY'
 
         String commit = registration["commit"];
-        Serial.println(String("commit: ") + commit);
+        // Serial.println(String("commit: ") + commit);
 
         // should not be same except for forced update
         if (commit == thinx_commit_id) {
@@ -634,9 +634,9 @@ void THiNX::senddata(String body) {
         }
 
         String version = registration["version"];
-        Serial.println(String("version: ") + version);
+        Serial.println(String("*TH: version: ") + version);
 
-        Serial.println(F("Starting update..."));
+        Serial.println(F("*TH: Starting update B..."));
 
         String url = registration["url"];
         if (url.length() > 2) {
@@ -649,9 +649,10 @@ void THiNX::senddata(String body) {
         String ott = registration["ott"];
         if (ott.length() > 2) {
           String ott_url = "http://thinx.cloud:7442/device/firmware?ott="+ott;
+          Serial.print("Update with One-Time-Token: ");
           Serial.println(ott_url);
-          url.replace("http://", "");
-          update_and_reboot(url);
+          ott_url.replace("http://", "");
+          update_and_reboot(ott_url);
         }
 
       }
@@ -1044,7 +1045,7 @@ void THiNX::deviceInfo() {
 void THiNX::update_and_reboot(String url) {
 
 #ifdef __DEBUG__
-  Serial.println(F("[update] Starting update & reboot..."));
+  Serial.println(F("*TH: Starting update & reboot..."));
 #endif
 
 // #define __USE_ESP_UPDATER__ ; // Warning, this is MQTT-based streamed update!
@@ -1074,29 +1075,29 @@ void THiNX::update_and_reboot(String url) {
 
   switch(ret) {
     case HTTP_UPDATE_FAILED:
-    Serial.println(F("[update] Update failed."));
+    Serial.println(F("*TH: Update failed."));
     break;
     case HTTP_UPDATE_NO_UPDATES:
-    Serial.println(F("[update] Update no Update."));
+    Serial.println(F("*TH: Update no Update."));
     break;
     case HTTP_UPDATE_OK:
-    Serial.println(F("[update] Update ok.")); // may not called we reboot the ESP
+    Serial.println(F("*TH: Update ok.")); // may not called we reboot the ESP
     break;
   }
 
   if (ret != HTTP_UPDATE_OK) {
-    Serial.println(F("[update] WiFi connected, trying advanced update..."));
-    Serial.println(F("[update] TODO: Rewrite to secure binary provider on the API side!"));
+    Serial.println(F("*TH: WiFi connected, trying advanced update..."));
+    Serial.println(F("*TH: TODO: Rewrite to secure binary provider on the API side!"));
     ret = ESPhttpUpdate.update("images.thinx.cloud", 80, "ota.php", "5ccf7fee90e0");
     switch(ret) {
       case HTTP_UPDATE_FAILED:
-      Serial.println(F("[update] Update failed."));
+      Serial.println(F("*TH: Update failed."));
       break;
       case HTTP_UPDATE_NO_UPDATES:
-      Serial.println(F("[update] Update no Update."));
+      Serial.println(F("*TH: Update no Update."));
       break;
       case HTTP_UPDATE_OK:
-      Serial.println(F("[update] Update ok.")); // may not called we reboot the ESP
+      Serial.println(F("*TH: Update ok.")); // may not called we reboot the ESP
       break;
     }
   }
