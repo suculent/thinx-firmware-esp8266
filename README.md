@@ -5,6 +5,9 @@
 An Arduino/ESP8266 library to wrap client for OTA updates and RTM (Remote Things Management) based on THiNX platform.
 
 # Usage
+
+Warning, contains embedded WiFiManager. If you have one in Arduino libraries, delete WiFiManager folder in this repository and change "" to <> around WiFiManager in #include inside THiNXLib.h.
+
 ## Include
 
 ```c
