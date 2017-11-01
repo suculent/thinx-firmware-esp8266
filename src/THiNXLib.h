@@ -101,6 +101,9 @@ class THiNX {
     char* thinx_owner;
     char* thinx_udid;
 
+    double latitude;
+    double longitude;
+
     void setFinalizeCallback( void (*func)(void) );
 
     int wifi_connection_in_progress;
@@ -205,4 +208,7 @@ class THiNX {
       unsigned long wifi_wait_timeout;
       int wifi_retry;
       uint8_t wifi_status;
+
+      // Location Support
+      void setLocation(double,double);
 };

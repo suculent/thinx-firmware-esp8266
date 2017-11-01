@@ -80,6 +80,11 @@ THiNX::THiNX(const char * __apikey) {
 
 THiNX::THiNX(const char * __apikey, const char * __owner_id) {
 
+  thinx_phase = INIT;
+
+  latitude = 0.0;
+  longitude = 0.0;
+
   Serial.print(F("\nTHiNXLib rev. "));
   Serial.print(thx_revision);
   Serial.print(" (");
@@ -325,6 +330,10 @@ void THiNX::connect_wifi() {
      root["udid"] = thinx_udid;
    }
 
+   // Optional location data
+   root["lat"] = latitude;
+   root["lon"] = longitude;
+
    root["platform"] = strdup(THINX_PLATFORM);
 
    DynamicJsonBuffer wrapperBuffer(768);
@@ -411,7 +420,7 @@ void THiNX::senddata(String body) {
   int endIndex = payload.length();
 
   int reg_index = payload.indexOf("{\"registration\"");
-  int upd_index = payload.indexOf("{\"update\"");
+  int upd_index = payload.indexOf("{\"FIRMWARE_UPDATE\"");
   int not_index = payload.indexOf("{\"notification\"");
   int undefined_owner = payload.indexOf("old_protocol_owner:-undefined-");
 
@@ -457,7 +466,7 @@ void THiNX::senddata(String body) {
 
     case UPDATE: {
 
-      JsonObject& update = root["update"];
+      JsonObject& update = root["registration"];
       Serial.println(F("TODO: Parse update payload..."));
 
       String mac = update["mac"];
@@ -468,6 +477,11 @@ void THiNX::senddata(String body) {
         Serial.println(F("*TH: Warning: firmware is dedicated to device with different MAC."));
       }
 
+      String udid = root["udid"];
+      if ( udid.length() > 4 ) {
+        thinx_udid = strdup(udid.c_str());
+      }
+
       // Check current firmware based on commit id and store Updated state...
       String commit = update["commit"];
       Serial.println(String("commit: ") + commit);
@@ -476,17 +490,18 @@ void THiNX::senddata(String body) {
       String version = update["version"];
       Serial.println(String("version: ") + version);
 
-      if ((commit == thinx_commit_id) && (version == thinx_version_id)) {
+      //if ((commit == thinx_commit_id) && (version == thinx_version_id)) { WHY?
         if (strlen(available_update_url) > 5) {
           Serial.println(F("*TH: firmware has same commit_id as current and update availability is stored. Firmware has been installed."));
           available_update_url = strdup("");
-          save_device_info();
           notify_on_successful_update();
           return;
         } else {
           Serial.println(F("*TH: Info: firmware has same commit_id as current and no update is available."));
         }
-      }
+      //}
+
+      save_device_info();
 
       // In case automatic updates are disabled,
       // we must ask user to commence firmware update.
@@ -711,7 +726,7 @@ void THiNX::notify_on_successful_update() {
 
 bool THiNX::start_mqtt() {
 
-  Serial.println(F("*TH: start_mqtt()")); Serial.flush();
+  //
 
   if (mqtt_client != NULL) {
     if (mqtt_client->connected()) {
@@ -722,7 +737,7 @@ bool THiNX::start_mqtt() {
   }
 
   if (strlen(thinx_udid) < 4) {
-    Serial.println(F("*TH: MQTT NO-UDID!")); Serial.flush();
+    //Serial.println(F("*TH: MQTT NO-UDID!")); Serial.flush();
     return false;
   }
 
@@ -891,12 +906,11 @@ void THiNX::restore_device_info() {
 
    DynamicJsonBuffer jsonBuffer(512);
    JsonObject& config = jsonBuffer.parseObject(json_output.c_str()); // must not be String!
+
    if (!config.success()) {
-     Serial.println(F("*TH: Parsing JSON data failed..."));
-     //save_device_info(); // Only sometimes causes crash,
-     //Serial.println("*TH: Fixed data storage, re-reading...");
-     //restore_device_info();
+     // Serial.println(F("*TH: No JSON data to be parsed..."));
      return;
+
    } else {
 
      Serial.println(F("*TH: Reading JSON..."));
@@ -907,15 +921,19 @@ void THiNX::restore_device_info() {
        Serial.println(thinx_alias);
      }
 
-     /*
      if (config["udid"]) {
-       thinx_udid = strdup(config["udid"]);
+       const char *udid = config["udid"];
+       if ( strlen(udid) > 2 ) {
+         thinx_udid = strdup(udid);
+       } else {
+         thinx_udid = strdup(THINX_UDID);
+       }
      } else {
        thinx_udid = strdup(THINX_UDID);
      }
+
      Serial.print("thinx_udid: ");
      Serial.println(thinx_udid);
-     */
 
      if (config["apikey"]) {
       thinx_api_key = strdup(config["apikey"]);
@@ -929,13 +947,11 @@ void THiNX::restore_device_info() {
        Serial.println(thinx_owner);
      }
 
-     /*
-     if (config["update"]) {
-       available_update_url = strdup(config["update"]);
+     if (config["ott"]) {
+       available_update_url = strdup(config["ott"]);
        Serial.print("available_update_url: ");
        Serial.println(available_update_url);
      }
-     */
 
 #ifdef __USE_SPIFFS__
     Serial.print(F("*TH: Closing SPIFFS file."));
@@ -1251,11 +1267,16 @@ void THiNX::loop() {
   }
 
   if ( thinx_phase == CONNECT_MQTT ) {
-    Serial.println(F("*TH: WiFi connected, starting MQTT..."));
-    mqtt_result = start_mqtt(); // connect only, do not subscribe
-    if (mqtt_result == true) {
-      thinx_phase = CHECKIN_MQTT;
-      mqtt_client->loop();
+    if (strlen(thinx_udid) < 4) {
+      Serial.println(F("*TH: WiFi connected, starting MQTT..."));
+      mqtt_result = start_mqtt(); // connect only, do not checkin (subscribe) yet...
+      if (mqtt_result == true) {
+        thinx_phase = CHECKIN_MQTT;
+        mqtt_client->loop();
+      }
+    } else {
+      thinx_phase = FINALIZE;
+      // nothing to do, no dynamically assigned UDID from previously successful checkin connection...
     }
   }
 
@@ -1283,7 +1304,14 @@ void THiNX::loop() {
       mqtt_client->loop();
     }
   }
+}
 
+void setLocation(double lat, double lon) {
+  latitude = lat;
+  longitude = lon;
+  if (connected) {
+    checkin();
+  }
 }
 
 #endif // IMPORTANT LINE FOR UNIT-TESTING!
