@@ -651,7 +651,7 @@ void THiNX::senddata(String body) {
           String ott_url = "http://thinx.cloud:7442/device/firmware?ott="+ott;
           Serial.print("*TH: Update with One-Time-Token: ");
           Serial.println(ott_url);
-          ott_url.replace("http://", "");
+          //ott_url.replace("http://", "");
           update_and_reboot(ott_url);
         }
 
@@ -1044,12 +1044,12 @@ void THiNX::deviceInfo() {
 
 void THiNX::update_and_reboot(String url) {
 
-#ifdef __DEBUG__
-  Serial.println(F("*TH: Starting update & reboot..."));
-#endif
+  Serial.print("*TH: Update with URL: ");
+  Serial.println(url);
 
 // #define __USE_STREAM_UPDATER__ ; // Warning, this is MQTT-based streamed update!
 #ifdef __USE_STREAM_UPDATER__
+Serial.println(F("*TH: Starting MQTT & reboot..."));
   uint32_t size = pub.payload_len();
   if (ESP.updateSketch(*pub.payload_stream(), size, true, false)) {
     Serial.println(F("Clearing retained message."));
@@ -1071,7 +1071,11 @@ void THiNX::update_and_reboot(String url) {
   }
 #else
 
-  t_httpUpdate_return ret = ESPhttpUpdate.update(url.c_str());
+#ifdef __DEBUG__
+  Serial.println(F("*TH: Starting ESP8266 HTTP Update & reboot..."));
+#endif
+
+  t_httpUpdate_return ret = ESPhttpUpdate.update(url);
 
   switch(ret) {
     case HTTP_UPDATE_FAILED:
@@ -1083,7 +1087,7 @@ void THiNX::update_and_reboot(String url) {
     case HTTP_UPDATE_OK:
     Serial.println(F("*TH: Update ok.")); // may not called we reboot the ESP
     break;
-  }  
+  }
 #endif
 }
 
