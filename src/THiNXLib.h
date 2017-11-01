@@ -135,9 +135,9 @@ class THiNX {
         const char* firmware_version_short = THINX_FIRMWARE_VERSION_SHORT;
       #else
       #ifdef THX_REVISION
-        const char* firmware_version_short = strdup(String(THX_REVISION).c_str());
+        const char* firmware_version_short = strdup(String(THX_REVISION).c_str()); // "90"; // 
       #else
-        const char* firmware_version_short = "1";
+        const char* firmware_version_short = "90";
       #endif
 
       #endif

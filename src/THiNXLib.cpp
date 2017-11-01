@@ -634,24 +634,19 @@ void THiNX::senddata(String body) {
         }
 
         String version = registration["version"];
-        Serial.println(String("*TH: version: ") + version);
+        Serial.println(String(F("*TH: version: ")) + version);
 
         Serial.println(F("*TH: Starting direct update..."));
 
         String url = registration["url"];
         if (url.length() > 2) {
-          Serial.print(F("*TH: Running update with URL that should not contain http! :"));
           Serial.println(url);
-          url.replace("http://", "");
           update_and_reboot(url);
         }
 
         String ott = registration["ott"];
         if (ott.length() > 2) {
           String ott_url = "http://thinx.cloud:7442/device/firmware?ott="+ott;
-          Serial.print("*TH: Update with One-Time-Token: ");
-          Serial.println(ott_url);
-          //ott_url.replace("http://", "");
           update_and_reboot(ott_url);
         }
 
@@ -1075,19 +1070,21 @@ Serial.println(F("*TH: Starting MQTT & reboot..."));
   Serial.println(F("*TH: Starting ESP8266 HTTP Update & reboot..."));
 #endif
 
-  t_httpUpdate_return ret = ESPhttpUpdate.update(url);
+  t_httpUpdate_return ret = ESPhttpUpdate.update(url.c_str());
 
   switch(ret) {
-    case HTTP_UPDATE_FAILED:
-    Serial.println(F("*TH: Update failed."));
-    break;
-    case HTTP_UPDATE_NO_UPDATES:
-    Serial.println(F("*TH: Update no Update."));
-    break;
-    case HTTP_UPDATE_OK:
-    Serial.println(F("*TH: Update ok.")); // may not called we reboot the ESP
-    break;
-  }
+            case HTTP_UPDATE_FAILED:
+                Serial.printf("HTTP_UPDATE_FAILD Error (%d): %s", ESPhttpUpdate.getLastError(), ESPhttpUpdate.getLastErrorString().c_str());
+                break;
+
+            case HTTP_UPDATE_NO_UPDATES:
+                Serial.println("HTTP_UPDATE_NO_UPDATES");
+                break;
+
+            case HTTP_UPDATE_OK:
+                Serial.println("HTTP_UPDATE_OK");
+                break;
+        }
 #endif
 }
 
