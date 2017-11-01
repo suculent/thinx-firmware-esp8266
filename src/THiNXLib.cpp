@@ -49,6 +49,9 @@ void printStackHeap(String tag) {
   }
 #endif
 
+double THiNX::latitude = 0.0;
+double THiNX::longitude = 0.0;
+
 /* Constructor */
 
 THiNX::THiNX() {
@@ -81,9 +84,6 @@ THiNX::THiNX(const char * __apikey) {
 THiNX::THiNX(const char * __apikey, const char * __owner_id) {
 
   thinx_phase = INIT;
-
-  latitude = 0.0;
-  longitude = 0.0;
 
   Serial.print(F("\nTHiNXLib rev. "));
   Serial.print(thx_revision);
