@@ -35,7 +35,7 @@ void setup() {
   Serial.begin(115200);
   while (!Serial);
   Serial.setDebugOutput(true);
-  
+
   delay(3000);
   Serial.print("THiNXLib v");
   Serial.println(VERSION);
@@ -65,3 +65,8 @@ void loop()
     delay(100);
 }
 ```
+
+### Location Support
+
+You can update your device's location aquired by WiFi library or GPS module using `thx.setLocation(double lat, double lon`) from version 2.0.103 (rev88).
+Device will be forced to checked in when you change those values.

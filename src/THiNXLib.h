@@ -102,7 +102,7 @@ class THiNX {
     char* thinx_udid;
 
     double latitude;
-    double longitude;
+    double longitude;    
 
     void setFinalizeCallback( void (*func)(void) );
 
@@ -135,7 +135,7 @@ class THiNX {
         const char* firmware_version_short = THINX_FIRMWARE_VERSION_SHORT;
       #else
       #ifdef THX_REVISION
-        const char* firmware_version_short = strdup(String(THX_REVISION).c_str());
+        const char* firmware_version_short = "86"; // TEST FOR ALWAYS UPDATE strdup(String(THX_REVISION).c_str());
       #else
         const char* firmware_version_short = "1";
       #endif

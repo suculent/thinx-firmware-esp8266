@@ -636,7 +636,7 @@ void THiNX::senddata(String body) {
         String version = registration["version"];
         Serial.println(String("*TH: version: ") + version);
 
-        Serial.println(F("*TH: Starting update B..."));
+        Serial.println(F("*TH: Starting direct update..."));
 
         String url = registration["url"];
         if (url.length() > 2) {
@@ -649,7 +649,7 @@ void THiNX::senddata(String body) {
         String ott = registration["ott"];
         if (ott.length() > 2) {
           String ott_url = "http://thinx.cloud:7442/device/firmware?ott="+ott;
-          Serial.print("Update with One-Time-Token: ");
+          Serial.print("*TH: Update with One-Time-Token: ");
           Serial.println(ott_url);
           ott_url.replace("http://", "");
           update_and_reboot(ott_url);
@@ -1048,8 +1048,8 @@ void THiNX::update_and_reboot(String url) {
   Serial.println(F("*TH: Starting update & reboot..."));
 #endif
 
-// #define __USE_ESP_UPDATER__ ; // Warning, this is MQTT-based streamed update!
-#ifdef __USE_ESP_UPDATER__
+// #define __USE_STREAM_UPDATER__ ; // Warning, this is MQTT-based streamed update!
+#ifdef __USE_STREAM_UPDATER__
   uint32_t size = pub.payload_len();
   if (ESP.updateSketch(*pub.payload_stream(), size, true, false)) {
     Serial.println(F("Clearing retained message."));
@@ -1071,7 +1071,7 @@ void THiNX::update_and_reboot(String url) {
   }
 #else
 
-  t_httpUpdate_return ret = ESPhttpUpdate.update(thinx_cloud_url, 80, url.c_str());
+  t_httpUpdate_return ret = ESPhttpUpdate.update(url.c_str());
 
   switch(ret) {
     case HTTP_UPDATE_FAILED:
@@ -1083,24 +1083,7 @@ void THiNX::update_and_reboot(String url) {
     case HTTP_UPDATE_OK:
     Serial.println(F("*TH: Update ok.")); // may not called we reboot the ESP
     break;
-  }
-
-  if (ret != HTTP_UPDATE_OK) {
-    Serial.println(F("*TH: WiFi connected, trying advanced update..."));
-    Serial.println(F("*TH: TODO: Rewrite to secure binary provider on the API side!"));
-    ret = ESPhttpUpdate.update("images.thinx.cloud", 80, "ota.php", "5ccf7fee90e0");
-    switch(ret) {
-      case HTTP_UPDATE_FAILED:
-      Serial.println(F("*TH: Update failed."));
-      break;
-      case HTTP_UPDATE_NO_UPDATES:
-      Serial.println(F("*TH: Update no Update."));
-      break;
-      case HTTP_UPDATE_OK:
-      Serial.println(F("*TH: Update ok.")); // may not called we reboot the ESP
-      break;
-    }
-  }
+  }  
 #endif
 }
 
