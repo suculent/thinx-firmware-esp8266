@@ -19,10 +19,10 @@
 #include <ESP8266HTTPClient.h>
 #include <ESP8266httpUpdate.h>
 
-#include "ArduinoJson/ArduinoJson.h"
+#include <ArduinoJson.h>
 
 // Using better than Arduino-bundled version of MQTT https://github.com/Imroy/pubsubclient
-#include "PubSubClient/PubSubClient.h" // Local checkout
+#include <PubSubClient.h>
 
 #ifndef THX_REVISION
   #ifdef THINX_FIRMWARE_VERSION_SHORT
