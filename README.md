@@ -6,12 +6,16 @@ An Arduino/ESP8266 library to wrap client for OTA updates and RTM (Remote Things
 
 # Usage
 
-Warning, contains embedded WiFiManager. If you have one in Arduino libraries, delete WiFiManager folder in this repository and change "" to <> around WiFiManager in #include inside THiNXLib.h.
+> WARNING! Arduino Library Manager is supported through the thinx.yml file, however this library already contains all required dependencies, because your local Arduino Libraries are not located on the CI server. 
+
+> Copy dependencies from the `lib` folder to your Arduino libraries to compile locally.
+
+> Use the thinx.yml to add more dependencies for THiNX CI, but be aware that those will be merged with libraries from lib folder next to .ino file.
 
 ## Include
 
 ```c
-#include "THiNXLib.h"
+#include <THiNXLib.h>
 ```
 
 ## Definition
