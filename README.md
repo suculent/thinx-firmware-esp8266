@@ -6,7 +6,7 @@ An Arduino/ESP8266 library to wrap client for OTA updates and RTM (Remote Things
 
 # Usage
 
-> WARNING! Arduino Library Manager is supported through the thinx.yml file, however this library already contains all required dependencies, because your local Arduino Libraries are not located on the CI server. 
+> WARNING! Arduino Library Manager is supported through the thinx.yml file, however this library already contains all required dependencies, because your local Arduino Libraries are not located on the CI server.
 
 > Copy dependencies from the `lib` folder to your Arduino libraries to compile locally.
 
@@ -19,6 +19,7 @@ An Arduino/ESP8266 library to wrap client for OTA updates and RTM (Remote Things
 ```
 
 ## Definition
+
 ### THiNX Library
 
 The singleton class started by library should not require any additional parameters except for optional API Key.
@@ -30,50 +31,89 @@ and awaits optionally new API Key (security hole? FIXME: In case the API Key is 
 
 ```c
 #include "Arduino.h"
-#include "FS.h"
 #include <THiNXLib.h>
-#include "Settings.h" // ssid, pass and API Key
 
 THiNX thx;
 
-bool once = false;
-
 void setup() {
+
   Serial.begin(115200);
-  while (!Serial);
-  Serial.setDebugOutput(true);
 
-  delay(3000);
-  Serial.print("THiNXLib v");
-  Serial.println(VERSION);
+#ifdef __DEBUG__
+  while (!Serial); // wait for debug console connection
+  WiFi.begin("THiNX-IoT+", "<enter-your-ssid-password>");
+#endif
 
-  // Force override WiFi before attempting to connect
-  WiFi.mode(WIFI_STA);
-  WiFi.disconnect();
-  WiFi.begin();
+   // Enter API Key and Owner ID
+  thx = THiNX("71679ca646c63d234e957e37e4f4069bf4eed14afca4569a0c74abf503076732", "cedc16bb6bb06daaa3ff6d30666d91aacd6e3efbf9abbc151b4dcade59af7c12");
+  thx.setFinalizeCallback(finalizeCallback);
+  thx.setPushConfigCallback(pushConfigCallback);
+}
 
-  if (WiFi.status() != WL_CONNECTED) {
-    WiFi.begin(ssid, pass);
+/* Loop must call the thx.loop() in order to pickup MQTT messages and advance the state machine. */
+void loop()
+{
+  thx.loop();
+}
+```
+
+
+### Finalize callback
+
+When THiNX connects safely to network and connection is working, you'll get this callback.
+
+```
+/* Called after library gets connected and registered */
+void finalizeCallback () {
+  Serial.println("*INO: Finalize callback called.");
+  ESP.deepSleep(3e9);
+}
+```
+
+### Environment Variables
+
+/* Example of using Environment variables */
+void pushConfigCallback (String config) {
+
+  // Convert incoming JSON string to Object
+  DynamicJsonBuffer jsonBuffer(512);
+  JsonObject& root = jsonBuffer.parseObject(config.c_str());
+  JsonObject& configuration = root["configuration"];
+
+  if ( !configuration.success() ) {
+    Serial.println(F("Failed parsing configuration."));
+  } else {
+
+    // Parse and apply your Environment vars
+    const char *ssid = configuration["THINX_ENV_SSID"];
+    const char *pass = configuration["THINX_ENV_PASS"];
+
+    // password may be empty string
+    if ((strlen(ssid) > 2) && (strlen(pass) > 0)) {
+      WiFi.disconnect();
+      WiFi.begin(ssid, pass);
+      long timeout = millis() + 20000;
+      Serial.println("Attempting WiFi migration...");
+      while (WiFi.status() != WL_CONNECTED) {
+        yield();
+        if (millis() > timeout) break;
+      }
+      if (WiFi.status() != WL_CONNECTED) {
+        Serial.println("WiFi migration failed."); // TODO: Notify using publish() to device status channel
+      } else {
+        Serial.println("WiFi migration successful."); // TODO: Notify using publish() to device status channel
+      }
+    }
   }
 }
 
-void loop()
-{
-    if (once) {
-      thx.loop(); // calling the loop is important to let MQTT work in background
-    } else {
-      once = true;
-      thx = THiNX(apikey);
-      if (WiFi.status() == WL_CONNECTED) {
-        thx.connected = true; // force checkin
-      }
-    }
-    Serial.println(millis());
-    delay(100);
-}
-```
 
 ### Location Support
 
 You can update your device's location aquired by WiFi library or GPS module using `thx.setLocation(double lat, double lon`) from version 2.0.103 (rev88).
 Device will be forced to checked in when you change those values.
+
+
+# Changelog
+
+4/11/2017 - 2.0.123 - added pushConfigCallback, public MQTT methods publishStatus(message) and publish(message, topic, retain), WiFi migration example; added support for finding and using thinx-connect proxy using MDNS

@@ -422,6 +422,7 @@ void THiNX::senddata(String body) {
   int reg_index = payload.indexOf("{\"registration\"");
   int upd_index = payload.indexOf("{\"FIRMWARE_UPDATE\"");
   int not_index = payload.indexOf("{\"notification\"");
+  int cfg_index = payload.indexOf("{\"configuration\"");
   int undefined_owner = payload.indexOf("old_protocol_owner:-undefined-");
 
   if (upd_index > start_index) {
@@ -439,6 +440,12 @@ void THiNX::senddata(String body) {
     start_index = not_index;
     endIndex = payload.indexOf("}}") + 2; // is this still needed?
     ptype = NOTIFICATION;
+  }
+
+  if (cfg_index > start_index) {
+    start_index = cfg_index;
+    endIndex = payload.indexOf("}}") + 2; // is this still needed?
+    ptype = CONFIGURATION;
   }
 
   if (undefined_owner > start_index) {
@@ -654,6 +661,48 @@ void THiNX::senddata(String body) {
 
       } break;
 
+    case CONFIGURATION: {
+
+      JsonObject& configuration = root["configuration"];
+
+      if ( !configuration.success() ) {
+        Serial.println(F("*TH: Failed parsing configuration node."));
+        return;
+      }
+
+
+#ifdef __ENABLE_WIFI_MIGRATION__
+      //
+      // Built-in support for WiFi migration
+      //
+
+      const char *ssid = configuration["THINX_ENV_SSID"];
+      const char *pass = configuration["THINX_ENV_PASS"];
+
+      // password may be empty string
+      if ((strlen(ssid) > 2) && (strlen(pass) > 0)) {
+        WiFi.disconnect();
+        WiFi.begin(ssid, pass);
+        long timeout = millis() + 20000;
+        Serial.println("Attempting WiFi migration...");
+        while (WiFi.status() != WL_CONNECTED) {
+          yield();
+          if (millis() > timeout) break;
+        }
+        if (WiFi.status() != WL_CONNECTED) {
+          Serial.println("WiFi migration failed."); // TODO: Notify using publish() to device status channel
+        } else {
+          Serial.println("WiFi migration successful."); // TODO: Notify using publish() to device status channel
+        }
+      }
+#endif
+      // Forward update body to the library user
+      if (_config_callback != NULL) {
+        _config_callback(body);
+      }
+
+      } break;
+
     default:
       Serial.println(F("Nothing to do..."));
       break;
@@ -713,6 +762,43 @@ void THiNX::notify_on_successful_update() {
     mqtt_client->loop();
   } else {
     Serial.println(F("Device updated but MQTT not active to notify. TODO: Store."));
+  }
+}
+
+/*
+ * Sends a MQTT message to Device's Status channel (/owner/udid/status)
+ */
+
+void THiNX::publishStatus(String message) {
+  if (mqtt_client != NULL) {
+    mqtt_client->publish(
+      MQTT::Publish(mqtt_device_status_channel, message.c_str()).set_retain()
+    );
+    mqtt_client->loop();
+  } else {
+    Serial.println(F("MQTT not active."));
+  }
+}
+
+/*
+ * Sends a MQTT message to the Device Channel (/owner/udid)
+ */
+
+void THiNX::publish(String message, String topic, bool retain)  {
+  if (mqtt_client != NULL) {
+
+    if (retain == true) {
+      mqtt_client->publish(
+        MQTT::Publish(mqtt_device_channel, message.c_str()).set_retain()
+      );
+    } else {
+      mqtt_client->publish(
+        mqtt_device_channel, message.c_str()
+      );
+    }
+    mqtt_client->loop();
+  } else {
+    Serial.println(F("MQTT not active."));
   }
 }
 
@@ -1175,6 +1261,10 @@ void THiNX::evt_save_api_key() {
  * Final callback setter
  */
 
+ void THiNX::setPushConfigCallback( void (*func)(String) ) {
+   _config_callback = func;
+ }
+
 void THiNX::setFinalizeCallback( void (*func)(void) ) {
   _finalize_callback = func;
 }
@@ -1226,6 +1316,28 @@ void THiNX::loop() {
       }
     } else {
       connected = true;
+
+      // Start MDNS broadcast      
+      if (!MDNS.begin(thinx_alias)) {
+        Serial.println(F("*TH: Error setting up mDNS"));
+      } else {
+        // Query MDNS proxy
+        Serial.println(F("*TH: Querying for thinx-connect proxy"));
+        int n = MDNS.queryService("thinx", "tcp"); // TODO: WARNING! may be _tcp!
+        if (n == 0) {
+          Serial.println("*TH: No proxy found");
+        }
+        else {
+          Serial.println("*TH: proxy found, using:");
+          Serial.println("Host: " + String(MDNS.hostname(0)));
+          Serial.print("IP  : " );
+          Serial.println(MDNS.IP(0));
+          Serial.println("Port: " + String(MDNS.port(0)));
+          thinx_cloud_url = strdup(String(MDNS.hostname(0)).c_str());
+          thinx_mqtt_url = strdup(String(MDNS.hostname(0)).c_str());
+        }
+      }
+
       thinx_phase = CONNECT_API;
     }
   }

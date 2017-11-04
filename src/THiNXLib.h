@@ -3,6 +3,7 @@
 #define __DEBUG__
 #define __DEBUG_JSON__
 
+#define __ENABLE_WIFI_MIGRATION__ // enable automatic WiFi disconnect/reconnect on Configuration Push (THINX_ENV_SSID and THINX_ENV_PASS)
 #define __USE_WIFI_MANAGER__
 //#define __USE_SPIFFS__
 
@@ -16,6 +17,7 @@
 #include <FS.h>
 #include <EEPROM.h>
 #include <ESP8266WiFi.h>
+#include <ESP8266mDNS.h>
 #include <ESP8266HTTPClient.h>
 #include <ESP8266httpUpdate.h>
 
@@ -50,6 +52,7 @@ class THiNX {
       UPDATE = 1,		                         // Firmware Update Response Payload
       REGISTRATION = 2,		                   // Registration Response Payload
       NOTIFICATION = 3,                      // Notification/Interaction Response Payload
+      CONFIGURATION = 4,                     // Environment variables update
       Reserved = 255,		                     // Reserved
     };
 
@@ -103,12 +106,17 @@ class THiNX {
     static double latitude;
     static double longitude;
 
+    void setPushConfigCallback( void (*func)(String) );
     void setFinalizeCallback( void (*func)(void) );
 
     int wifi_connection_in_progress;
 
     // Location Support
     void setLocation(double,double);
+
+    // MQTT Support
+    void publishStatus(String);               // send String to status channel
+    void publish(String, String, bool);       // send String to any channel, optinally with retain
 
     private:
 
@@ -118,7 +126,7 @@ class THiNX {
       static char* thinx_owner_key;
 
       //
-      // Build-specific constants
+      // Build-specific constants (override for Arduino IDE which does not set any Environments like PlatformIO)
       //
 
       #ifdef THX_REVISION
@@ -128,7 +136,7 @@ class THiNX {
       #endif
 
       #ifdef THINX_COMMIT_ID
-        const char* commit_id = THINX_COMMIT_ID;
+        const char* commit_id = strdup(THINX_COMMIT_ID);
       #else
         const char* commit_id = "commit-id";
       #endif
@@ -136,12 +144,11 @@ class THiNX {
       #ifdef THINX_FIRMWARE_VERSION_SHORT
         const char* firmware_version_short = THINX_FIRMWARE_VERSION_SHORT;
       #else
-      #ifdef THX_REVISION
-        const char* firmware_version_short = strdup(String(THX_REVISION).c_str());
-      #else
-        const char* firmware_version_short = "90";
-      #endif
-
+        #ifdef THX_REVISION
+          const char* firmware_version_short = strdup(String(THX_REVISION).c_str());
+        #else
+          const char* firmware_version_short = "123";
+        #endif
       #endif
 
       //
@@ -185,6 +192,8 @@ class THiNX {
       int last_mqtt_reconnect;                // interval
       int performed_mqtt_checkin;              // one-time flag
       int all_done;                              // finalize flag
+
+      void (*_config_callback)(String) = NULL;  // Called when server pushes new environment vars using MQTT
 
       // Data Storage
       void import_build_time_constants();     // sets variables from thinx.h file
