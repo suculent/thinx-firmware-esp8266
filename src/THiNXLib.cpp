@@ -62,6 +62,11 @@ THiNX::THiNX() {
 
 THiNX::THiNX(const char * __apikey) {
 
+  THiNX(__apikey, "");
+}
+
+THiNX::THiNX(const char * __apikey, const char * __owner_id) {
+
   thinx_phase = INIT;
 
   #ifdef __USE_WIFI_MANAGER__
@@ -76,14 +81,6 @@ THiNX::THiNX(const char * __apikey) {
     wifiManager.setSaveConfigCallback(saveConfigCallback);
     wifiManager.autoConnect("THiNX-AP");
   #endif
-
-  Serial.println("THiNX::THiNX(const char * __apikey)");
-  THiNX(__apikey, "");
-}
-
-THiNX::THiNX(const char * __apikey, const char * __owner_id) {
-
-  thinx_phase = INIT;
 
   Serial.print(F("\nTHiNXLib rev. "));
   Serial.print(thx_revision);
@@ -242,7 +239,7 @@ void THiNX::connect_wifi() {
   if (wifi_connection_in_progress) {
     if (wifi_retry > 1000) {
       if (WiFi.getMode() == WIFI_STA) {
-        Serial.println(F("*TH: Starting THiNX-AP with PASSWORD..."));
+        Serial.println(F("*TH: Starting THiNX-AP without PASSWORD..."));
         WiFi.mode(WIFI_AP);
         WiFi.softAP("THiNX-AP", "PASSWORD"); // setup the AP on channel 1, not hidden, and allow 8 clients
         wifi_retry = 0;
@@ -1317,7 +1314,7 @@ void THiNX::loop() {
     } else {
       connected = true;
 
-      // Start MDNS broadcast      
+      // Start MDNS broadcast
       if (!MDNS.begin(thinx_alias)) {
         Serial.println(F("*TH: Error setting up mDNS"));
       } else {
