@@ -107,6 +107,9 @@ class THiNX {
 
     int wifi_connection_in_progress;
 
+    // Location Support
+    void setLocation(double,double);
+
     private:
 
       bool connected;                         // WiFi connected in station mode
@@ -134,7 +137,7 @@ class THiNX {
         const char* firmware_version_short = THINX_FIRMWARE_VERSION_SHORT;
       #else
       #ifdef THX_REVISION
-        const char* firmware_version_short = strdup(String(THX_REVISION).c_str()); 
+        const char* firmware_version_short = strdup(String(THX_REVISION).c_str());
       #else
         const char* firmware_version_short = "90";
       #endif
@@ -207,7 +210,4 @@ class THiNX {
       unsigned long wifi_wait_timeout;
       int wifi_retry;
       uint8_t wifi_status;
-
-      // Location Support
-      void setLocation(double,double);
 };
