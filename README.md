@@ -72,6 +72,7 @@ void finalizeCallback () {
 
 ### Environment Variables
 
+```
 /* Example of using Environment variables */
 void pushConfigCallback (String config) {
 
@@ -106,7 +107,7 @@ void pushConfigCallback (String config) {
     }
   }
 }
-
+```
 
 ### Location Support
 
