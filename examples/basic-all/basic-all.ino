@@ -1,3 +1,12 @@
+/*
+ * THiNX Basic Example with all features
+ * 
+ * - Set your own WiFi credentials for development purposes.
+ * - When THiNX finalizes checkin, set your custom status
+ * - Use the `Push Configuration` function in website's action menu to trigger pushConfigCallback() [limit 512 bytes so far]
+ * - TODO: Run Transformers (JavaScript functions to transform status bytes to human readable form) to the backend
+ */
+
 #include <Arduino.h>
 
 #define ARDUINO_IDE
@@ -25,6 +34,7 @@ THiNX thx;
 /* Called after library gets connected and registered */
 void finalizeCallback () {
   Serial.println("*INO: Finalize callback called.");
+  thx.setStatus("Hello IoT!");
   //ESP.deepSleep(3e9);
 }
 
