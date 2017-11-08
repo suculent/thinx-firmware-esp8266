@@ -335,8 +335,14 @@ String THiNX::checkin_body() {
     // Optional location data
     root["lat"] = String(latitude);
     root["lon"] = String(longitude);
-
+    
+    // Flag for THiNX CI
+#ifndef PLATFORMIO_IDE
+    // THINX_PLATFORM is not overwritten by builder in Arduino IDE
+    root["platform"] = "arduino";
+#else
     root["platform"] = strdup(THINX_PLATFORM);
+#endif
 
     DynamicJsonBuffer wrapperBuffer(1024);
     JsonObject& wrapper = wrapperBuffer.createObject();
@@ -350,6 +356,7 @@ String THiNX::checkin_body() {
     wrapper.printTo(json_output);
     return json_output;
 }
+
 
 /*
  * Registration - HTTPS POST
