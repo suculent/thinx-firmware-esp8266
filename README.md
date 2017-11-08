@@ -4,6 +4,13 @@
 
 An Arduino/ESP8266 library to wrap client for OTA updates and RTM (Remote Things Management) based on THiNX platform.
 
+# What's New
+
+* Added example that combines THiNX with any other UART device (SigFox) for outage reporting with battery backup
+* Added possibility to set own status string on check-in
+
+See changelog at the end for rest.
+
 # Usage
 
 > WARNING! Arduino Library Manager is supported through the thinx.yml file, however this library already contains all required dependencies, because your local Arduino Libraries are not located on the CI server.
@@ -113,7 +120,6 @@ void pushConfigCallback (String config) {
 
 You can update your device's location aquired by WiFi library or GPS module using `thx.setLocation(double lat, double lon`) from version 2.0.103 (rev88).
 Device will be forced to checked in when you change those values.
-
 
 # Changelog
 
