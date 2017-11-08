@@ -9,12 +9,8 @@ extern "C" {
     extern cont_t g_cont;
 }
 
-#ifndef VERSION
-#define VERSION "2.0.94"
-#endif
-
 #ifndef THINX_FIRMWARE_VERSION_SHORT
-#define THINX_FIRMWARE_VERSION_SHORT "2.0.94"
+#define THINX_FIRMWARE_VERSION_SHORT VERSION
 #endif
 
 #ifndef THINX_COMMIT_ID
@@ -335,7 +331,7 @@ String THiNX::checkin_body() {
     // Optional location data
     root["lat"] = String(latitude);
     root["lon"] = String(longitude);
-    
+
     // Flag for THiNX CI
 #ifndef PLATFORMIO_IDE
     // THINX_PLATFORM is not overwritten by builder in Arduino IDE
@@ -1202,7 +1198,13 @@ void THiNX::import_build_time_constants() {
         thinx_udid = strdup("");
     }
 
+    // Use commit-id from thinx.h if not given by environment
+#ifdef THX_COMMIT_ID
     thinx_commit_id = strdup(commit_id);
+#else
+    thinx_commit_id = strdup(THINX_COMMIT_ID);
+#endif
+
     thinx_mqtt_url = strdup(THINX_MQTT_URL);
     thinx_cloud_url = strdup(THINX_CLOUD_URL);
     thinx_alias = strdup(THINX_ALIAS);
