@@ -1179,7 +1179,11 @@ void THiNX::update_and_reboot(String url) {
 
     switch(ret) {
         case HTTP_UPDATE_FAILED:
-            Serial.printf("HTTP_UPDATE_FAILD Error (%d): %s", ESPhttpUpdate.getLastError(), ESPhttpUpdate.getLastErrorString().c_str());
+            Serial.printf("HTTP_UPDATE_FAILED Error (%d): %s", ESPhttpUpdate.getLastError(), ESPhttpUpdate.getLastErrorString().c_str());
+            if (mqtt_client) {
+                String message = String("{ \"status\" : \"") + ESPhttpUpdate.getLastErrorString() + String("\" }");
+                mqtt_client->publish(mqtt_device_status_channel, message.c_str());
+            }
             break;
 
         case HTTP_UPDATE_NO_UPDATES:
