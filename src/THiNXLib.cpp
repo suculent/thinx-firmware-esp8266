@@ -1083,7 +1083,7 @@ void THiNX::save_device_info()
 #else
     Serial.println(F("*TH: saving configuration to EEPROM: "));
     json_info[512] = {0};
-    for (long addr = 0; addr <= strlen((const char*)json_info); addr++) {
+    for (long addr = 0; addr < strlen((const char*)json_info); addr++) {
         uint8_t byte = json_info[addr];
         EEPROM.put(addr, json_info[addr]);
         if (byte == 0) break;
