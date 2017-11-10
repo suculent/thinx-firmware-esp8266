@@ -1,13 +1,13 @@
-#include "THiNXLib.h"
-
-#ifndef UNIT_TEST // IMPORTANT LINE FOR UNIT-TESTING!
-
 extern "C" {
   #include "user_interface.h"
   #include "thinx.h"
   #include <cont.h>
     extern cont_t g_cont;
 }
+
+#include "THiNXLib.h"
+
+#ifndef UNIT_TEST // IMPORTANT LINE FOR UNIT-TESTING!
 
 #ifndef THINX_FIRMWARE_VERSION_SHORT
 #define THINX_FIRMWARE_VERSION_SHORT VERSION

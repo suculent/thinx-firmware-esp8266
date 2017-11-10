@@ -1,7 +1,8 @@
 #include <Arduino.h>
 
+// should deprecate! this is THINX_FIRMWARE_VERSION_SHORT
 #ifndef VERSION
-#define VERSION "2.0.140"
+#define VERSION "2.1.143"
 #endif
 
 #define __DEBUG__
