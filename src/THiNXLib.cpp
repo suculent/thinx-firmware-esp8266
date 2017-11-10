@@ -191,9 +191,15 @@ void THiNX::connect() {
                 Serial.print(F("THiNX > LOOP > START() > AP SSID"));
                 Serial.println(WiFi.SSID());
             } else {
-                Serial.println(F("*TH: LOOP > CONNECT > STA RECONNECT"));
-                WiFi.begin(THINX_ENV_SSID, THINX_ENV_PASS);
-                Serial.println(F("*TH: Enabling connection state (212)"));
+                if (strlen(THINX_ENV_SSID) > 2) {
+                    Serial.println(F("*TH: LOOP > CONNECT > STA RECONNECT"));
+                    WiFi.begin(THINX_ENV_SSID, THINX_ENV_PASS);
+                    Serial.println(F("*TH: Enabling connection state (197)"));
+                } else {
+                    Serial.println(F("*TH: LOOP > CONNECT > NO CREDS"));
+                    wifi_connection_in_progress = true;
+                    Serial.println(F("*TH: WARNING: Dead branch (201)"));
+                }
                 wifi_connection_in_progress = true; // prevents re-entering connect_wifi(); should timeout
             }
             //
@@ -244,12 +250,16 @@ void THiNX::connect_wifi() {
                 connected = true;
                 return;
             } else {
-                Serial.println(F("*TH: Connecting to AP with pre-defined credentials...")); Serial.flush();
-                WiFi.mode(WIFI_STA);
-                WiFi.begin(THINX_ENV_SSID, THINX_ENV_PASS);
-                Serial.println(F("*TH: Enabling connection state (283)"));
-                wifi_connection_in_progress = true; // prevents re-entering connect_wifi()
-                wifi_retry = 0; // waiting for sta...
+                if (strlen(THINX_ENV_SSID) > 2) {
+                    Serial.println(F("*TH: Connecting to AP with pre-defined credentials...")); Serial.flush();
+                    WiFi.mode(WIFI_STA);
+                    WiFi.begin(THINX_ENV_SSID, THINX_ENV_PASS);
+                    Serial.println(F("*TH: Enabling connection state (283)"));
+                    wifi_connection_in_progress = true; // prevents re-entering connect_wifi()
+                    wifi_retry = 0; // waiting for sta...
+                } else {
+                    Serial.println(F("*TH: WARNING! Dead code branch (261)")); Serial.flush();
+                }
             }
 
         } else {
@@ -297,6 +307,7 @@ String THiNX::checkin_body() {
 
     DynamicJsonBuffer jsonBuffer(768);
     JsonObject& root = jsonBuffer.createObject();
+    json_output = "";
 
     root["mac"] = thinx_mac();
 
@@ -930,6 +941,8 @@ void THiNX::restore_device_info() {
     long data_len = 0;
 
     Serial.println(F("*TH: Restoring configuration from EEPROM..."));
+    
+    json_output = "";
 
     for (long a = 0; a < buf_len; a++) {
         value = EEPROM.read(a);
@@ -967,8 +980,8 @@ void THiNX::restore_device_info() {
         return;
     }
 
-    Serial.println(F("*TH: Converting data to string...")); // Serial.flush(); // flush may crash
-    json_output = String(json_info); // crashed with \n
+    Serial.println(F("*TH: Converting data to string..."));
+    json_output = String(json_info);
 
 #else
     if (!SPIFFS.exists("/thx.cfg")) {
@@ -993,6 +1006,7 @@ void THiNX::restore_device_info() {
 
     DynamicJsonBuffer jsonBuffer(512);
     JsonObject& config = jsonBuffer.parseObject(json_output.c_str()); // must not be String!
+    json_output = "";
 
     if (!config.success()) {
         // Serial.println(F("*TH: No JSON data to be parsed..."));
