@@ -64,6 +64,22 @@ void loop()
 }
 ```
 
+### Configurations Priority
+
+0. When using WiFiManager, the WiFi SSID/PASS is stored in device's Flash (only on successful connection).
+
+1. THiNXLib is built with null default values (mostly).
+
+2. THiNXLib is configured from thinx.h file, which is overwritten by the THiNX CI for each build.
+
+3. As a user, you are allowed to initialize THiNX() with API Key and Owner ID entered into the code sketch or thinx.h file, so you can run it against backend while building locally (without THiNX CI).
+
+4. Additional data are loaded from EEPROM/SPIFFS, where saved Owner ID takes precedence before user value to support OTA device migration.
+
+5. On successful checkin, incoming data incl. UDID (unique device identifier) and Owner ID is stored to EEPROM or SPIFFS for further use after reboot.
+
+6. Configuration Push can be used to inject custom Environment Variables over the network, without need to have them stored anywhere in the code on the device (e.g. WiFi credentials)
+
 
 ### Finalize callback
 
