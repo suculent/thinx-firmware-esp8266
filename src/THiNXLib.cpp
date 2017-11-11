@@ -112,6 +112,7 @@ THiNX::THiNX(const char * __apikey, const char * __owner_id) {
     thinx_mqtt_url = strdup("thinx.cloud");
     thinx_version_id = strdup("");
     thinx_api_key = strdup("");
+    thinx_forced_update = false;
 
     // will be loaded from SPIFFS/EEPROM or retrieved on Registration later
     if (strlen(__owner_id) == 0) {
@@ -528,7 +529,7 @@ void THiNX::parse(String payload) {
 
             // In case automatic updates are disabled,
             // we must ask user to commence firmware update.
-            if (THINX_AUTO_UPDATE == false) {
+            if (thinx_auto_update == false) {
                 if (mqtt_client != NULL) {
                     Serial.println("mqtt_client->publish");
                     mqtt_client->publish(
@@ -538,7 +539,7 @@ void THiNX::parse(String payload) {
                     mqtt_client->loop();
                 }
 
-            } else {
+            } else if (thinx_auto_update || thinx_forced_update){
 
                 Serial.println(F("*TH: Starting update A..."));
 
@@ -640,6 +641,14 @@ void THiNX::parse(String payload) {
                     thinx_udid = strdup(udid.c_str());
                 }
 
+                if (registration.containsKey(F("auto_update"))) {
+                  thinx_auto_update = (bool)registration[F("auto_update")];
+                }
+
+                if (registration.containsKey(F("forced_update"))) {
+                  thinx_forced_update = (bool)registration[F("forced_update")];
+                }
+
                 save_device_info();
 
             } else if (status == "FIRMWARE_UPDATE") {
@@ -720,7 +729,6 @@ void THiNX::parse(String payload) {
         } break;
 
         default:
-            Serial.println(F("Nothing to do..."));
             break;
     }
 

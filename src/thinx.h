@@ -17,7 +17,7 @@ const char * THINX_UDID = "0";
 const long THINX_MQTT_PORT = 1883;
 const long THINX_API_PORT = 7442;
 
-const bool THINX_AUTO_UPDATE = true;
+const bool THINX_AUTO_UPDATE = false;
 const bool THINX_FORCED_UPDATE = false;
 
 const char * THINX_ENV_SSID = "";     // your network SSID (name)
