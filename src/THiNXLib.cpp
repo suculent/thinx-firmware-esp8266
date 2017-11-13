@@ -368,10 +368,10 @@ String THiNX::checkin_body() {
   JsonObject& wrapper = wrapperBuffer.createObject();
   wrapper["registration"] = root;
 
-  #ifdef __DEBUG_JSON__
+#ifdef __DEBUG_JSON__
   wrapper.printTo(Serial);
   Serial.println();
-  #endif
+#endif
 
   json_output = "";
   wrapper.printTo(json_output);
@@ -484,11 +484,12 @@ void THiNX::parse(String payload) {
 
   String body = payload.substring(start_index, endIndex);
 
-  #ifdef __DEBUG__
+#ifdef __DEBUG__
+  printStackHeap("parse");
   Serial.print(F("*TH: Parsing response:\n'"));
   Serial.print(body);
   Serial.println("'");
-  #endif
+#endif
 
   DynamicJsonBuffer jsonBuffer(1024);
   JsonObject& root = jsonBuffer.parseObject(body.c_str());
@@ -1204,10 +1205,7 @@ void THiNX::update_and_reboot(String url) {
   }
   #else
 
-  #ifdef __DEBUG__
   Serial.println(F("*TH: Starting ESP8266 HTTP Update & reboot..."));
-  #endif
-
   t_httpUpdate_return ret = ESPhttpUpdate.update(url.c_str());
 
   switch(ret) {

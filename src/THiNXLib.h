@@ -1,5 +1,12 @@
 #include <Arduino.h>
 
+#define __DEBUG__ // enables stack/heap debugging
+#define __DEBUG_JSON__ // enables API request debugging
+
+#define __ENABLE_WIFI_MIGRATION__ // enable automatic WiFi disconnect/reconnect on Configuration Push (THINX_ENV_SSID and THINX_ENV_PASS)
+#define __USE_WIFI_MANAGER__ // if disabled, you need to `WiFi.begin(ssid, pass)` on your own
+#define __USE_SPIFFS__ // if disabled, uses EEPROM instead
+
 // should deprecate! this is THINX_FIRMWARE_VERSION_SHORT
 #ifndef VERSION
 #define VERSION "2.1.144"
@@ -12,13 +19,6 @@
 #define THX_REVISION "144"
 #endif
 #endif
-
-#define __DEBUG__
-#define __DEBUG_JSON__
-
-#define __ENABLE_WIFI_MIGRATION__ // enable automatic WiFi disconnect/reconnect on Configuration Push (THINX_ENV_SSID and THINX_ENV_PASS)
-#define __USE_WIFI_MANAGER__
-#define __USE_SPIFFS__ // if disabled, uses EEPROM instead
 
 #ifdef __USE_WIFI_MANAGER__
 #include <DNSServer.h>
