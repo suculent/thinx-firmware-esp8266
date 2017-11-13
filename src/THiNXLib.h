@@ -17,7 +17,7 @@
 #define __DEBUG_JSON__
 
 #define __ENABLE_WIFI_MIGRATION__ // enable automatic WiFi disconnect/reconnect on Configuration Push (THINX_ENV_SSID and THINX_ENV_PASS)
-#define __USE_WIFI_MANAGER__
+//#define __USE_WIFI_MANAGER__
 //#define __USE_SPIFFS__
 
 #ifdef __USE_WIFI_MANAGER__
@@ -50,7 +50,7 @@ public:
 #ifdef __USE_WIFI_MANAGER__
     static WiFiManagerParameter *api_key_param;
     static WiFiManagerParameter *owner_param;
-    static int should_save_config;                // after autoconnect, may provide new API Key
+    static int should_save_config; // after autoconnect, may provide new API Key
     static void saveConfigCallback();
 #endif
 
@@ -146,15 +146,9 @@ private:
 #endif
 
 #ifdef THX_COMMIT_ID
-    const char* commit_id = strdup(THX_COMMIT_ID);
+    const char* thx_commit_id = strdup(THX_COMMIT_ID);
 #else
-    const char* commit_id = "unknown";
-#endif
-
-#ifdef THX_REVISION
-    const char* firmware_version_short = strdup(String(THX_REVISION).c_str());
-#else
-    const char* firmware_version_short = VERSION;
+    const char* thx_commit_id = "unknown";
 #endif
 
     //

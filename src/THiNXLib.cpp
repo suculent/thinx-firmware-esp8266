@@ -28,9 +28,10 @@ void printStackHeap(String tag) {
   Serial.print("*TH: loop(): tag = "); Serial.println(tag);
 }
 
-#ifdef __USE_WIFI_MANAGER__
 char* THiNX::thinx_api_key;
 char* THiNX::thinx_owner_key;
+
+#ifdef __USE_WIFI_MANAGER__
 char THiNX::thx_api_key[65] = {0};
 char THiNX::thx_owner_key[65] = {0};
 int THiNX::should_save_config = 0;
@@ -38,6 +39,11 @@ WiFiManagerParameter * THiNX::api_key_param;
 WiFiManagerParameter * THiNX::owner_param;
 
 void THiNX::saveConfigCallback() {
+
+#ifdef __DEBUG__
+  printStackHeap("safeConfigCallback");
+#endif
+
   Serial.println(F("* TH: WiFiManager's saveConfigCallback called. Counfiguration should be saved now!"));
   should_save_config = true;
   strcpy(thx_api_key, api_key_param->getValue());
@@ -82,7 +88,14 @@ THiNX::THiNX(const char * __apikey, const char * __owner_id) {
   Serial.print(F("\n*TH: THiNXLib rev. "));
   Serial.print(thx_revision);
   Serial.print(" (");
-  Serial.print(commit_id); // returned string is "not declared in expansion of THX_CID, why?
+
+  if (strlen(thx_commit_id) > 8) { // unknown
+    thinx_commit_id = strdup(thx_commit_id);
+  } else {
+    thinx_commit_id = strdup(THINX_COMMIT_ID);
+  }
+
+  Serial.print(thinx_commit_id); // returned string is "not declared in expansion of THX_CID, why?
   Serial.println(")");
 
   // see lines ../hardware/cores/esp8266/Esp.cpp:80..100
@@ -106,7 +119,7 @@ THiNX::THiNX(const char * __apikey, const char * __owner_id) {
   app_version = strdup("");
   available_update_url = strdup("");
   thinx_cloud_url = strdup("thinx.cloud");
-  thinx_commit_id = strdup("");
+
   thinx_firmware_version_short = strdup("");
   thinx_firmware_version = strdup("");
   thinx_mqtt_url = strdup("thinx.cloud");
@@ -232,9 +245,9 @@ void THiNX::connect_wifi() {
   return;
   #else
 
-  #ifdef __DEBUG__
+#ifdef __DEBUG__
   printStackHeap("connect_wifi");
-  #endif
+#endif
 
   if (connected) {
     return;
@@ -308,7 +321,6 @@ String THiNX::checkin_body() {
 
   DynamicJsonBuffer jsonBuffer(768);
   JsonObject& root = jsonBuffer.createObject();
-  json_output = "";
 
   root["mac"] = thinx_mac();
 
@@ -316,12 +328,12 @@ String THiNX::checkin_body() {
     root["firmware"] = strdup(THINX_FIRMWARE_VERSION);
   }
 
-  if (strlen(firmware_version_short) > 1) {
-    root["version"] = firmware_version_short;
+  if (strlen(thinx_firmware_version_short) > 1) {
+    root["version"] = thinx_firmware_version_short;
   }
 
-  if (strlen(commit_id) > 1) {
-    root["commit"] = commit_id;
+  if (strlen(thx_commit_id) > 1) {
+    root["commit"] = thx_commit_id;
   }
 
   if (strlen(thinx_owner) > 1) {
@@ -516,12 +528,12 @@ void THiNX::parse(String payload) {
 
       //if ((commit == thinx_commit_id) && (version == thinx_version_id)) { WHY?
       if (strlen(available_update_url) > 5) {
-        Serial.println(F("*TH: firmware has same commit_id as current and update availability is stored. Firmware has been installed."));
+        Serial.println(F("*TH: firmware has same thx_commit_id as current and update availability is stored. Firmware has been installed."));
         available_update_url = strdup("");
         notify_on_successful_update();
         return;
       } else {
-        Serial.println(F("*TH: Info: firmware has same commit_id as current and no update is available."));
+        Serial.println(F("*TH: Info: firmware has same thx_commit_id as current and no update is available."));
       }
       //}
 
@@ -668,7 +680,7 @@ void THiNX::parse(String payload) {
 
         // should not be same except for forced update
         if (commit == thinx_commit_id) {
-          Serial.println(F("*TH: Warning: new firmware has same commit_id as current."));
+          Serial.println(F("*TH: Warning: new firmware has same thx_commit_id as current."));
         }
 
         String version = registration["version"];
@@ -961,8 +973,6 @@ void THiNX::restore_device_info() {
 
   Serial.println(F("*TH: Restoring configuration from EEPROM..."));
 
-  json_output = "";
-
   for (long a = 0; a < buf_len; a++) {
     value = EEPROM.read(a);
     json_output += char(value);
@@ -1017,7 +1027,7 @@ void THiNX::restore_device_info() {
   String data = f.readStringUntil('\n');
   #endif
 
-  Serial.println(json_output);
+  Serial.println(json_info);
   Serial.println(F("*TH: Parsing..."));
 
   DynamicJsonBuffer jsonBuffer(512);
@@ -1237,7 +1247,7 @@ void THiNX::import_build_time_constants() {
 
   // Use commit-id from thinx.h if not given by environment
   #ifdef THX_COMMIT_ID
-  thinx_commit_id = strdup(commit_id);
+  thinx_commit_id = strdup(thx_commit_id);
   #else
   thinx_commit_id = strdup(THINX_COMMIT_ID);
   #endif
@@ -1251,7 +1261,7 @@ void THiNX::import_build_time_constants() {
   thinx_auto_update = THINX_AUTO_UPDATE;
   thinx_forced_update = THINX_FORCED_UPDATE;
   thinx_firmware_version = strdup(THINX_FIRMWARE_VERSION);
-  thinx_firmware_version_short = strdup(firmware_version_short);
+  thinx_firmware_version_short = strdup(THINX_FIRMWARE_VERSION_SHORT);
   app_version = strdup(THINX_APP_VERSION);
 
   Serial.println(F("*TH: Loaded build-time constants..."));
@@ -1284,6 +1294,7 @@ bool THiNX::fsck() {
   return fileSystemReady ? true : false;
 }
 
+#ifdef __USE_WIFI_MANAGER__
 /*
 * API key update event
 */
@@ -1304,6 +1315,7 @@ void THiNX::evt_save_api_key() {
     should_save_config = false;
   }
 }
+#endif
 
 /*
 * Final callback setter
@@ -1332,13 +1344,6 @@ void THiNX::finalize() {
 */
 
 void THiNX::loop() {
-
-  // Save API key on change
-  if (should_save_config) {
-    Serial.println(F("*TH: Saving API key on change..."));
-    evt_save_api_key();
-    should_save_config = false;
-  }
 
   if (thinx_phase < COMPLETED) {
     // Serial.print("Phase: "); Serial.println(thinx_phase);
@@ -1448,6 +1453,15 @@ void THiNX::loop() {
       mqtt_client->loop();
     }
   }
+
+  #ifdef __USE_WIFI_MANAGER__
+    // Save API key on change
+    if (should_save_config) {
+      Serial.println(F("*TH: Saving API key on change..."));
+      evt_save_api_key();
+      should_save_config = false;
+    }
+  #endif
 }
 
 void THiNX::setLocation(double lat, double lon) {
