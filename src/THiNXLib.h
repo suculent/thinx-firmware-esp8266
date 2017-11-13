@@ -7,7 +7,7 @@
 #define __USE_WIFI_MANAGER__ // if disabled, you need to `WiFi.begin(ssid, pass)` on your own
 #define __USE_SPIFFS__ // if disabled, uses EEPROM instead
 
-// should deprecate! this is THINX_FIRMWARE_VERSION_SHORT
+// Provides placeholder for THINX_FIRMWARE_VERSION_SHORT
 #ifndef VERSION
 #define VERSION "2.1.144"
 #endif

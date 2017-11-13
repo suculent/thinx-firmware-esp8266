@@ -14,7 +14,7 @@ extern "C" {
 #endif
 
 #ifndef THINX_COMMIT_ID
-#define THINX_COMMIT_ID "4cc948484eb97256842035f1857d869da18ad7a2"
+#define THINX_COMMIT_ID "c2d13320cca4df4149bc94e7c19692299eca3fcf"
 #endif
 
 /* Debug tools (should be extradited from Release builds) */
