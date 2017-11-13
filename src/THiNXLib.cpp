@@ -1024,7 +1024,8 @@ void THiNX::restore_device_info() {
     Serial.println(F("*TH: Remote configuration file empty..."));
     return;
   }
-  String data = f.readStringUntil('\n');
+
+  f.readBytesUntil('\n', json_info, 511);
   #endif
 
   Serial.println(json_info);
@@ -1100,7 +1101,7 @@ void THiNX::save_device_info()
   File f = SPIFFS.open("/thx.cfg", "w");
   if (f) {
     Serial.println(F("*TH: saving configuration to SPIFFS..."));
-    f.println(String(json_info)); // String instead of const char* due to LoadStoreAlignmentCause...
+    f.println(String((char*)json_info)); // String instead of const char* due to LoadStoreAlignmentCause...
     Serial.println(F("*TH: closing file..."));
     f.close();
     delay(1);

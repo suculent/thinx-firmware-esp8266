@@ -18,7 +18,7 @@
 
 #define __ENABLE_WIFI_MIGRATION__ // enable automatic WiFi disconnect/reconnect on Configuration Push (THINX_ENV_SSID and THINX_ENV_PASS)
 #define __USE_WIFI_MANAGER__
-//#define __USE_SPIFFS__
+#define __USE_SPIFFS__ // if disabled, uses EEPROM instead
 
 #ifdef __USE_WIFI_MANAGER__
 #include <DNSServer.h>
@@ -169,9 +169,7 @@ private:
     char mac_string[17];
     const char * thinx_mac();
 
-#ifndef __USE_SPIFFS__
-    char json_info[512] = {0};           // statically allocated to prevent fragmentation (?)
-#endif
+    char json_info[512] = {0};               // statically allocated to prevent fragmentation
 
     String json_output;
 
