@@ -17,7 +17,7 @@
 #define __DEBUG_JSON__
 
 #define __ENABLE_WIFI_MIGRATION__ // enable automatic WiFi disconnect/reconnect on Configuration Push (THINX_ENV_SSID and THINX_ENV_PASS)
-//#define __USE_WIFI_MANAGER__
+#define __USE_WIFI_MANAGER__
 //#define __USE_SPIFFS__
 
 #ifdef __USE_WIFI_MANAGER__
