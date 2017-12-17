@@ -9,14 +9,14 @@
 
 // Provides placeholder for THINX_FIRMWARE_VERSION_SHORT
 #ifndef VERSION
-#define VERSION "2.1.157"
+#define VERSION "2.1.160"
 #endif
 
 #ifndef THX_REVISION
 #ifdef THINX_FIRMWARE_VERSION_SHORT
 #define THX_REVISION THINX_FIRMWARE_VERSION_SHORT
 #else
-#define THX_REVISION "157"
+#define THX_REVISION "160"
 #endif
 #endif
 
@@ -131,6 +131,7 @@ public:
 private:
 
     bool connected;                         // WiFi connected in station mode
+    bool info_loaded = false;
 
     static char* thinx_api_key;
     static char* thinx_owner_key;

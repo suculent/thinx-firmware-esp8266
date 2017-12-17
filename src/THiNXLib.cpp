@@ -135,7 +135,8 @@ THiNX::THiNX(const char * __apikey, const char * __owner_id) {
   EEPROM.begin(512); // should be SPI_FLASH_SEC_SIZE
 
   import_build_time_constants();
-  restore_device_info();
+  restore_device_info(); // loads saved apikey/ownerid
+  info_loaded = true;
 
   #ifdef __USE_WIFI_MANAGER__
   connected = true;
@@ -148,17 +149,31 @@ THiNX::THiNX(const char * __apikey, const char * __owner_id) {
   }
   #endif
 
-  if (strlen(thinx_api_key) > 4) {
-    Serial.print(F("*TH: Init with stored API Key: "));
+  if (strlen(__apikey) > 4) {
+    Serial.print(F("*TH: With custom API Key..."));
+    thinx_api_key = strdup(__apikey);
   } else {
-    if (strlen(__apikey) > 4) {
-      Serial.print(F("*TH: With custom API Key: "));
-      thinx_api_key = strdup(__apikey);
-      Serial.println(thinx_api_key);
-    }
+      if (strlen(thinx_api_key) > 4) {
+          Serial.print(F("*TH: With thinx.h API Key..."));
+      } else {
+          Serial.print(F("*TH: No API Key!"));
+          return;
+      }
   }
-  initWithAPIKey(thinx_api_key);
 
+  if (strlen(__owner_id) > 4) {
+    Serial.print(F("*TH: With custom Owner ID..."));
+    thinx_owner = strdup(__owner_id);
+  } else {
+      if (strlen(thinx_owner) > 4) {
+          Serial.print(F("*TH: With thinx.h owner..."));
+      } else {
+          Serial.print(F("*TH: No API Key!"));
+          return;
+      }
+  }
+
+  initWithAPIKey(thinx_api_key);
   wifi_connection_in_progress = false; // last
 }
 
@@ -173,12 +188,20 @@ void THiNX::initWithAPIKey(const char * __apikey) {
   }
   #endif
 
-  if (strlen(thinx_api_key) < 4) {
-    if (strlen(__apikey) > 1) {
-      thinx_api_key = strdup(__apikey);
+  if (info_loaded == false) {
+    restore_device_info(); // loads saved apikey/ownerid
+    info_loaded = true;
+  }
+
+  if (strlen(__apikey) > 4) {
+    thinx_api_key = strdup(__apikey);
+  } else {
+    if (strlen(thinx_api_key) < 4) {
+      Serial.print(F("*TH: No API Key!"));
+      return;
     }
   }
-  Serial.println(F("*TH: Initialization completed..."));
+
   wifi_connection_in_progress = false;
   thinx_phase = CONNECT_WIFI;
 }
