@@ -194,6 +194,7 @@ private:
     int all_done;                              // finalize flag
 
     void (*_config_callback)(String) = NULL;  // Called when server pushes new environment vars using MQTT
+    void (*_mqtt_callback)(String) = NULL; 
 
     // Data Storage
     void import_build_time_constants();     // sets variables from thinx.h file
