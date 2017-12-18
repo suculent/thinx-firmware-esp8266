@@ -9,14 +9,14 @@
 
 // Provides placeholder for THINX_FIRMWARE_VERSION_SHORT
 #ifndef VERSION
-#define VERSION "2.1.160"
+#define VERSION "2.1.161"
 #endif
 
 #ifndef THX_REVISION
 #ifdef THINX_FIRMWARE_VERSION_SHORT
 #define THX_REVISION THINX_FIRMWARE_VERSION_SHORT
 #else
-#define THX_REVISION "160"
+#define THX_REVISION "161"
 #endif
 #endif
 
@@ -116,6 +116,7 @@ public:
 
     void setPushConfigCallback( void (*func)(String) );
     void setFinalizeCallback( void (*func)(void) );
+    void setMQTTCallback( void (*func)(String) );
 
     int wifi_connection_in_progress;
 
@@ -193,6 +194,7 @@ private:
     int all_done;                              // finalize flag
 
     void (*_config_callback)(String) = NULL;  // Called when server pushes new environment vars using MQTT
+    void (*_mqtt_callback)(String) = NULL; 
 
     // Data Storage
     void import_build_time_constants();     // sets variables from thinx.h file
