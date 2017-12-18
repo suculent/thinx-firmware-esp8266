@@ -116,6 +116,7 @@ public:
 
     void setPushConfigCallback( void (*func)(String) );
     void setFinalizeCallback( void (*func)(void) );
+    void setMQTTCallback( void (*func)(String) );
 
     int wifi_connection_in_progress;
 
