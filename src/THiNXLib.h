@@ -9,14 +9,14 @@
 
 // Provides placeholder for THINX_FIRMWARE_VERSION_SHORT
 #ifndef VERSION
-#define VERSION "2.1.161"
+#define VERSION "2.1.162"
 #endif
 
 #ifndef THX_REVISION
 #ifdef THINX_FIRMWARE_VERSION_SHORT
 #define THX_REVISION THINX_FIRMWARE_VERSION_SHORT
 #else
-#define THX_REVISION "161"
+#define THX_REVISION "162"
 #endif
 #endif
 
@@ -87,13 +87,14 @@ public:
 
     // MQTT
     PubSubClient *mqtt_client = NULL;
-
+    char mqtt_device_channel[128];
+    char mqtt_device_channels[128];
+    char mqtt_device_status_channel[128];
     String thinx_mqtt_channel();
-    char mqtt_device_channel[128]; //  = {0}
+    String thinx_mqtt_channels();
     String thinx_mqtt_status_channel();
-    char mqtt_device_status_channel[128]; //  = {0}
 
-    // Import build-time values from thinx.h
+    // Values imported on from thinx.h
     const char* app_version;                  // max 80 bytes
     const char* available_update_url;         // up to 1k
     const char* thinx_cloud_url;              // up to 1k but generally something where FQDN fits
@@ -194,7 +195,7 @@ private:
     int all_done;                              // finalize flag
 
     void (*_config_callback)(String) = NULL;  // Called when server pushes new environment vars using MQTT
-    void (*_mqtt_callback)(String) = NULL; 
+    void (*_mqtt_callback)(String) = NULL;
 
     // Data Storage
     void import_build_time_constants();     // sets variables from thinx.h file

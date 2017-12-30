@@ -763,6 +763,11 @@ String THiNX::thinx_mqtt_channel() {
   return String(mqtt_device_channel);
 }
 
+String THiNX::thinx_mqtt_channels() {
+  sprintf(mqtt_device_channels, "/%s/%s/#", thinx_owner, thinx_udid);
+  return String(mqtt_device_channels);
+}
+
 // TODO: Should be called only on init and update (and store result for later)
 String THiNX::thinx_mqtt_status_channel() {
   sprintf(mqtt_device_status_channel, "/%s/%s/status", thinx_owner, thinx_udid);
