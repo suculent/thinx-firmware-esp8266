@@ -112,6 +112,9 @@ THiNX::THiNX(const char * __apikey, const char * __owner_id) {
   thinx_api_key = strdup("");
   thinx_forced_update = false;
 
+  checkin_interval = millis() + checkin_timeout / 4; // retry faster before first checkin
+  reboot_interval = millis() + reboot_timeout;
+
   // will be loaded from SPIFFS/EEPROM or retrieved on Registration later
   if (strlen(__owner_id) == 0) {
     thinx_owner = strdup("");
@@ -314,6 +317,7 @@ void THiNX::checkin() {
     Serial.println(F("*TH: Cannot checkin while not connected, exiting."));
   } else {
     senddata(checkin_body());
+    checkin_interval = millis() + checkin_timeout;
   }
 }
 
@@ -1401,6 +1405,14 @@ void THiNX::loop() {
 
   // CASE thinx_phase == CONNECT_API
 
+  // Force re-checkin after specified interval
+  if (millis() > checkin_timeout) {
+    if (checkin_interval > 0) {
+      thinx_phase == CONNECT_API;
+      checkin_interval = millis() + checkin_timeout;
+    }
+  }
+
   // If connected, perform the MQTT loop and bail out ASAP
   if (thinx_phase == CONNECT_API) {
     if (WiFi.getMode() == WIFI_AP) {
@@ -1421,6 +1433,11 @@ void THiNX::loop() {
     if (mqtt_result == true) {
       mqtt_client->loop();
     }
+  }
+
+  if ( millis() > reboot_interval ) {
+    setStatus("Rebooting...");
+    ESP.restart();
   }
 
   #ifdef __USE_WIFI_MANAGER__
@@ -1450,6 +1467,14 @@ void THiNX::setStatus(String newstatus) {
     String message = String("{ \"status\" : \"") + newstatus + String("\" }");
     mqtt_client->publish(mqtt_device_status_channel, message.c_str());
   }
+}
+
+void THiNX::setCheckinInterval(long interval) {
+  checkin_interval = interval;
+}
+
+void THiNX::setRebootInterval(long interval) {
+  reboot_interval = interval;
 }
 
 #endif // IMPORTANT LINE FOR UNIT-TESTING!

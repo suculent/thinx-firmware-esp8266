@@ -129,6 +129,8 @@ public:
     void publish(String, String, bool);       // send String to any channel, optinally with retain
 
     void setStatus(String);
+    void setCheckinInterval(long interval);
+    void setRebootInterval(long interval);
 
 private:
 
@@ -184,6 +186,12 @@ private:
     void senddata(String);
     void parse(String);
     void update_and_reboot(String);
+
+    unsigned long checkin_timeout;          // next timeout millis()
+    unsigned long checkin_interval = 3600 * 1000;  // can be set externaly, defaults to 1h
+
+    unsigned long reboot_timeout;          // next timeout millis()
+    unsigned long reboot_interval = 86400 * 1000;  // can be set externaly, defaults to 24h
 
     // MQTT
     bool start_mqtt();                      // connect to broker and subscribe
