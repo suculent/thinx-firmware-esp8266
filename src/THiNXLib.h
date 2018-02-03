@@ -9,14 +9,14 @@
 
 // Provides placeholder for THINX_FIRMWARE_VERSION_SHORT
 #ifndef VERSION
-#define VERSION "2.1.162"
+#define VERSION "2.1.163"
 #endif
 
 #ifndef THX_REVISION
 #ifdef THINX_FIRMWARE_VERSION_SHORT
 #define THX_REVISION THINX_FIRMWARE_VERSION_SHORT
 #else
-#define THX_REVISION "162"
+#define THX_REVISION "163"
 #endif
 #endif
 
@@ -126,6 +126,8 @@ public:
 
     // MQTT Support
     void publishStatus(String);               // send String to status channel
+    void publishStatusUnretained(String);     // send String to status channel (unretained)
+    void publishStatusRetain(String, bool);   // send String to status channel (optionally retained)
     void publish(String, String, bool);       // send String to any channel, optinally with retain
 
     void setStatus(String);
