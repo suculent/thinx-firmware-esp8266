@@ -14,7 +14,7 @@ extern "C" {
 #endif
 
 #ifndef THINX_COMMIT_ID
-#define THINX_COMMIT_ID "c2d13320cca4df4149bc94e7c19692299eca3fcf"
+#define THINX_COMMIT_ID "c680610df8457bb634cbaa80ce00b2b761208347"
 #endif
 
 char* THiNX::thinx_api_key;
@@ -672,6 +672,13 @@ void THiNX::parse(String payload) {
           thinx_forced_update = (bool)registration[F("forced_update")];
         }
 
+        if (registration.containsKey(F("timestamp"))) {
+          Serial.println("Updating time...");
+          last_checkin_timestamp = (long)registration[F("timestamp")];
+          last_checkin_millis = millis();
+          //setTime(last_checkin_timestamp); TODO: FIXME:requires Time.h somehow...
+        }
+
         save_device_info();
 
       } else if (status == "FIRMWARE_UPDATE") {
@@ -778,6 +785,23 @@ String THiNX::thinx_mqtt_status_channel() {
   return String(mqtt_device_status_channel);
 }
 
+unsigned long THiNX::epoch() {
+  unsigned long since_last_checkin = (millis() - last_checkin_millis) / 1000;
+  return last_checkin_timestamp + since_last_checkin;
+}
+
+String THiNX::time() {
+  unsigned long stamp = THiNX::epoch();
+    String time_representation = String((time_unix % 86400L) / 3600);
+    time_representation += ":";
+    if ( ((time_unix % 3600) / 60) < 10 ) {
+        // In the first 10 minutes of each hour, we'll want a leading '0'
+        time_representation += "0";
+    }
+    time_representation += String((time_unix % 3600) / 60);
+    return String(time_representation);
+}
+
 /*
 * Device MAC address
 */
@@ -822,10 +846,22 @@ void THiNX::notify_on_successful_update() {
 */
 
 void THiNX::publishStatus(String message) {
+  publishStatusRetain(message, true);
+}
+
+void THiNX::publishStatusUnretained(String message) {
+  publishStatusRetain(message, false);
+}
+
+void THiNX::publishStatusRetain(String message, bool retain) {
   if (mqtt_client != NULL) {
-    mqtt_client->publish(
-      MQTT::Publish(mqtt_device_status_channel, message.c_str()).set_retain()
-    );
+    if (retain) {
+      mqtt_client->publish(
+        MQTT::Publish(mqtt_device_status_channel, message.c_str()).set_retain()
+      );
+    } else {
+      mqtt_client->publish(mqtt_device_status_channel, message.c_str());
+    }
     mqtt_client->loop();
   } else {
     Serial.println(F("*TH: MQTT not active."));
@@ -876,9 +912,7 @@ bool THiNX::start_mqtt() {
   }
 
   Serial.println(F("*TH: Contacting MQTT server..."));
-
   mqtt_client = new PubSubClient(thx_wifi_client, thinx_mqtt_url);
-
   last_mqtt_reconnect = 0;
 
   if (strlen(thinx_api_key) < 5) {
@@ -893,12 +927,10 @@ bool THiNX::start_mqtt() {
   int willQos = 0;
   bool willRetain = false;
 
-  delay(1);
-
   if (mqtt_client->connect(MQTT::Connect(id)
   .set_will(willTopic.c_str(), F("{ \"status\" : \"disconnected\" }"))
   .set_auth(user, pass)
-  .set_keepalive(30)
+  .set_keepalive(60)
 )) {
 
   mqtt_connected = true;
@@ -906,9 +938,7 @@ bool THiNX::start_mqtt() {
 
   mqtt_client->set_callback([this](const MQTT::Publish &pub){
 
-    delay(1);
-
-    // >
+    // Never tested...
     if (pub.has_stream()) {
 
       Serial.println(F("*TH: MQTT Type: Stream..."));
@@ -916,7 +946,6 @@ bool THiNX::start_mqtt() {
       uint32_t size = pub.payload_len();
 
       if ( ESP.updateSketch(*pub.payload_stream(), size, true, false) ) {
-
         // Notify on reboot for update
         mqtt_client->publish(
           mqtt_device_status_channel,
@@ -1099,10 +1128,10 @@ void THiNX::save_device_info()
   #ifdef __USE_SPIFFS__
   File f = SPIFFS.open("/thx.cfg", "w");
   if (f) {
-    Serial.println(F("*TH: Saving configuration..."));
+    Serial.println(F("*TH: Saving configuration to SPIFFS..."));
     f.println(String((char*)json_info)); // String instead of const char* due to LoadStoreAlignmentCause...
     f.close();
-    delay(1);
+    Serial.println(F("*TH: Saved configuration (SPIFFS)."));
   }
   #else
   Serial.println(F("*TH: Saving configuration to EEPROM: "));
@@ -1112,7 +1141,7 @@ void THiNX::save_device_info()
     if (byte == 0) break;
   }
   EEPROM.commit();
-  Serial.println(F("*TH: EEPROM data committed..."));
+  Serial.println(F("*TH: Saved configuration (EEPROM)."));
   #endif
 }
 
