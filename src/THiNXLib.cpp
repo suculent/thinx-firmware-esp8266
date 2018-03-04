@@ -672,6 +672,13 @@ void THiNX::parse(String payload) {
           thinx_forced_update = (bool)registration[F("forced_update")];
         }
 
+        if (registration.containsKey(F("timestamp"))) {
+          Serial.println("Updating time...");
+          last_checkin_timestamp = (long)registration[F("timestamp")];
+          last_checkin_millis = millis();
+          //setTime(last_checkin_timestamp); TODO: FIXME:requires Time.h somehow...
+        }
+
         save_device_info();
 
       } else if (status == "FIRMWARE_UPDATE") {
@@ -776,6 +783,23 @@ String THiNX::thinx_mqtt_channels() {
 String THiNX::thinx_mqtt_status_channel() {
   sprintf(mqtt_device_status_channel, "/%s/%s/status", thinx_owner, thinx_udid);
   return String(mqtt_device_status_channel);
+}
+
+unsigned long THiNX::epoch() {
+  unsigned long since_last_checkin = (millis() - last_checkin_millis) / 1000;
+  return last_checkin_timestamp + since_last_checkin;
+}
+
+String THiNX::time() {
+  unsigned long stamp = THiNX::epoch();
+    String time_representation = String((time_unix % 86400L) / 3600);
+    time_representation += ":";
+    if ( ((time_unix % 3600) / 60) < 10 ) {
+        // In the first 10 minutes of each hour, we'll want a leading '0'
+        time_representation += "0";
+    }
+    time_representation += String((time_unix % 3600) / 60);
+    return String(time_representation);
 }
 
 /*
