@@ -133,11 +133,15 @@ public:
     void publish(String, String, bool);       // send String to any channel, optinally with retain
 
     void setStatus(String);
-    void setCheckinInterval(long interval);
-    void setRebootInterval(long interval);
+    void setCheckinInterval(long);
+    void setRebootInterval(long);
+
+    const char time_format[] = "%H-%M-%S";
+    const char date_format[] = "%Y-%M-%d";
 
     unsigned long epoch();                    // estimated timestamp since last checkin as
-    String time();                            // estimated current Time
+    String time(const char*);                            // estimated current Time
+    String date(const char*);                            // estimated current Date
 
 private:
 

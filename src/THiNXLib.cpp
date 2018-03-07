@@ -2,6 +2,7 @@ extern "C" {
   #include "user_interface.h"
   #include "thinx.h"
   #include <cont.h>
+  #include <time.h>
   extern cont_t g_cont;
 }
 
@@ -111,6 +112,7 @@ THiNX::THiNX(const char * __apikey, const char * __owner_id) {
   thinx_version_id = strdup("");
   thinx_api_key = strdup("");
   thinx_forced_update = false;
+  last_checkin_timestamp = 0; // 1/1/1970
 
   checkin_interval = millis() + checkin_timeout / 4; // retry faster before first checkin
   reboot_interval = millis() + reboot_timeout;
@@ -676,7 +678,6 @@ void THiNX::parse(String payload) {
           Serial.println("Updating time...");
           last_checkin_timestamp = (long)registration[F("timestamp")];
           last_checkin_millis = millis();
-          //setTime(last_checkin_timestamp); TODO: FIXME:requires Time.h somehow...
         }
 
         save_device_info();
@@ -790,16 +791,63 @@ unsigned long THiNX::epoch() {
   return last_checkin_timestamp + since_last_checkin;
 }
 
-String THiNX::time() {
+String THiNX::time(const char* optional_format) {
+
+  const char *format = time_format;
+
+  if (optional_format != null) {
+    format = optional;
+  }
+
   unsigned long stamp = THiNX::epoch();
+  const char *format = time_format;
+  struct tm lt = struct tm (stamp);
+  char res[32];
+  (void) localtime_r(&t, (struct tm) &lt);
+  if (strftime(res, sizeof(res), format, &lt) == 0) {
+      char str[] = sprintf("cannot format supplied date/time into buffer of size %lu using: '%s'\n", sizeof(res), format);
+      Serial.println(str);
+  }
+  return String(res);
+
+    /* deprecated
+    unsigned long stamp = THiNX::epoch();
+    unsigned long time_unix = stamp + 3600;
     String time_representation = String((time_unix % 86400L) / 3600);
     time_representation += ":";
+    // leading minute zero
     if ( ((time_unix % 3600) / 60) < 10 ) {
-        // In the first 10 minutes of each hour, we'll want a leading '0'
         time_representation += "0";
     }
     time_representation += String((time_unix % 3600) / 60);
+    time_representation += ":";
+    // leading second zero
+    if ( ((time_unix % 3600) % 60) < 10 ) {
+        time_representation += "0";
+    }
+    time_representation += String((time_unix % 3600) % 60);
     return String(time_representation);
+    */
+}
+
+String THiNX::date(const char* optional_format) {
+
+  const char *format = date_format;
+
+  if (optional_format != null) {
+    format = optional;
+  }
+
+    unsigned long stamp = THiNX::epoch();
+
+    struct tm lt = struct tm (stamp);
+    char res[32];
+    (void) localtime_r(&t, (struct tm) &lt);
+    if (strftime(res, sizeof(res), format, &lt) == 0) {
+        char str[] = sprintf("cannot format supplied date/time into buffer of size %lu using: '%s'\n", sizeof(res), format);
+        Serial.println(str);
+    }
+    return String(res);
 }
 
 /*
