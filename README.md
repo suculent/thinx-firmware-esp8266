@@ -6,7 +6,8 @@ An Arduino/ESP8266 library to wrap client for OTA updates and RTM (Remote Things
 
 # What's New
 
-* Leveraged latest registration response features by providing unix timestamp using epoch() function and time in HH:MM:SS string using time() function (does not use Arduino's Time library as it is not available on ESP8266 so far).
+* Added example that combines THiNX with any other UART device (SigFox) for outage reporting with battery backup
+* Added possibility to set own status string on check-in
 
 # Usage
 

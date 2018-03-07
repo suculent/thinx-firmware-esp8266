@@ -136,10 +136,10 @@ public:
     void setCheckinInterval(long);
     void setRebootInterval(long);
 
-    const char time_format[] = "%H-%M-%S";
-    const char date_format[] = "%Y-%M-%d";
+    static const char time_format[];
+    static const char date_format[];
 
-    unsigned long epoch();                    // estimated timestamp since last checkin as
+    long epoch();                    // estimated timestamp since last checkin as
     String time(const char*);                            // estimated current Time
     String date(const char*);                            // estimated current Date
 
