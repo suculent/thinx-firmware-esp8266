@@ -22,7 +22,7 @@ extern "C" {
 char* THiNX::thinx_api_key;
 char* THiNX::thinx_owner_key;
 
-const char THiNX::time_format[] = "%H-%M-%S";
+const char THiNX::time_format[] = "%T";
 const char THiNX::date_format[] = "%Y-%M-%d";
 
 #ifdef __USE_WIFI_MANAGER__
