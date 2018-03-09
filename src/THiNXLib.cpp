@@ -3,6 +3,7 @@ extern "C" {
   #include "thinx.h"
   #include <cont.h>
   #include <time.h>
+  #include <stdlib.h>
   extern cont_t g_cont;
 }
 
@@ -20,6 +21,9 @@ extern "C" {
 
 char* THiNX::thinx_api_key;
 char* THiNX::thinx_owner_key;
+
+const char THiNX::time_format[] = "%T";
+const char THiNX::date_format[] = "%Y-%M-%d";
 
 #ifdef __USE_WIFI_MANAGER__
 char THiNX::thx_api_key[65] = {0};
@@ -786,27 +790,27 @@ String THiNX::thinx_mqtt_status_channel() {
   return String(mqtt_device_status_channel);
 }
 
-unsigned long THiNX::epoch() {
-  unsigned long since_last_checkin = (millis() - last_checkin_millis) / 1000;
+long THiNX::epoch() {
+  long since_last_checkin = (millis() - last_checkin_millis) / 1000;
   return last_checkin_timestamp + since_last_checkin;
 }
 
 String THiNX::time(const char* optional_format) {
 
-  const char *format = time_format;
+  /*
+  char *format = (const char *)time_format;
 
-  if (optional_format != null) {
-    format = optional;
+  if (optional_format != NULL) {
+    format = optional_format;
   }
+  */
 
-  unsigned long stamp = THiNX::epoch();
-  const char *format = time_format;
-  struct tm lt = struct tm (stamp);
+  long stamp = THiNX::epoch();
+  struct tm lt;
   char res[32];
-  (void) localtime_r(&t, (struct tm) &lt);
-  if (strftime(res, sizeof(res), format, &lt) == 0) {
-      char str[] = sprintf("cannot format supplied date/time into buffer of size %lu using: '%s'\n", sizeof(res), format);
-      Serial.println(str);
+  (void) localtime_r(&stamp, &lt);
+  if (strftime(res, sizeof(res), time_format, &lt) == 0) {
+      Serial.println(F("cannot format supplied time into buffer"));
   }
   return String(res);
 
@@ -832,22 +836,22 @@ String THiNX::time(const char* optional_format) {
 
 String THiNX::date(const char* optional_format) {
 
-  const char *format = date_format;
+  /*
+  char *format = (const char *) date_format;
 
-  if (optional_format != null) {
-    format = optional;
+  if (optional_format != NULL) {
+    format = (const char *)optional_format;
+  }*/
+
+  long stamp = THiNX::epoch();
+
+  struct tm lt;
+  char res[32];
+  (void) localtime_r(&stamp, &lt);
+  if (strftime(res, sizeof(res), date_format, &lt) == 0) {
+      Serial.println(F("cannot format supplied date into buffer"));
   }
-
-    unsigned long stamp = THiNX::epoch();
-
-    struct tm lt = struct tm (stamp);
-    char res[32];
-    (void) localtime_r(&t, (struct tm) &lt);
-    if (strftime(res, sizeof(res), format, &lt) == 0) {
-        char str[] = sprintf("cannot format supplied date/time into buffer of size %lu using: '%s'\n", sizeof(res), format);
-        Serial.println(str);
-    }
-    return String(res);
+  return String(res);
 }
 
 /*
