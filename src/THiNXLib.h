@@ -9,14 +9,14 @@
 
 // Provides placeholder for THINX_FIRMWARE_VERSION_SHORT
 #ifndef VERSION
-#define VERSION "2.1.166"
+#define VERSION "2.1.167"
 #endif
 
 #ifndef THX_REVISION
 #ifdef THINX_FIRMWARE_VERSION_SHORT
 #define THX_REVISION THINX_FIRMWARE_VERSION_SHORT
 #else
-#define THX_REVISION "166"
+#define THX_REVISION "167"
 #endif
 #endif
 
@@ -43,12 +43,12 @@ class THiNX {
 
 public:
 
-    // Variables that can be injected into THiNX class before initial checkin...
     static double latitude;
     static double longitude;
     static String statusString;
+    static String accessPointName;
+    static String accessPointPassword;
 
-    // Disable the WiFi Manager if you don't use or don't need one.
 #ifdef __USE_WIFI_MANAGER__
     static WiFiManagerParameter *api_key_param;
     static WiFiManagerParameter *owner_param;
@@ -115,7 +115,8 @@ public:
     // dynamic variables
     char* thinx_alias;
     char* thinx_owner;
-    char* thinx_udid;
+
+    char * get_udid();
 
     void setPushConfigCallback( void (*func)(String) );
     void setFinalizeCallback( void (*func)(void) );
@@ -133,19 +134,14 @@ public:
     void publish(String, String, bool);       // send String to any channel, optinally with retain
 
     void setStatus(String);
-    void setCheckinInterval(long);
-    void setRebootInterval(long);
-
-    static const char time_format[];
-    static const char date_format[];
-
-    long epoch();                    // estimated timestamp since last checkin as
-    String time(const char*);                            // estimated current Time
-    String date(const char*);                            // estimated current Date
+    void setCheckinInterval(long interval);
+    void setRebootInterval(long interval);
 
 private:
 
-    bool connected;                           // WiFi connected in station mode
+    char* thinx_udid;
+
+    bool connected;                         // WiFi connected in station mode
     bool info_loaded = false;
 
     static char* thinx_api_key;
@@ -240,7 +236,4 @@ private:
     unsigned long wifi_wait_timeout;
     int wifi_retry;
     uint8_t wifi_status;
-
-    unsigned long last_checkin_timestamp = 0;
-    unsigned long last_checkin_millis = 0;
 };
