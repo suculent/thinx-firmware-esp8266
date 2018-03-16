@@ -44,6 +44,8 @@ void THiNX::saveConfigCallback() {
 double THiNX::latitude = 0.0;
 double THiNX::longitude = 0.0;
 String THiNX::statusString = "Registered";
+String THiNX::accessPointName = "THiNX-AP";
+String THiNX::accessPointPassword = "PASSWORD";
 
 /* Constructor */
 
@@ -72,7 +74,7 @@ THiNX::THiNX(const char * __apikey, const char * __owner_id) {
   wifiManager.setTimeout(5000);
   wifiManager.setDebugOutput(true); // does some logging on mode set
   wifiManager.setSaveConfigCallback(saveConfigCallback);
-  wifiManager.autoConnect("THiNX-AP");
+  wifiManager.autoConnect(accessPointName.c_str());
   #endif
 
   Serial.print(F("\n*TH: THiNXLib rev. "));
@@ -97,7 +99,7 @@ THiNX::THiNX(const char * __apikey, const char * __owner_id) {
   }
 
   status = WL_IDLE_STATUS;
-  connected = false;
+  wifi_connected = false;
   mqtt_client = NULL;
   mqtt_payload = "";
   mqtt_result = false;
@@ -133,10 +135,10 @@ THiNX::THiNX(const char * __apikey, const char * __owner_id) {
   info_loaded = true;
 
   #ifdef __USE_WIFI_MANAGER__
-  connected = true;
+  wifi_connected = true;
   #else
   if ((WiFi.status() == WL_CONNECTED) && (WiFi.getMode() == WIFI_STA)) {
-    connected = true;
+    wifi_connected = true;
     wifi_connection_in_progress = false;
   } else {
     WiFi.mode(WIFI_STA);
@@ -204,9 +206,13 @@ void THiNX::initWithAPIKey(const char * __apikey) {
 * Connection management
 */
 
+char* THiNX::get_udid() {
+  return strdup(thinx_udid);
+}
+
 void THiNX::connect() {
 
-  if (connected) {
+  if (wifi_connected) {
     Serial.println(F("*TH: connected"));
     return;
   }
@@ -242,7 +248,7 @@ void THiNX::connect() {
 
   if (WiFi.status() == WL_CONNECTED) {
     Serial.println(F("THiNX > LOOP > ALREADY CONNECTED"));
-    connected = true; // prevents re-entering start() [this method]
+    wifi_connected = true; // prevents re-entering start() [this method]
     wifi_connection_in_progress = false;
   } else {
     Serial.println(F("THiNX > LOOP > CONNECTING WiFi:"));
@@ -262,19 +268,19 @@ void THiNX::connect_wifi() {
   return;
   #else
 
-  if (connected) {
+  if (wifi_connected) {
     return;
   }
 
   if (wifi_connection_in_progress) {
     if (wifi_retry > 1000) {
       if (WiFi.getMode() == WIFI_STA) {
-        Serial.println(F("*TH: Starting THiNX-AP without PASSWORD..."));
+        Serial.println(F("*TH: Starting AP with PASSWORD..."));
         WiFi.mode(WIFI_AP);
-        WiFi.softAP("THiNX-AP", "PASSWORD"); // setup the AP on channel 1, not hidden, and allow 8 clients
+        WiFi.softAP(accessPointName.c_str(), accessPointPassword.c_str()); // setup the AP on channel 1, not hidden, and allow 8 clients
         wifi_retry = 0;
         wifi_connection_in_progress = false;
-        connected = true;
+        wifi_connected = true;
         return;
       } else {
         if (strlen(THINX_ENV_SSID) > 2) {
@@ -284,8 +290,6 @@ void THiNX::connect_wifi() {
           Serial.println(F("*TH: Enabling connection state (283)"));
           wifi_connection_in_progress = true; // prevents re-entering connect_wifi()
           wifi_retry = 0; // waiting for sta...
-        } else {
-          Serial.println(F("*TH: WARNING! Dead code branch (261)")); Serial.flush();
         }
       }
 
@@ -319,7 +323,7 @@ void THiNX::connect_wifi() {
 
 void THiNX::checkin() {
   Serial.println(F("\n*TH: Contacting API..."));
-  if(!connected) {
+  if(!wifi_connected) {
     Serial.println(F("*TH: Cannot checkin while not connected, exiting."));
   } else {
     senddata(checkin_body());
@@ -338,8 +342,8 @@ String THiNX::checkin_body() {
 
   root["mac"] = thinx_mac();
 
-  if (strlen(THINX_FIRMWARE_VERSION) > 1) {
-    root["firmware"] = strdup(THINX_FIRMWARE_VERSION);
+  if (strlen(thinx_firmware_version) > 1) {
+    root["firmware"] = thinx_firmware_version;
   }
 
   if (strlen(thinx_firmware_version_short) > 1) {
@@ -527,6 +531,7 @@ void THiNX::parse(String payload) {
       String udid = root["udid"];
       if ( udid.length() > 4 ) {
         thinx_udid = strdup(udid.c_str());
+        Serial.println(String("thinx_udid: ") + thinx_udid);
       }
 
       // Check current firmware based on commit id and store Updated state...
@@ -678,15 +683,16 @@ void THiNX::parse(String payload) {
           thinx_forced_update = (bool)registration[F("forced_update")];
         }
 
-        if (registration.containsKey(F("timestamp"))) {
-          Serial.println("Updating time...");
-          last_checkin_timestamp = (long)registration[F("timestamp")];
-          last_checkin_millis = millis();
-        }
-
         save_device_info();
 
       } else if (status == "FIRMWARE_UPDATE") {
+
+        String udid = registration["udid"];
+        if ( udid.length() > 4 ) {
+          thinx_udid = strdup(udid.c_str());
+        }
+
+        save_device_info();
 
         String mac = registration["mac"];
         Serial.println(String("*TH: Update for MAC: ") + mac);
@@ -703,6 +709,11 @@ void THiNX::parse(String payload) {
         String version = registration["version"];
         Serial.println(String(F("*TH: version: ")) + version);
 
+        if (thinx_auto_update == false) {
+          Serial.println(String(F("*TH: Skipping auto-update (disabled).")));
+          return;
+        }
+
         Serial.println(F("*TH: Starting direct update..."));
 
         String url = registration["url"];
@@ -715,6 +726,7 @@ void THiNX::parse(String payload) {
         if (ott.length() > 2) {
           String ott_url = "http://thinx.cloud:7442/device/firmware?ott="+ott;
           update_and_reboot(ott_url);
+          return;
         }
 
       }
@@ -1262,7 +1274,7 @@ void THiNX::update_and_reboot(String url) {
       mqtt_client->disconnect();
     }
 
-    ESP.restart();
+
   }
   #else
 
@@ -1284,6 +1296,8 @@ void THiNX::update_and_reboot(String url) {
     break;
   }
   #endif
+
+  ESP.restart();
 }
 
 /*
@@ -1411,7 +1425,7 @@ void THiNX::loop() {
   if (thinx_phase == CONNECT_WIFI) {
     // If not connected manually or using WiFiManager, start connection in progress...
     if (WiFi.status() != WL_CONNECTED) {
-      connected = false;
+      wifi_connected = false;
       if (wifi_connection_in_progress != true) {
         Serial.println(F("*TH: CONNECTING »"));
         Serial.println(F("*TH: LOOP «÷»")); Serial.flush();
@@ -1425,7 +1439,7 @@ void THiNX::loop() {
         return;
       }
     } else {
-      connected = true;
+      wifi_connected = true;
 
       // Start MDNS broadcast
       if (!MDNS.begin(thinx_alias)) {
@@ -1534,14 +1548,14 @@ void THiNX::loop() {
 void THiNX::setLocation(double lat, double lon) {
   latitude = lat;
   longitude = lon;
-  if (connected) {
+  if (wifi_connected) {
     checkin();
   }
 }
 
 void THiNX::setStatus(String newstatus) {
   statusString = newstatus;
-  if (connected) {
+  if (wifi_connected) {
     checkin();
   }
   if (mqtt_client) {
