@@ -177,7 +177,7 @@ THiNX::THiNX(const char * __apikey, const char * __owner_id) {
 void THiNX::initWithAPIKey(const char * __apikey) {
 
   #ifdef __USE_SPIFFS__
-  Serial.println(F("*TH: Checking FS..."));
+  Serial.println(F("*TH: Checking filesystem, please don't turn off or reset the device now..."));
   if (!fsck()) {
     Serial.println(F("*TH: Filesystem check failed, disabling THiNX."));
     return;
