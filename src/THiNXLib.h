@@ -134,6 +134,12 @@ public:
     void publish(String, String, bool);       // send String to any channel, optinally with retain
 
     void setStatus(String);
+    static const char time_format[];
+    static const char date_format[];
+
+    long epoch();                    // estimated timestamp since last checkin as
+    String time(const char*);                            // estimated current Time
+    String date(const char*);                            // estimated current Date
     void setCheckinInterval(long interval);
     void setRebootInterval(long interval);
 
@@ -141,7 +147,7 @@ private:
 
     char* thinx_udid;
 
-    bool connected;                         // WiFi connected in station mode
+    bool wifi_connected;                         // WiFi connected in station mode
     bool info_loaded = false;
 
     static char* thinx_api_key;
