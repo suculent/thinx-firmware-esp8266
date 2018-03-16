@@ -200,11 +200,14 @@ private:
     void parse(String);
     void update_and_reboot(String);
 
-    unsigned long checkin_timeout;          // next timeout millis()
-    unsigned long checkin_interval = 3600 * 1000;  // can be set externaly, defaults to 1h
+    long checkin_timeout;          // next timeout millis()
+    long checkin_interval = 3600 * 1000;  // can be set externaly, defaults to 1h
+    
+    long last_checkin_millis;
+    long last_checkin_timestamp;    
 
-    unsigned long reboot_timeout;          // next timeout millis()
-    unsigned long reboot_interval = 86400 * 1000;  // can be set externaly, defaults to 24h
+    long reboot_timeout;          // next timeout millis()
+    long reboot_interval = 86400 * 1000;  // can be set externaly, defaults to 24h
 
     // MQTT
     bool start_mqtt();                      // connect to broker and subscribe
