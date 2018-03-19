@@ -16,7 +16,7 @@ extern "C" {
 #endif
 
 #ifndef THINX_COMMIT_ID
-#define THINX_COMMIT_ID "c680610df8457bb634cbaa80ce00b2b761208347"
+#define THINX_COMMIT_ID "0"
 #endif
 
 char* THiNX::thinx_api_key;

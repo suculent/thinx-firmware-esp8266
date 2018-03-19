@@ -9,14 +9,14 @@
 
 // Provides placeholder for THINX_FIRMWARE_VERSION_SHORT
 #ifndef VERSION
-#define VERSION "2.1.169"
+#define VERSION "2.1.170"
 #endif
 
 #ifndef THX_REVISION
 #ifdef THINX_FIRMWARE_VERSION_SHORT
 #define THX_REVISION THINX_FIRMWARE_VERSION_SHORT
 #else
-#define THX_REVISION "169"
+#define THX_REVISION "170"
 #endif
 #endif
 
@@ -202,9 +202,9 @@ private:
 
     long checkin_timeout;          // next timeout millis()
     long checkin_interval = 3600 * 1000;  // can be set externaly, defaults to 1h
-    
+
     long last_checkin_millis;
-    long last_checkin_timestamp;    
+    long last_checkin_timestamp;
 
     long reboot_timeout;          // next timeout millis()
     long reboot_interval = 86400 * 1000;  // can be set externaly, defaults to 24h

@@ -2,9 +2,8 @@
  * THiNX Basic Example with all features
  * 
  * - Set your own WiFi credentials for development purposes.
- * - When THiNX finalizes checkin, set your custom status
+ * - When THiNX finalizes checkin, update device status over MQTT.
  * - Use the `Push Configuration` function in website's action menu to trigger pushConfigCallback() [limit 512 bytes so far]
- * - TODO: Run Transformers (JavaScript functions to transform status bytes to human readable form) to the backend
  */
 
 #include <Arduino.h>
@@ -13,33 +12,21 @@
 
 #include <THiNXLib.h>
 
-// Import SSID, PASSWORD and API KEY from file not included in repository
-#ifndef THINXCI
-#import "settings.h"
-#else
-// Those are just dummy demo values. Never store those in public repository!
-// Save them to settings.h and use .gitigore to keep file on your machine only.
-// THiNX CI will be able to add the apikey and owner_id on its own. You can configure
-// optinally THINX_ENV_SSID and THINX_ENV_PASS Environment Variables to inject those from CI.
-
-// Add this to your settings.h and ignore this file from repository before committing!
 const char *apikey = "";
 const char *owner_id = "";
-const char *ssid = "THiNX-IoT+";
+const char *ssid = "THiNX-IoT";
 const char *pass = "<enter-your-ssid-password>";
-#endif
 
 THiNX thx;
 
-/* Called after library gets connected and registered */
-void finalizeCallback () {
-  Serial.println("*INO: Finalize callback called.");
-  thx.setStatus("Hello IoT!");
-  //ESP.deepSleep(3e9);
-}
+//
+// Example of using injected Environment variables to change WiFi login credentials.
+// 
 
-/* Example of using Environment variables */
 void pushConfigCallback (String config) {
+
+  // Set MQTT status (unretained)
+  thx.publishStatusUnretained("{ \"status\" : \"push configuration received\"}"); 
 
   // Convert incoming JSON string to Object
   DynamicJsonBuffer jsonBuffer(512);
@@ -78,13 +65,51 @@ void setup() {
 
 #ifdef __DEBUG__
   while (!Serial); // wait for debug console connection
-  WiFi.begin(ssid, pass);
 #endif
 
-  thx = THiNX(apikey);
-  thx.setStatus("Hello internet!");
-  thx.setFinalizeCallback(finalizeCallback);
+  // If you need to inject WiFi credentials once...
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(ssid, pass);
+
+  //
+  // Static pre-configuration
+  //
+  
+  THiNX::accessPointName = "THiNX-AP";
+  THiNX::accessPointPassword = "PASSWORD";
+
+  //
+  // Initialization
+  // 
+  
+  thx = THiNX(apikey, owner_id);
+
+  //
+  // App and version identification
+  // 
+  
+  // Override versioning with your own app before checkin
+  thx.thinx_firmware_version = "ESP8266-THiNX-App-1.0.0";
+  thx.thinx_firmware_version_short = "1.0.0";
+
+  //
+  // Callbacks
+  // 
+
+  // Called after library gets connected and registered.
+  thx.setFinalizeCallback([]{
+    Serial.println("*INO: Finalize callback called.");  
+  thx.publishStatus("STATUS:RETAINED"); // set MQTT status (unretained)
+  });
+
+  // Called when new configuration is pushed OTA
   thx.setPushConfigCallback(pushConfigCallback);
+
+  // Callbacks can be defined inline
+  thx.setMQTTCallback([](String message) {
+    Serial.println(message);    
+  });
+       
 }
 
 /* Loop must call the thx.loop() in order to pickup MQTT messages and advance the state machine. */
