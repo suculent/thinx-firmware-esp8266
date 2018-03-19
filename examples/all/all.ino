@@ -1,5 +1,5 @@
 /*
- * THiNX Basic Example with all features
+ * THiNX Example with all features
  * 
  * - Set your own WiFi credentials for development purposes.
  * - When THiNX finalizes checkin, update device status over MQTT.
