@@ -1,0 +1,8 @@
+.pioenvs/
+
+# developer secret
+thinx-firmware-esp8266/Settings.h
+.pioenvs
+.piolibdeps
+.clang_complete
+.gcc-flags.json
