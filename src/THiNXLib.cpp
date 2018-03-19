@@ -1280,7 +1280,7 @@ void THiNX::update_and_reboot(String url) {
       mqtt_client->disconnect();
     }
 
-
+    ESP.restart();
   }
   #else
 
