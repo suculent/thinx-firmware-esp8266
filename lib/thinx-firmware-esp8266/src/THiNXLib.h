@@ -9,7 +9,7 @@
 
 // Provides placeholder for THINX_FIRMWARE_VERSION_SHORT
 #ifndef VERSION
-#define VERSION "2.1.170"
+#define VERSION "2.1.172"
 #endif
 
 #ifndef THX_REVISION
