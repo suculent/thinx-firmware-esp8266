@@ -374,6 +374,9 @@ String THiNX::checkin_body() {
   // Optional location data
   root["lat"] = String(latitude);
   root["lon"] = String(longitude);
+    
+  root["rssi"] = String(WiFi.RSSI());
+  root["snr"] = String(-100 + WiFi.RSSI()); // approximate only
 
   // Flag for THiNX CI
   #ifndef PLATFORMIO_IDE
