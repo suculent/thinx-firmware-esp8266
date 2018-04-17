@@ -9,14 +9,14 @@
 
 // Provides placeholder for THINX_FIRMWARE_VERSION_SHORT
 #ifndef VERSION
-#define VERSION "2.2.175"
+#define VERSION "2.2.177"
 #endif
 
 #ifndef THX_REVISION
 #ifdef THINX_FIRMWARE_VERSION_SHORT
 #define THX_REVISION THINX_FIRMWARE_VERSION_SHORT
 #else
-#define THX_REVISION "175"
+#define THX_REVISION "177"
 #endif
 #endif
 
@@ -142,6 +142,12 @@ public:
     String date(const char*);                            // estimated current Date
     void setCheckinInterval(long interval);
     void setRebootInterval(long interval);
+    
+    // checkins
+    void checkin();                         // happens on registration
+    void setDashboardStatus(String);        // performs checkin while updating Status on Dashboard
+    void setStatus(String);                 // deprecated 2.2 (3)
+    void setLocation(double,double);        // performs checkin while updating Location
 
 private:
 
@@ -195,12 +201,6 @@ private:
     bool fsck();                            // check filesystem if using SPIFFS
     void connect();                         // start the connect loop
     void connect_wifi();                    // start connecting
-
-    // checkins
-    void checkin();                         // happens on registration
-    void setDashboardStatus(String);        // performs checkin while updating Status on Dashboard
-    void setStatus(String);                 // deprecated 2.2 (3)
-    void setLocation(double,double);        // performs checkin while updating Location
 
     void senddata(String);
     void parse(String);
