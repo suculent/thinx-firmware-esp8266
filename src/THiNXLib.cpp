@@ -1021,8 +1021,6 @@ bool THiNX::start_mqtt() {
 
 void THiNX::restore_device_info() {
 
-  Serial.println(F("*TH: Restoring device info..."));
-
   int json_end = 0;
 
   #ifndef __USE_SPIFFS__
@@ -1088,9 +1086,6 @@ void THiNX::restore_device_info() {
   f.readBytesUntil('\n', json_info, 511);
   #endif
 
-  Serial.println(json_info);
-  Serial.println(F("*TH: Parsing..."));
-
   DynamicJsonBuffer jsonBuffer(512);
   JsonObject& config = jsonBuffer.parseObject((char*)json_info); // must not be String!
 
@@ -1100,12 +1095,8 @@ void THiNX::restore_device_info() {
 
   } else {
 
-    Serial.println(F("*TH: Reading JSON..."));
-
     if (config["alias"]) {
       thinx_alias = strdup(config["alias"]);
-      Serial.print("alias: ");
-      Serial.println(thinx_alias);
     }
 
     if (config["udid"]) {
@@ -1119,25 +1110,16 @@ void THiNX::restore_device_info() {
       thinx_udid = strdup(THINX_UDID);
     }
 
-    Serial.print("thinx_udid: ");
-    Serial.println(thinx_udid);
-
     if (config["apikey"]) {
       thinx_api_key = strdup(config["apikey"]);
-      Serial.print("apikey: ");
-      Serial.println(thinx_api_key);
     }
 
     if (config["owner"]) {
       thinx_owner = strdup(config["owner"]);
-      Serial.print("owner: ");
-      Serial.println(thinx_owner);
     }
 
     if (config["ott"]) {
       available_update_url = strdup(config["ott"]);
-      Serial.print("available_update_url: ");
-      Serial.println(available_update_url);
     }
 
     #ifdef __USE_SPIFFS__
@@ -1348,13 +1330,11 @@ void THiNX::evt_save_api_key() {
   if (should_save_config) {
     if (strlen(thx_api_key) > 4) {
       thinx_api_key = thx_api_key;
-      Serial.print(F("Saving thx_api_key from Captive Portal: "));
-      Serial.println(thinx_api_key);
+      Serial.print(F("Saving thx_api_key from Captive Portal."));
     }
     if (strlen(thx_owner_key) > 4) {
       thinx_owner_key = thx_owner_key;
-      Serial.print(F("Saving thx_owner_key from Captive Portal: "));
-      Serial.println(thinx_owner_key);
+      Serial.print(F("Saving thx_owner_key from Captive Portal."));
     }
     Serial.println("Saving device info for API key."); Serial.flush();
     save_device_info();
@@ -1406,11 +1386,8 @@ void THiNX::loop() {
       wifi_connected = false;
       if (wifi_connection_in_progress != true) {
         Serial.println(F("*TH: CONNECTING »"));
-        Serial.println(F("*TH: LOOP «÷»")); Serial.flush();
         connect(); // blocking
-        Serial.println(F("*TH: Enabling connection state (1283)"));
         wifi_connection_in_progress = true;
-        Serial.println(F("*TH: LOOP «"));
         wifi_connection_in_progress = true;
         return;
       } else {
@@ -1429,13 +1406,6 @@ void THiNX::loop() {
         if (n > 0) {
           thinx_cloud_url = strdup(String(MDNS.hostname(0)).c_str());
           thinx_mqtt_url = strdup(String(MDNS.hostname(0)).c_str());
-
-          Serial.println(F("*TH: Routing traffic through thinx-connect..."));
-          Serial.print(F("     host            : ")); Serial.println(MDNS.hostname(0));
-          Serial.print(F("     IP              : ")); Serial.println(MDNS.IP(0));
-          Serial.print(F("     port            : ")); Serial.println(MDNS.port(0));
-          Serial.print(F("     thinx_cloud_url : ")); Serial.println(thinx_cloud_url);
-          Serial.print(F("     thinx_mqtt_url  : ")); Serial.println(thinx_mqtt_url);
         }
       }
 
