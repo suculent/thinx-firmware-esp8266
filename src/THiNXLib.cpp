@@ -1336,6 +1336,7 @@ void THiNX::evt_save_api_key() {
       thinx_owner_key = thx_owner_key;
       Serial.print(F("Saving thx_owner_key from Captive Portal."));
     }
+    Serial.println("Saving device info for API key."); Serial.flush();
     save_device_info();
     should_save_config = false;
   }
