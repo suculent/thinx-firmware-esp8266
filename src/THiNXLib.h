@@ -9,14 +9,14 @@
 
 // Provides placeholder for THINX_FIRMWARE_VERSION_SHORT
 #ifndef VERSION
-#define VERSION "2.2.177"
+#define VERSION "2.2.178"
 #endif
 
 #ifndef THX_REVISION
 #ifdef THINX_FIRMWARE_VERSION_SHORT
 #define THX_REVISION THINX_FIRMWARE_VERSION_SHORT
 #else
-#define THX_REVISION "177"
+#define THX_REVISION "178"
 #endif
 #endif
 
@@ -138,11 +138,12 @@ public:
     static const char date_format[];
 
     long epoch();                    // estimated timestamp since last checkin as
+    long timezone_offset = 2;
     String time(const char*);                            // estimated current Time
     String date(const char*);                            // estimated current Date
     void setCheckinInterval(long interval);
     void setRebootInterval(long interval);
-    
+
     // checkins
     void checkin();                         // happens on registration
     void setDashboardStatus(String);        // performs checkin while updating Status on Dashboard

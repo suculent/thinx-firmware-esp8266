@@ -16,7 +16,7 @@ extern "C" {
 #endif
 
 #ifndef THINX_COMMIT_ID
-#define THINX_COMMIT_ID "0"
+#define THINX_COMMIT_ID "0c48a9ab0c4f89c4b8fb72173553d3e74986632d0"
 #endif
 
 char* THiNX::thinx_api_key;
@@ -79,16 +79,15 @@ THiNX::THiNX(const char * __apikey, const char * __owner_id) {
 
   Serial.print(F("\n*TH: THiNXLib rev. "));
   Serial.print(thx_revision);
-  Serial.print(" (");
+  Serial.print(" commit-id:");
 
-  if (strlen(thx_commit_id) > 8) { // unknown
-    thinx_commit_id = strdup(thx_commit_id);
+  if (strlen(thx_commit_id) > 8) {
+    thinx_commit_id = strdup(thx_commit_id); // -D build env var
   } else {
-    thinx_commit_id = strdup(THINX_COMMIT_ID);
+    thinx_commit_id = strdup(THINX_COMMIT_ID); // value from thinx.h
   }
 
-  Serial.print(thinx_commit_id); // returned string is "not declared in expansion of THX_CID, why?
-  Serial.println(")");
+  Serial.println(thinx_commit_id); // returned string is "not declared in expansion of THX_CID, why?
 
   // see lines ../hardware/cores/esp8266/Esp.cpp:80..100
   wdt_disable(); // causes wdt reset after 8 seconds!
@@ -375,6 +374,9 @@ String THiNX::checkin_body() {
   root["lat"] = String(latitude);
   root["lon"] = String(longitude);
 
+  root["rssi"] = String(WiFi.RSSI());
+  // root["snr"] = String(100 + WiFi.RSSI() / WiFi.RSSI()); // approximate only
+
   // Flag for THiNX CI
   #ifndef PLATFORMIO_IDE
   // THINX_PLATFORM is not overwritten by builder in Arduino IDE
@@ -403,6 +405,9 @@ String THiNX::checkin_body() {
 */
 
 void THiNX::senddata(String body) {
+
+    char buf[1024];
+    int pos = 0;
 
   // Serial.print("Sending data over HTTP to: "); Serial.println(thinx_cloud_url);
 
@@ -434,15 +439,15 @@ void THiNX::senddata(String body) {
     }
 
     // Read while connected
-    String payload;
     while ( thx_wifi_client.connected() ) {
-      delay(1);
       if ( thx_wifi_client.available() ) {
-        char str = thx_wifi_client.read();
-        payload = payload + String(str);
+          buf[pos] = thx_wifi_client.read();
+          pos++;
       }
     }
 
+    Serial.printf("Received %u bytes\n", pos);
+    String payload = String(buf);
     parse(payload);
 
   } else {
@@ -463,6 +468,9 @@ void THiNX::parse(String payload) {
 
   int start_index = 0;
   int endIndex = payload.length();
+
+  //Serial.print(F("*TH: Parsing payload:\n'"));
+  //Serial.print(payload);
 
   int reg_index = payload.indexOf("{\"registration\"");
   int upd_index = payload.indexOf("{\"FIRMWARE_UPDATE\"");
@@ -684,9 +692,10 @@ void THiNX::parse(String payload) {
         }
 
         if (registration.containsKey(F("timestamp"))) {
-          Serial.println("Updating time...");
-          last_checkin_timestamp = (long)registration[F("timestamp")];
+          Serial.print("Updating time: ");
+          last_checkin_timestamp = (long)registration[F("timestamp")] + timezone_offset * 3600;
           last_checkin_millis = millis();
+          Serial.println(time(NULL));
         }
 
         Serial.println("Saving device info for registration."); Serial.flush();
