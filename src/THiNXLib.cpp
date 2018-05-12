@@ -1452,7 +1452,10 @@ void THiNX::loop() {
         Serial.println(F("*TH: PHASE » CONNECT_MQTT"));
         mqtt_connected = start_mqtt();
         mqtt_client->loop();
-        thinx_phase = FINALIZE; // == CONNECT_MQTT+1
+          if (mqtt_connected) {
+              Serial.println(F("*TH: PHASE » CHECKIN_MQTT"));
+              thinx_phase = CHECKIN_MQTT; // == CONNECT_MQTT+1
+          }
         return;
       } else {
         thinx_phase = FINALIZE;
