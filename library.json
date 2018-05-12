@@ -1,17 +1,17 @@
 {
-  "name" : "THiNXLib",
-  "keywords" : "thinx, ota, management, mqtt",
-  "description" : "Arduino/ESP8266 library for device management communicating with THiNX API mode",
-  "authors" : {
-    "name" : "Matej Sychra",
-    "email" : "suculent@me.com",
-    "url" : "https://github.com/suculent/thinx-firmware-esp8266-pio"
+  "name": "THiNXLib",
+  "keywords": "thinx, ota, management, mqtt",
+  "description": "Arduino/ESP8266 library for device management communicating with THiNX API mode",
+  "authors": {
+    "name": "Matej Sychra",
+    "email": "suculent@me.com",
+    "url": "https://github.com/suculent/thinx-firmware-esp8266"
   },
-  "repository" : {
-    "type" : "git",
-    "url" : "https://github.com/suculent/thinx-firmware-esp8266-pio.git"
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/suculent/thinx-firmware-esp8266.git"
   },
-  "version" : "2.2.178",
-  "frameworks" : "arduino",
-  "platforms" : "*"
+  "version": "2.2.180",
+  "frameworks": "arduino",
+  "platforms": "*"
 }
