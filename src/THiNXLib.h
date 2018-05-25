@@ -44,14 +44,15 @@
 #include <PubSubClient.h>
 
 #include "sha256.h"
+#include "thinx_root_ca.h"
 
 class THiNX {
 
 public:
 
   // Root certificate used by thinx.cloud
-    static unsigned char thx_ca_cert[];
-    static unsigned int thx_ca_cert_len;
+    extern unsigned char thx_ca_cert[] PROGMEM;
+    extern unsigned int thx_ca_cert_len;
 
     static double latitude;
     static double longitude;
@@ -148,8 +149,8 @@ public:
     static const char date_format[];
 
     long epoch();                    // estimated timestamp since last checkin as
-    String thinx_time(const char*);                            // estimated current Time
-    String thinx_date(const char*);                            // estimated current Date
+    String time(const char*);                            // estimated current Time
+    String date(const char*);                            // estimated current Date
     void setCheckinInterval(long interval);
     void setRebootInterval(long interval);
 
@@ -213,12 +214,10 @@ private:
     void connect();                         // start the connect loop
     void connect_wifi();                    // start connecting
 
-    void senddata(String);                  // HTTP, will deprecate?
-    void send_data(String);                  // HTTP, will deprecate?
+    void senddata(String);
     void parse(String);
     void update_and_reboot(String);
 
-    int timezone_offset = 2;
     long checkin_timeout = 3600 * 1000;          // next timeout millis()
     long checkin_interval = 3600 * 1000;  // can be set externaly, defaults to 1h
 
@@ -266,8 +265,8 @@ private:
 
     // SHA256
     bool check_hash(char * filename, char * expected);
-    char * expected_hash;
-    char * expected_md5;
+    char expected_hash[64] = {0};
+    char expected_md5[64] = {0};
 
     // SSL/TLS
     void sync_sntp();                     // Synchronize time using SNTP instead of THiNX
