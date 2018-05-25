@@ -36,7 +36,7 @@ WiFiManagerParameter * THiNX::api_key_param;
 WiFiManagerParameter * THiNX::owner_param;
 
 void THiNX::saveConfigCallback() {
-  Serial.println(F("* TH: WiFiManager's saveConfigCallback called. Counfiguration should be saved now!"));
+  Serial.println(F("*TH: WiFiManager's saveConfigCallback called. Counfiguration should be saved now!"));
   should_save_config = true;
   strcpy(thx_api_key, api_key_param->getValue());
   strcpy(thx_owner_key, owner_param->getValue());
@@ -469,9 +469,15 @@ void THiNX::send_data(String body) {
 
   if (https_client.connect(thinx_cloud_url, 7443)) {
 
+    // Load root certificate in DER format into WiFiClientSecure object
+    bool res = https_client.setCACert_P(thx_ca_cert, thx_ca_cert_len);
+    if (!res) {
+      Serial.println("*TH: Failed to load root CA certificate!");
+    }
+
     // Verify validity of server's certificate
     if (https_client.verifyCertChain(thinx_cloud_url)) {
-      Serial.println("*TH: Server certificate verified");
+      // Serial.println("*TH: Server certificate verified");      
     } else {
       Serial.println("*TH: ERROR: certificate verification failed!");
       return;
@@ -630,7 +636,7 @@ void THiNX::parse(String payload) {
       // we must ask user to commence firmware update.
       if (thinx_auto_update == false) {
         if (mqtt_client != NULL) {
-          Serial.println(F("* TH: Update availability notification..."));
+          Serial.println(F("*TH: Update availability notification..."));
           mqtt_client->publish(
             thinx_mqtt_channel().c_str(),
             F("{ title: \"Update Available\", body: \"There is an update available for this device. Do you want to install it now?\", type: \"actionable\", response_type: \"bool\" }")
@@ -1400,20 +1406,20 @@ bool THiNX::fsck() {
 #endif
   bool fileSystemReady = false;
   if(flashCorrectlyConfigured) {
-    Serial.println(F("* TH: Starting SPIFFS..."));
+    Serial.println(F("*TH: Starting SPIFFS..."));
     #if defined(ESP8266)
       fileSystemReady = SPIFFS.begin();
     #else
       fileSystemReady = SPIFFS.begin(true); // formatOnFail=true
     #endif
     if (!fileSystemReady) {
-      Serial.println(F("* TH: Formatting SPIFFS..."));
+      Serial.println(F("*TH: Formatting SPIFFS..."));
       fileSystemReady = SPIFFS.format();;
-      Serial.println(F("* TH: Format complete, rebooting...")); Serial.flush();
+      Serial.println(F("*TH: Format complete, rebooting...")); Serial.flush();
       ESP.restart();
       return false;
     }
-    Serial.println(F("* TH: SPIFFS Initialization completed."));
+    Serial.println(F("*TH: SPIFFS Initialization completed."));
   }  else {
     Serial.print(F("*TH: Flash incorrectly configured, SPIFFS cannot start."));
 #if defined(ESP8266)
@@ -1517,12 +1523,6 @@ void THiNX::loop() {
 
       // Synchronize SNTP time
       sync_sntp();
-
-      // Load root certificate in DER format into WiFiClientSecure object
-      bool res = https_client.setCACert_P(thx_ca_cert, thx_ca_cert_len);
-      if (!res) {
-        Serial.println("*TH: Failed to load root CA certificate!");
-      }
 
       // Start MDNS broadcast
       if (!MDNS.begin(thinx_alias)) {
