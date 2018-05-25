@@ -469,9 +469,15 @@ void THiNX::send_data(String body) {
 
   if (https_client.connect(thinx_cloud_url, 7443)) {
 
+    // Load root certificate in DER format into WiFiClientSecure object
+    bool res = https_client.setCACert_P(thx_ca_cert, thx_ca_cert_len);
+    if (!res) {
+      Serial.println("*TH: Failed to load root CA certificate!");
+    }
+
     // Verify validity of server's certificate
     if (https_client.verifyCertChain(thinx_cloud_url)) {
-      Serial.println("*TH: Server certificate verified");
+      // Serial.println("*TH: Server certificate verified");
     } else {
       Serial.println("*TH: ERROR: certificate verification failed!");
       return;
@@ -1517,12 +1523,6 @@ void THiNX::loop() {
 
       // Synchronize SNTP time
       sync_sntp();
-
-      // Load root certificate in DER format into WiFiClientSecure object
-      bool res = https_client.setCACert_P(thx_ca_cert, thx_ca_cert_len);
-      if (!res) {
-        Serial.println("*TH: Failed to load root CA certificate!");
-      }
 
       // Start MDNS broadcast
       if (!MDNS.begin(thinx_alias)) {
