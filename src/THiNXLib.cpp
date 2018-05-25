@@ -326,8 +326,12 @@ void THiNX::checkin() {
   if(!wifi_connected) {
     Serial.println(F("*TH: Cannot checkin while not connected, exiting."));
   } else {
-    // senddata(checkin_body()); // HTTP
-    send_data(checkin_body()); // HTTPS
+    if (thx_ca_cert_len == 0) {
+      senddata(checkin_body()); // HTTP fallback, will deprecate
+    } else {
+      send_data(checkin_body()); // HTTPS
+    }
+
     checkin_interval = millis() + checkin_timeout;
   }
 }
@@ -465,7 +469,7 @@ void THiNX::send_data(String body) {
   char buf[1024];
   int pos = 0;
 
-  Serial.print("Sending data over HTTPS to: "); Serial.println(thinx_cloud_url);
+  Serial.println("Secure API checkin...");
 
   if (https_client.connect(thinx_cloud_url, 7443)) {
 
@@ -477,7 +481,7 @@ void THiNX::send_data(String body) {
 
     // Verify validity of server's certificate
     if (https_client.verifyCertChain(thinx_cloud_url)) {
-      // Serial.println("*TH: Server certificate verified");      
+      // Serial.println("*TH: Server certificate verified");
     } else {
       Serial.println("*TH: ERROR: certificate verification failed!");
       return;
@@ -1489,7 +1493,7 @@ void THiNX::sync_sntp() {
   Serial.println("");
   struct tm timeinfo;
   gmtime_r(&now, &timeinfo);
-  Serial.print("*TH: Current time: ");
+  Serial.print("*TH: SNTP time: ");
   Serial.print(asctime(&timeinfo));
 }
 
