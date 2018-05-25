@@ -23,9 +23,11 @@ THiNX thx;
 
 SoftwareSerial Sigfox(D2, D1); // RX (e.g. yellow), TX (e.g. orange) -- it's worth noting wire colors here
 
-#define DEFAULT_SLEEP_TIME (millis()+3600*1e6) // 1e6 is 1 000 000 microseconds = 1 second
+#define SLEEP_TIME_MICROS 3600e6
 
-unsigned long autoSleepTime = DEFAULT_SLEEP_TIME;
+#define DEFAULT_SLEEP_DELAY (millis() + 60 * 1000) // autosleep in 60 seconds
+
+unsigned long autoSleepTime = DEFAULT_SLEEP_DELAY;
 
 unsigned int raw = 0;
 float voltage = 0.0;
@@ -34,12 +36,17 @@ const char *ssid = "THiNX-IoT";
 const char *pass = "<enter-your-ssid-password>";
 
 void resetAutoSleepTime() {
-  autoSleepTime = DEFAULT_SLEEP_TIME; // Will power down in 60 secs to let the SigFox message get delivered...
+  autoSleepTime = DEFAULT_SLEEP_DELAY; // Will power down in 60 secs to let the SigFox message get delivered...
 }
 
 /* Called after library gets connected and registered */
 void finalizeCallback () {
-  Serial.println("THiNX check-in completed.");  
+  Serial.print("THiNX check-in completed. Waking up in ");
+
+  uint32_t micro = SLEEP_TIME_MICROS;
+  //micro = 300e6; // testing 5 minutes 
+  Serial.print(micro/1000000); Serial.println(" seconds");
+  ESP.deepSleep(micro);
 }
 
 /* Measures and stores current ADC voltage in global float variable */
@@ -140,6 +147,6 @@ void loop() {
   if (millis() > autoSleepTime) {
     Serial.println("Going into deep sleep for 1 hour...");
     Serial.println(millis());    
-    ESP.deepSleep(3600e9); 
+    ESP.deepSleep(SLEEP_TIME_MICROS);
   }      
 }
