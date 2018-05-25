@@ -477,7 +477,7 @@ void THiNX::send_data(String body) {
 
     // Verify validity of server's certificate
     if (https_client.verifyCertChain(thinx_cloud_url)) {
-      // Serial.println("*TH: Server certificate verified");
+      // Serial.println("*TH: Server certificate verified");      
     } else {
       Serial.println("*TH: ERROR: certificate verification failed!");
       return;
