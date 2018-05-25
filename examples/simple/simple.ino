@@ -21,7 +21,7 @@ void setup() {
 #endif
   
   // 3. initialize with API Key and Owner ID
-  thx = THiNX("71679ca646c63d234e957e37e4f4069bf4eed14afca4569a0c74abf503076732", "cedc16bb6bb06daaa3ff6d30666d91aacd6e3efbf9abbc151b4dcade59af7c12"); 
+  thx = THiNX("23a80bf9d8e1ce4d5c0be292b26bf3a935824d19a85344d238089722c6be335a", "cedc16bb6bb06daaa3ff6d30666d91aacd6e3efbf9abbc151b4dcade59af7c12"); 
 }
 
 void loop()

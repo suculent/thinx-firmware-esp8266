@@ -3,7 +3,7 @@
 //
 
 const char * THINX_ALIAS = "unnamed";
-const char * THINX_API_KEY = "0";
+const char * THINX_API_KEY = "";
 const char * THINX_APP_VERSION = "thinx-lib-esp8266-arduino:2.3.180:2018-05-25";
 const char * THINX_CLOUD_URL = "thinx.cloud";
 const char * THINX_COMMIT_ID = "0";

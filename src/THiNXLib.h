@@ -50,7 +50,7 @@ class THiNX {
 public:
 
   // Root certificate used by thinx.cloud
-    static unsigned char thx_ca_cert[];
+    static unsigned char PROGMEM thx_ca_cert[];
     static unsigned int thx_ca_cert_len;
 
     static double latitude;
