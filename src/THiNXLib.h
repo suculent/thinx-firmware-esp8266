@@ -9,14 +9,14 @@
 
 // Provides placeholder for THINX_FIRMWARE_VERSION_SHORT
 #ifndef VERSION
-#define VERSION "2.2.177"
+#define VERSION "2.3.180"
 #endif
 
 #ifndef THX_REVISION
 #ifdef THINX_FIRMWARE_VERSION_SHORT
 #define THX_REVISION THINX_FIRMWARE_VERSION_SHORT
 #else
-#define THX_REVISION "177"
+#define THX_REVISION "180"
 #endif
 #endif
 
@@ -27,6 +27,8 @@
 #endif
 
 #include <stdio.h>
+#include <time.h>
+
 #include <FS.h>
 #include <EEPROM.h>
 #include <ESP8266WiFi.h>
@@ -34,14 +36,23 @@
 #include <ESP8266HTTPClient.h>
 #include <ESP8266httpUpdate.h>
 
+#include <WiFiClientSecure.h>
+
 #include <ArduinoJson.h>
 
 // Using better than Arduino-bundled version of MQTT https://github.com/Imroy/pubsubclient
 #include <PubSubClient.h>
 
+#include "sha256.h"
+#include "thinx_root_ca.h"
+
 class THiNX {
 
 public:
+
+  // Root certificate used by thinx.cloud
+  extern const unsigned char caCert[] PROGMEM;
+  extern const unsigned int caCertLen;
 
     static double latitude;
     static double longitude;
@@ -142,7 +153,7 @@ public:
     String date(const char*);                            // estimated current Date
     void setCheckinInterval(long interval);
     void setRebootInterval(long interval);
-    
+
     // checkins
     void checkin();                         // happens on registration
     void setDashboardStatus(String);        // performs checkin while updating Status on Dashboard
@@ -183,6 +194,7 @@ private:
 
     // WiFi Manager
     WiFiClient thx_wifi_client;
+    WiFiClientSecure https_client;
     int status;                             // global WiFi status
     bool once;                              // once token for initialization
 
@@ -250,4 +262,12 @@ private:
     unsigned long wifi_wait_timeout;
     int wifi_retry;
     uint8_t wifi_status;
+
+    // SHA256
+    bool check_hash(char * filename, char * expected);
+    char expected_hash[64] = {0};
+    char expected_md5[64] = {0};
+
+    // SSL/TLS
+    void sync_sntp();                     // Synchronize time using SNTP instead of THiNX
 };
