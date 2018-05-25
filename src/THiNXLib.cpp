@@ -30,6 +30,8 @@ char THiNX::thx_api_key[65] = {0};
 char THiNX::thx_owner_key[65] = {0};
 int THiNX::should_save_config = 0;
 
+#include "thinx_root_ca.h"
+
 WiFiManagerParameter * THiNX::api_key_param;
 WiFiManagerParameter * THiNX::owner_param;
 
@@ -658,16 +660,16 @@ void THiNX::parse(String payload) {
         String ott = update["ott"];
         available_update_url = ott.c_str();
 
-        String hash = registration["hash"];
+        String hash = update["hash"];
         if (hash.length() > 2) {
-          Serial.print(F("*TH: #")); Seral.println(hash);
-          expected_hash = hash.c_str();
+          Serial.print(F("*TH: #")); Serial.println(hash);
+          expected_hash = strdup(hash.c_str());
         }
 
-        String md5 = registration["md5"];
+        String md5 = update["md5"];
         if (md5.length() > 2) {
-          Serial.print(F("*TH: #")); Seral.println(md5);
-          expected_md5 = md5.c_str();
+          Serial.print(F("*TH: #")); Serial.println(md5);
+          expected_md5 = strdup(md5.c_str());
         }
 
         Serial.println("Saving device info before firmware update."); Serial.flush();
@@ -823,14 +825,14 @@ void THiNX::parse(String payload) {
 
         String hash = registration["hash"];
         if (hash.length() > 2) {
-          Serial.print(F("*TH: #")); Seral.println(hash);
-          expected_hash = hash.c_str();
+          Serial.print(F("*TH: #")); Serial.println(hash);
+          expected_hash = strdup(hash.c_str());
         }
 
         String md5 = registration["md5"];
         if (md5.length() > 2) {
-          Serial.print(F("*TH: #")); Seral.println(md5);
-          expected_md5 = md5.c_str();
+          Serial.print(F("*TH: #")); Serial.println(md5);
+          expected_md5 = strdup(md5.c_str());
         }
 
         Serial.println(update_url);
@@ -913,7 +915,7 @@ long THiNX::epoch() {
   return last_checkin_timestamp + since_last_checkin;
 }
 
-String THiNX::time(const char* optional_format) {
+String THiNX::thinx_time(const char* optional_format) {
 
   char *format = strdup(time_format);
   if (optional_format != NULL) {
@@ -930,7 +932,7 @@ String THiNX::time(const char* optional_format) {
   return String(res);
 }
 
-String THiNX::date(const char* optional_format) {
+String THiNX::thinx_date(const char* optional_format) {
 
   char *format = strdup(date_format);
   if (optional_format != NULL) {
@@ -1517,7 +1519,7 @@ void THiNX::loop() {
       sync_sntp();
 
       // Load root certificate in DER format into WiFiClientSecure object
-      bool res = client.setCACert_P(thx_ca_cert, thx_ca_cert_len);
+      bool res = https_client.setCACert_P(thx_ca_cert, thx_ca_cert_len);
       if (!res) {
         Serial.println("*TH: Failed to load root CA certificate!");
       }
@@ -1680,7 +1682,7 @@ void THiNX::setRebootInterval(long interval) {
 // SHA256
 
 /* Calculates SHA-256 of a file */
-char * THiNX::check_hash(char * filename, char * expected) {
+bool THiNX::check_hash(char * filename, char * expected) {
   File file = SPIFFS.open(filename, "r");
   char aes_text[2 * SHA256_BLOCK_SIZE + 1];
   BYTE hash[SHA256_BLOCK_SIZE];
@@ -1727,7 +1729,7 @@ char * THiNX::check_hash(char * filename, char * expected) {
 
   } else {
     Serial.println("Failed to open file for reading");
-    return false
+    return false;
   }
 }
 
