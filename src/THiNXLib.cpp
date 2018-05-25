@@ -327,7 +327,7 @@ void THiNX::checkin() {
     Serial.println(F("*TH: Cannot checkin while not connected, exiting."));
   } else {
     if (thx_ca_cert_len == 0) {
-      senddata(checkin_body()); // HTTP fallback, will deprecate
+      senddata(checkin_body()); // HTTP fallback
     } else {
       send_data(checkin_body()); // HTTPS
     }
