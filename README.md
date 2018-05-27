@@ -6,6 +6,7 @@ An Arduino/ESP8266 library to wrap client for OTA updates and RTM (Remote Things
 
 # What's New
 
+* HTTPS can be optionally disabled for faster checkins with `THiNX:forceHTTP = true` (speeds up checkin from 120 seconds to 2 seconds)
 * SHA-256 and MD5 firmware validation; currently the MD5 only is supported by ESPhttpUpdate (it will need fork or completely own implementation)
 * Added setCheckinInterval(long) and setRebootInterval(long) to allow heartbeat and timed restarts (defaults to 24h)
 * Added example that combines THiNX with any other UART device (SigFox) for outage reporting with battery backup
