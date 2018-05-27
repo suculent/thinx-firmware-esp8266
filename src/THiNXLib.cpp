@@ -1025,16 +1025,16 @@ void THiNX::publishStatusRetain(String message, bool retain) {
 * Sends a MQTT message to the Device Channel (/owner/udid)
 */
 
-void THiNX::publish(String message, String topic, bool retain)  {
+void THiNX::publish(String message, String topic, bool retain)  {    
+  String channel = String(mqtt_device_channel) + String("/") + String(topic);
   if (mqtt_client != NULL) {
-
     if (retain == true) {
       mqtt_client->publish(
-        MQTT::Publish(mqtt_device_channel, message.c_str()).set_retain()
+        MQTT::Publish(channel.c_str(), message.c_str()).set_retain()
       );
     } else {
       mqtt_client->publish(
-        mqtt_device_channel, message.c_str()
+        channel.c_str(), message.c_str()
       );
     }
     mqtt_client->loop();
