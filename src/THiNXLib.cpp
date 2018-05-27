@@ -30,11 +30,13 @@ char THiNX::thx_api_key[65] = {0};
 char THiNX::thx_owner_key[65] = {0};
 int THiNX::should_save_config = 0;
 
+#include "thinx_root_ca.h"
+
 WiFiManagerParameter * THiNX::api_key_param;
 WiFiManagerParameter * THiNX::owner_param;
 
 void THiNX::saveConfigCallback() {
-  Serial.println(F("* TH: WiFiManager's saveConfigCallback called. Counfiguration should be saved now!"));
+  Serial.println(F("*TH: WiFiManager's saveConfigCallback called. Counfiguration should be saved now!"));
   should_save_config = true;
   strcpy(thx_api_key, api_key_param->getValue());
   strcpy(thx_owner_key, owner_param->getValue());
@@ -324,7 +326,12 @@ void THiNX::checkin() {
   if(!wifi_connected) {
     Serial.println(F("*TH: Cannot checkin while not connected, exiting."));
   } else {
-    senddata(checkin_body());
+    if (thx_ca_cert_len == 0) {
+      senddata(checkin_body()); // HTTP fallback
+    } else {
+      send_data(checkin_body()); // HTTPS
+    }
+
     checkin_interval = millis() + checkin_timeout;
   }
 }
@@ -456,6 +463,73 @@ void THiNX::senddata(String body) {
   }
 }
 
+/* Secure version */
+void THiNX::send_data(String body) {
+
+  char buf[1024];
+  int pos = 0;
+
+  Serial.println("Secure API checkin...");
+
+  if (https_client.connect(thinx_cloud_url, 7443)) {
+
+    // Load root certificate in DER format into WiFiClientSecure object
+    bool res = https_client.setCACert_P(thx_ca_cert, thx_ca_cert_len);
+    if (!res) {
+      Serial.println("*TH: Failed to load root CA certificate!");
+    }
+
+    // Verify validity of server's certificate
+    if (https_client.verifyCertChain(thinx_cloud_url)) {
+      // Serial.println("*TH: Server certificate verified");
+    } else {
+      Serial.println("*TH: ERROR: certificate verification failed!");
+      return;
+    }
+
+    https_client.println(F("POST /device/register HTTP/1.1"));
+    https_client.print(F("Host: ")); https_client.println(thinx_cloud_url);
+    https_client.print(F("Authentication: ")); https_client.println(thinx_api_key);
+    https_client.println(F("Accept: application/json")); // application/json
+    https_client.println(F("Origin: device"));
+    https_client.println(F("Content-Type: application/json"));
+    https_client.println(F("User-Agent: THiNX-Client"));
+    https_client.print(F("Content-Length: "));
+    https_client.println(body.length());
+    https_client.println();
+    https_client.println(body);
+
+    long interval = 30000;
+    unsigned long currentMillis = millis(), previousMillis = millis();
+
+    // Wait until client available or timeout...
+    while(!https_client.available()){
+      delay(1);
+      if( (currentMillis - previousMillis) > interval ){
+        https_client.stop();
+        return;
+      }
+      currentMillis = millis();
+    }
+
+    // Read while connected
+    while ( https_client.connected() ) {
+      if ( https_client.available() ) {
+          buf[pos] = https_client.read();
+          pos++;
+      }
+    }
+
+    Serial.printf("Received %u bytes\n", pos);
+    String payload = String(buf);
+    parse(payload);
+
+  } else {
+    Serial.println(F("*TH: API connection failed."));
+    return;
+  }
+}
+
 /*
 * Response Parser
 */
@@ -473,7 +547,7 @@ void THiNX::parse(String payload) {
   //Serial.print(payload);
 
   int reg_index = payload.indexOf("{\"registration\"");
-  int upd_index = payload.indexOf("{\"FIRMWARE_UPDATE\"");
+  int upd_index = payload.indexOf("{\"UPDATE\"");
   int not_index = payload.indexOf("{\"notification\"");
   int cfg_index = payload.indexOf("{\"configuration\"");
   int undefined_owner = payload.indexOf("old_protocol_owner:-undefined-");
@@ -566,7 +640,7 @@ void THiNX::parse(String payload) {
       // we must ask user to commence firmware update.
       if (thinx_auto_update == false) {
         if (mqtt_client != NULL) {
-          Serial.println(F("* TH: Update availability notification..."));
+          Serial.println(F("*TH: Update availability notification..."));
           mqtt_client->publish(
             thinx_mqtt_channel().c_str(),
             F("{ title: \"Update Available\", body: \"There is an update available for this device. Do you want to install it now?\", type: \"actionable\", response_type: \"bool\" }")
@@ -595,6 +669,18 @@ void THiNX::parse(String payload) {
 
         String ott = update["ott"];
         available_update_url = ott.c_str();
+
+        String hash = update["hash"];
+        if (hash.length() > 2) {
+          Serial.print(F("*TH: #")); Serial.println(hash);
+          expected_hash = strdup(hash.c_str());
+        }
+
+        String md5 = update["md5"];
+        if (md5.length() > 2) {
+          Serial.print(F("*TH: #")); Serial.println(md5);
+          expected_md5 = strdup(md5.c_str());
+        }
 
         Serial.println("Saving device info before firmware update."); Serial.flush();
         save_device_info();
@@ -704,6 +790,8 @@ void THiNX::parse(String payload) {
 
       } else if (status == "FIRMWARE_UPDATE") {
 
+        // Warning, this branch may be deprecated!
+
         String udid = registration["udid"];
         if ( udid.length() > 4 ) {
           thinx_udid = strdup(udid.c_str());
@@ -716,12 +804,11 @@ void THiNX::parse(String payload) {
         Serial.println(String("*TH: Update for MAC: ") + mac);
         // TODO: must be current or 'ANY'
 
+        // commit should not be same except for forced update
         String commit = registration["commit"];
-        // Serial.println(String("commit: ") + commit);
-
-        // should not be same except for forced update
+        Serial.println(String("commit: ") + commit);
         if (commit == thinx_commit_id) {
-          Serial.println(F("*TH: Warning: new firmware has same thx_commit_id as current."));
+          Serial.println(F("*TH: Info: new firmware has same thx_commit_id as current."));
         }
 
         String version = registration["version"];
@@ -744,6 +831,18 @@ void THiNX::parse(String payload) {
         if (ott.length() > 2) {
           Serial.println(F("*TH: Starting OTT update..."));
           update_url = "http://thinx.cloud:7442/device/firmware?ott="+ott;
+        }
+
+        String hash = registration["hash"];
+        if (hash.length() > 2) {
+          Serial.print(F("*TH: #")); Serial.println(hash);
+          expected_hash = strdup(hash.c_str());
+        }
+
+        String md5 = registration["md5"];
+        if (md5.length() > 2) {
+          Serial.print(F("*TH: #")); Serial.println(md5);
+          expected_md5 = strdup(md5.c_str());
         }
 
         Serial.println(update_url);
@@ -826,7 +925,7 @@ long THiNX::epoch() {
   return last_checkin_timestamp + since_last_checkin;
 }
 
-String THiNX::time(const char* optional_format) {
+String THiNX::thinx_time(const char* optional_format) {
 
   char *format = strdup(time_format);
   if (optional_format != NULL) {
@@ -843,7 +942,7 @@ String THiNX::time(const char* optional_format) {
   return String(res);
 }
 
-String THiNX::date(const char* optional_format) {
+String THiNX::thinx_date(const char* optional_format) {
 
   char *format = strdup(date_format);
   if (optional_format != NULL) {
@@ -1233,11 +1332,14 @@ void THiNX::update_and_reboot(String url) {
       mqtt_client->disconnect();
     }
   }
+
   ESP.restart();
   #else
 
+  // TODO: Download the file and check expected_hash first...
+
   Serial.println(F("*TH: Starting ESP8266 HTTP Update & reboot..."));
-  t_httpUpdate_return ret = ESPhttpUpdate.update(url.c_str());
+  t_httpUpdate_return ret = ESPhttpUpdate.update(url.c_str(), expected_md5);
 
   switch(ret) {
     case HTTP_UPDATE_FAILED:
@@ -1251,6 +1353,7 @@ void THiNX::update_and_reboot(String url) {
 
     case HTTP_UPDATE_OK:
     Serial.println(F("HTTP_UPDATE_OK"));
+    ESP.restart();
     break;
   }
   #endif
@@ -1307,20 +1410,20 @@ bool THiNX::fsck() {
 #endif
   bool fileSystemReady = false;
   if(flashCorrectlyConfigured) {
-    Serial.println(F("* TH: Starting SPIFFS..."));
+    Serial.println(F("*TH: Starting SPIFFS..."));
     #if defined(ESP8266)
       fileSystemReady = SPIFFS.begin();
     #else
       fileSystemReady = SPIFFS.begin(true); // formatOnFail=true
     #endif
     if (!fileSystemReady) {
-      Serial.println(F("* TH: Formatting SPIFFS..."));
+      Serial.println(F("*TH: Formatting SPIFFS..."));
       fileSystemReady = SPIFFS.format();;
-      Serial.println(F("* TH: Format complete, rebooting...")); Serial.flush();
+      Serial.println(F("*TH: Format complete, rebooting...")); Serial.flush();
       ESP.restart();
       return false;
     }
-    Serial.println(F("* TH: SPIFFS Initialization completed."));
+    Serial.println(F("*TH: SPIFFS Initialization completed."));
   }  else {
     Serial.print(F("*TH: Flash incorrectly configured, SPIFFS cannot start."));
 #if defined(ESP8266)
@@ -1377,6 +1480,23 @@ void THiNX::finalize() {
   }
 }
 
+/* This is necessary for SSL/TLS and should replace THiNX timestamp */
+void THiNX::sync_sntp() {
+  Serial.print("*TH: Setting time using SNTP...");
+  configTime(8 * 3600, 0, "pool.ntp.org", "time.nist.gov");
+  time_t now = time(nullptr);
+  while (now < 8 * 3600 * 2) {
+    delay(500);
+    Serial.print(".");
+    now = time(nullptr);
+  }
+  Serial.println("");
+  struct tm timeinfo;
+  gmtime_r(&now, &timeinfo);
+  Serial.print("*TH: SNTP time: ");
+  Serial.print(asctime(&timeinfo));
+}
+
 /*
 * Core loop
 */
@@ -1404,6 +1524,9 @@ void THiNX::loop() {
       }
     } else {
       wifi_connected = true;
+
+      // Synchronize SNTP time
+      sync_sntp();
 
       // Start MDNS broadcast
       if (!MDNS.begin(thinx_alias)) {
@@ -1558,6 +1681,60 @@ void THiNX::setCheckinInterval(long interval) {
 
 void THiNX::setRebootInterval(long interval) {
   reboot_interval = interval;
+}
+
+// SHA256
+
+/* Calculates SHA-256 of a file */
+bool THiNX::check_hash(char * filename, char * expected) {
+  File file = SPIFFS.open(filename, "r");
+  char aes_text[2 * SHA256_BLOCK_SIZE + 1];
+  BYTE hash[SHA256_BLOCK_SIZE];
+  static uint8_t buf[512] = {0};
+  static uint8_t obuf[512] = {0};
+  size_t len = 0;
+  uint32_t start = millis();
+  uint32_t end = start;
+  uint32_t fpos = 0;
+
+  if (file) {
+    len = file.size();
+    size_t flen = len;
+    start = millis();
+    Sha256 *sha256Instance = new Sha256();
+
+    while (len) {
+      size_t toRead = len;
+      if (toRead > 512) {
+        toRead = 512;
+      }
+      file.read(buf, toRead);
+      sha256Instance->update((const unsigned char*)buf, toRead);
+      fpos += toRead;
+      len -= toRead;
+    }
+
+    sha256Instance->final(obuf);
+    delete sha256Instance;
+
+    for (int i = 0; i < SHA256_BLOCK_SIZE; ++i) {
+      sprintf(aes_text + 2 * i, "%02X", obuf[i]);
+    }
+
+    Serial.printf("AES # %s at %u\n", aes_text, fpos);
+    Serial.printf("EXPECTED # %s", expected);
+
+    end = millis() - start;
+    Serial.printf("%u bytes hashed in %u ms\n\n", flen, end);
+
+    file.close();
+
+    return strcmp(expected, aes_text);
+
+  } else {
+    Serial.println("Failed to open file for reading");
+    return false;
+  }
 }
 
 #endif // IMPORTANT LINE FOR UNIT-TESTING!

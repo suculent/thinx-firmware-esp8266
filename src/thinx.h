@@ -3,15 +3,15 @@
 //
 
 const char * THINX_ALIAS = "unnamed";
-const char * THINX_API_KEY = "0";
-const char * THINX_APP_VERSION = "thinx-lib-esp8266-arduino:2.2.180:2018-05-12";
+const char * THINX_API_KEY = "";
+const char * THINX_APP_VERSION = "thinx-lib-esp8266-arduino:2.3.180:2018-05-25";
 const char * THINX_CLOUD_URL = "thinx.cloud";
-const char * THINX_COMMIT_ID = "0c48a9ab0c4f89c4b8fb72173553d3e74986632d0"; // R150
-const char * THINX_FIRMWARE_VERSION = "thinx-lib-esp8266-arduino:2.2.180";
-const char * THINX_FIRMWARE_VERSION_SHORT = "2.2.180";
+const char * THINX_COMMIT_ID = "0";
+const char * THINX_FIRMWARE_VERSION = "thinx-lib-esp8266-arduino:2.3.180";
+const char * THINX_FIRMWARE_VERSION_SHORT = "2.3.180";
 const char * THINX_MQTT_URL = "thinx.cloud";
 const char * THINX_OWNER = "0";
-const char * THINX_PLATFORM  = "arduino";
+const char * THINX_PLATFORM  = "platformio";
 const char * THINX_UDID = "0";
 
 const long THINX_MQTT_PORT = 1883;

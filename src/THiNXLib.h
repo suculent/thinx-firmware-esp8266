@@ -9,7 +9,7 @@
 
 // Provides placeholder for THINX_FIRMWARE_VERSION_SHORT
 #ifndef VERSION
-#define VERSION "2.2.180"
+#define VERSION "2.3.180"
 #endif
 
 #ifndef THX_REVISION
@@ -27,6 +27,8 @@
 #endif
 
 #include <stdio.h>
+#include <time.h>
+
 #include <FS.h>
 #include <EEPROM.h>
 #include <ESP8266WiFi.h>
@@ -34,14 +36,22 @@
 #include <ESP8266HTTPClient.h>
 #include <ESP8266httpUpdate.h>
 
+#include <WiFiClientSecure.h>
+
 #include <ArduinoJson.h>
 
 // Using better than Arduino-bundled version of MQTT https://github.com/Imroy/pubsubclient
 #include <PubSubClient.h>
 
+#include "sha256.h"
+
 class THiNX {
 
 public:
+
+  // Root certificate used by thinx.cloud
+    static unsigned char thx_ca_cert[];
+    static unsigned int thx_ca_cert_len;
 
     static double latitude;
     static double longitude;
@@ -138,9 +148,8 @@ public:
     static const char date_format[];
 
     long epoch();                    // estimated timestamp since last checkin as
-    long timezone_offset = 2;
-    String time(const char*);                            // estimated current Time
-    String date(const char*);                            // estimated current Date
+    String thinx_time(const char*);                            // estimated current Time
+    String thinx_date(const char*);                            // estimated current Date
     void setCheckinInterval(long interval);
     void setRebootInterval(long interval);
 
@@ -184,6 +193,7 @@ private:
 
     // WiFi Manager
     WiFiClient thx_wifi_client;
+    WiFiClientSecure https_client;
     int status;                             // global WiFi status
     bool once;                              // once token for initialization
 
@@ -203,10 +213,12 @@ private:
     void connect();                         // start the connect loop
     void connect_wifi();                    // start connecting
 
-    void senddata(String);
+    void senddata(String);                  // HTTP, will deprecate?
+    void send_data(String);                  // HTTP, will deprecate?
     void parse(String);
     void update_and_reboot(String);
 
+    int timezone_offset = 2;
     long checkin_timeout = 3600 * 1000;          // next timeout millis()
     long checkin_interval = 3600 * 1000;  // can be set externaly, defaults to 1h
 
@@ -251,4 +263,12 @@ private:
     unsigned long wifi_wait_timeout;
     int wifi_retry;
     uint8_t wifi_status;
+
+    // SHA256
+    bool check_hash(char * filename, char * expected);
+    char * expected_hash;
+    char * expected_md5;
+
+    // SSL/TLS
+    void sync_sntp();                     // Synchronize time using SNTP instead of THiNX
 };
