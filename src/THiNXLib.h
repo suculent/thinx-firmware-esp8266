@@ -53,6 +53,7 @@ public:
     static unsigned char thx_ca_cert[];
     static unsigned int thx_ca_cert_len;
 
+    static bool forceHTTP;                        // set to true for disabling HTTPS
     static double latitude;
     static double longitude;
     static String statusString;

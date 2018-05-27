@@ -22,6 +22,8 @@ extern "C" {
 char* THiNX::thinx_api_key;
 char* THiNX::thinx_owner_key;
 
+bool THiNX::forceHTTP = false;
+
 const char THiNX::time_format[] = "%T";
 const char THiNX::date_format[] = "%Y-%M-%d";
 
@@ -329,7 +331,11 @@ void THiNX::checkin() {
     if (thx_ca_cert_len == 0) {
       senddata(checkin_body()); // HTTP fallback
     } else {
-      send_data(checkin_body()); // HTTPS
+      if (forceHTTP) {
+        senddata(checkin_body()); // HTTP fallback
+      } else {
+        send_data(checkin_body()); // HTTPS
+      }
     }
 
     checkin_interval = millis() + checkin_timeout;
@@ -427,6 +433,7 @@ void THiNX::senddata(String body) {
     thx_wifi_client.println(F("Origin: device"));
     thx_wifi_client.println(F("Content-Type: application/json"));
     thx_wifi_client.println(F("User-Agent: THiNX-Client"));
+    thx_wifi_client.println(F("Connection: close"));
     thx_wifi_client.print(F("Content-Length: "));
     thx_wifi_client.println(body.length());
     thx_wifi_client.println();
@@ -452,6 +459,8 @@ void THiNX::senddata(String body) {
           pos++;
       }
     }
+
+    thx_wifi_client.stop();
 
     Serial.printf("Received %u bytes\n", pos);
     String payload = String(buf);
@@ -1483,7 +1492,8 @@ void THiNX::finalize() {
 /* This is necessary for SSL/TLS and should replace THiNX timestamp */
 void THiNX::sync_sntp() {
   Serial.print("*TH: Setting time using SNTP...");
-  configTime(8 * 3600, 0, "pool.ntp.org", "time.nist.gov");
+  // find closest server at http://www.pool.ntp.org/zone/
+  configTime(8 * 3600, 0, "0.europe.pool.ntp.org", "cz.pool.ntp.org");
   time_t now = time(nullptr);
   while (now < 8 * 3600 * 2) {
     delay(500);
