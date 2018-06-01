@@ -171,12 +171,12 @@ THiNX::THiNX(const char * __apikey, const char * __owner_id) {
       }
   }
 
-  initWithAPIKey(thinx_api_key);
+  init_with_api_key(thinx_api_key);
   wifi_connection_in_progress = false; // last
 }
 
 // Designated initializer
-void THiNX::initWithAPIKey(const char * __apikey) {
+void THiNX::init_with_api_key(const char * __apikey) {
 
   #ifdef __USE_SPIFFS__
   Serial.println(F("*TH: Checking filesystem, please don't turn off or reset the device now..."));
@@ -490,7 +490,7 @@ void THiNX::send_data(String body) {
 
     // Verify validity of server's certificate
     if (https_client.verifyCertChain(thinx_cloud_url)) {
-      // Serial.println("*TH: Server certificate verified");
+      Serial.println("*TH: Server certificate verified. Handshake will take about 120 seconds now... keep calm.");
     } else {
       Serial.println("*TH: ERROR: certificate verification failed!");
       return;
@@ -508,14 +508,14 @@ void THiNX::send_data(String body) {
     https_client.println();
     https_client.println(body);
 
-    long interval = 30000;
+    long interval = 15000;
     unsigned long currentMillis = millis(), previousMillis = millis();
 
     // Wait until client available or timeout...
     while(!https_client.available()){
       delay(1);
       if( (currentMillis - previousMillis) > interval ){
-        https_client.stop();
+        https_client.stop(); // keep for MQTT with CA set...?
         return;
       }
       currentMillis = millis();
@@ -1025,7 +1025,7 @@ void THiNX::publishStatusRetain(String message, bool retain) {
 * Sends a MQTT message to the Device Channel (/owner/udid)
 */
 
-void THiNX::publish(String message, String topic, bool retain)  {    
+void THiNX::publish(String message, String topic, bool retain)  {
   String channel = String(mqtt_device_channel) + String("/") + String(topic);
   if (mqtt_client != NULL) {
     if (retain == true) {
@@ -1063,8 +1063,20 @@ bool THiNX::start_mqtt() {
     return false;
   }
 
-  Serial.println(F("*TH: Contacting MQTT server..."));
-  mqtt_client = new PubSubClient(thx_wifi_client, thinx_mqtt_url);
+  if (forceHTTP == true) {
+    Serial.println(F("*TH: Contacting MQTT server over HTTP..."));
+    mqtt_client = new PubSubClient(thx_wifi_client, thinx_mqtt_url);
+  } else {
+    Serial.println(F("*TH: Contacting MQTT server over HTTPS..."));
+    bool res = https_client.setCACert_P(thx_ca_cert, thx_ca_cert_len);
+    if (res) {
+      mqtt_client = new PubSubClient(https_client, thinx_mqtt_url);
+    } else {
+      Serial.println("*TH: Failed to load root CA certificate for MQTT!");
+    }
+  }
+
+
   last_mqtt_reconnect = 0;
 
   if (strlen(thinx_api_key) < 5) {
@@ -1116,9 +1128,9 @@ bool THiNX::start_mqtt() {
         Serial.println(F("*TH: MQTT Type: String or JSON..."));
         Serial.println(pub.payload_string());
         parse(pub.payload_string());
-          if (_mqtt_callback) {
-              _mqtt_callback(pub.payload_string());
-          }
+        if (_mqtt_callback) {
+            _mqtt_callback(pub.payload_string());
+        }
       }
     }); // end-of-callback
 
@@ -1127,12 +1139,22 @@ bool THiNX::start_mqtt() {
   } else {
     mqtt_connected = false;
     Serial.println(F("*TH: MQTT Not connected."));
+
+    #ifdef __DEBUG__
+          Serial.println("*TH: Failed to load root CA certificate for MQTT, falling back to HTTP!");
+          forceHTTP = false;
+          mqtt_client = new PubSubClient(thx_wifi_client, thinx_mqtt_url);
+          return start_mqtt();
+    #else
+          Serial.println("*TH: Failed to connect using MQTTS!");
+    #endif
+
     return false;
   }
 }
 
 /*
-* Restores Device Info. Calles (private): initWithAPIKey; save_device_info()
+* Restores Device Info. Callers (private): init_with_api_key; save_device_info()
 * Provides: alias, owner, update, udid, (apikey)
 */
 

@@ -49,14 +49,11 @@ void setup() {
 
   THiNX::accessPointName = "THiNX-AP";
   THiNX::accessPointPassword = "PASSWORD";
-
+  THiNX::forceHTTP = true; // disable HTTPS for faster checkins, enable for production security
+  
   //
   // Initialization
-  //x
-
-  // THiNX::forceHTTP = true; disable HTTPS to speed-up checkin in development
-
-  THiNX::forceHTTP = true;
+  //
 
   thx = THiNX(apikey, owner_id);
 
@@ -74,13 +71,13 @@ void setup() {
 
   // Called after library gets connected and registered.
   thx.setFinalizeCallback([] {
-    Serial.println("*INO: Finalize callback called.");
+    Serial.println("THX: Finalize callback called.");
 
     thx.publishStatus("{ \"status\" : \"server-ready\" }"); // set MQTT status (unretained)
 
     server.on("/", []() {
       Serial.println("HTTP root requested...");
-      server.send(200, "text/plain", "Supported commands? You wish...");
+      server.send(200, "text/plain", "Welcome to Terminator D1");
     });
 
     server.on("/help", []() {
@@ -90,21 +87,21 @@ void setup() {
 
     server.on("/on", []() {
       Serial.println("HTTP on requested...");
-      relay_on();
+      terminator_on();
       server.send(200, "text/plain", "Toggled ON.");
     });
 
     server.on("/off", []() {
       Serial.println("HTTP off requested...");
-      relay_off();
+      terminator_off();
       server.send(200, "text/plain", "Toggled OFF.");
     });
 
     server.on("/toggle", []() {
       Serial.println("HTTP toggle requested...");
-      relay_off();
+      terminator_on();
       set_toggle_delay(5000);
-      relay_on();
+      terminator_off();
       server.send(200, "text/plain", "Toggled OFF/ON after 5 seconds.");
     });
 
@@ -115,7 +112,7 @@ void setup() {
 
     server.begin();
 
-    Serial.println("HTTP server started");
+    Serial.println("SETUP: HTTP server started");
     Serial.println("...");
   });
 
@@ -148,19 +145,20 @@ void setup() {
 
     if (message.indexOf("on") != -1) {
       Serial.println("MQTT: Relay ON");
-      relay_on();
+      terminator_on();
     }
 
     if (message.indexOf("off") != -1) {
       Serial.println("MQTT: Relay OFF");
-      relay_off();
+      terminator_off();
     }
 
     if (message.indexOf("delay") != -1) {
       int param = root["param"];
       Serial.print("MQTT: Relay toggle with param ");
       Serial.println(param);
-      relay_toggle_after(param);
+      terminator_on();
+      toggle_after(param);
     }
 
   });
@@ -175,19 +173,19 @@ void setup() {
 
 /* User wants to change current status to ON. */
 
-void relay_on() {
-  Serial.println("BUS: Setting ON...");
+void terminator_on() {
+  Serial.println("BUS: Terminator ON...");
   set_state(true);
 }
 
 /* User wants to change current status to OFF. */
-void relay_off() {
-  Serial.println("BUS: Setting OFF...");
+void terminator_off() {
+  Serial.println("BUS: Terminator OFF...");
   set_state(false);
 }
 
 /* User wants to flip the current status after a timeout. */
-void relay_toggle_after(int seconds) {
+void toggle_after(int seconds) {
   Serial.println("BUS: Setting toggle_after...");
   set_toggle_delay(seconds);
 }
@@ -200,7 +198,7 @@ void set_state(bool state) {
     Serial.print("TECH: Setting state to ");
     Serial.println(state);
     relay_state = state;
-    digitalWrite(relay_pin, relay_state);
+    digitalWrite(relay_pin, relay_state); // ! because connected to NC port of relay    
   }
 }
 
@@ -216,10 +214,10 @@ void set_toggle_delay(long delay_time) {
 */
 void process_state() {
   if ( (toggle_delay > 0) && (toggle_delay < millis()) ) {
-    Serial.println("Toggle delay expired. Switching...");
+    Serial.println("PROC: Toggle delay expired. Switching...");
     toggle_delay = -1;
     relay_toggle();
-    Serial.print("Result state: ");
+    Serial.print("PROC: Result state: ");
     Serial.println(relay_state);
   } else {
     set_state(relay_state);
@@ -228,10 +226,11 @@ void process_state() {
 
 /* Switches current relay state. Change will occur on process_state() in main loop. */
 void relay_toggle() {
-  Serial.print("Toggling state: ");
+  Serial.print("TOGGLE: Toggling state: ");
   Serial.println(relay_state);
   set_state(!relay_state);
-  Serial.print("Final state: ");
+  toggle_delay = -1;
+  Serial.print("TOGGLE: Final state: ");
   Serial.println(relay_state);
 }
 

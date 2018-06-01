@@ -93,7 +93,7 @@ public:
     phase thinx_phase;
 
     // Public API
-    void initWithAPIKey(const char *);
+    void init_with_api_key(const char *);
     void loop();
 
     String checkin_body();                  // TODO: Refactor to C-string
