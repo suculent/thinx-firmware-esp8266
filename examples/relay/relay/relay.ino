@@ -29,7 +29,7 @@ THiNX thx;
 
 ESP8266WebServer server(80);
 
-void handleNotFound();
+//
 
 void setup() {  
 
@@ -65,8 +65,8 @@ void setup() {
   //
 
   // Override versioning with your own app before checkin
-  thx.thinx_firmware_version = "ESP8266-THiNX-App-1.0.0";
-  thx.thinx_firmware_version_short = "1.0.0";
+  thx.thinx_firmware_version = "ESP8266-THiNX-Relay-0.0.1";
+  thx.thinx_firmware_version_short = "0.0.1";
 
   //
   // Callbacks
@@ -108,7 +108,10 @@ void setup() {
       server.send(200, "text/plain", "Toggled OFF/ON after 5 seconds.");
     });
 
-    server.onNotFound(handleNotFound);
+    server.onNotFound([](void){
+      server.send(404, "text/plain", "No go.");
+    });
+    
 
     server.begin();
 
@@ -163,11 +166,8 @@ void setup() {
   });
 
   pinMode(relay_pin, OUTPUT);
+  digitalWrite(relay_pin, LOW);
 
-}
-
-void handleNotFound() {
-  server.send(404, "text/plain", "No go.");
 }
 
 
@@ -215,7 +215,7 @@ void set_toggle_delay(long delay_time) {
    Otherwise just updates the relay state.
 */
 void process_state() {
-  if ( (toggle_delay > 0) && (toggle_delay > millis()) ) {
+  if ( (toggle_delay > 0) && (toggle_delay < millis()) ) {
     Serial.println("Toggle delay expired. Switching...");
     toggle_delay = -1;
     relay_toggle();
@@ -236,10 +236,10 @@ void relay_toggle() {
 }
 
 /* Loop must call the thx.loop() in order to pickup MQTT messages and advance the state machine. */
-void loop()
+void loop(void)
 {
   process_state();
   thx.loop();
-  yield();
+  server.handleClient();
   delay(100);
 }
