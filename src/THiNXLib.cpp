@@ -1514,8 +1514,8 @@ void THiNX::finalize() {
 /* This is necessary for SSL/TLS and should replace THiNX timestamp */
 void THiNX::sync_sntp() {
   Serial.print("*TH: Setting time using SNTP...");
-  // find closest server at http://www.pool.ntp.org/zone/
-  configTime(timezone_offset * 3600, 3600, "0.europe.pool.ntp.org", "cz.pool.ntp.org");
+  // THiNX API returns timezone_offset in current DST, if applicable
+  configTime(timezone_offset * 3600, 0, "0.europe.pool.ntp.org", "cz.pool.ntp.org");
   time_t now = time(nullptr);
   while (now < 8 * 3600 * 2) {
     delay(500);

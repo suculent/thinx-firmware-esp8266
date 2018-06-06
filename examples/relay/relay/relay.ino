@@ -16,10 +16,17 @@
 
 const char *apikey = "c81a4c9d1e10979bdc9dfe12141c476c05055e096d0c6413fb00a25217715dfd";
 const char *owner_id = "cedc16bb6bb06daaa3ff6d30666d91aacd6e3efbf9abbc151b4dcade59af7c12";
-const char *ssid = "THiNX-IoT";
-const char *pass = "<enter-your-ssid-password>";
+
+const char *ssid_1 = "SSID-1";
+const char *pass_1 = "password-1";
+
+const char *ssid_2 = "SSID-2";
+const char *pass_2 = "password-2";
+
+int ledstate;
 
 const int relay_pin = D1;
+const int LED_PIN = D4;
 bool relay_state = false;
 long toggle_delay = -1;
 
@@ -31,17 +38,62 @@ ESP8266WebServer server(80);
 
 //
 
+void scan_and_connect_wifi() {
+  // If you need to inject WiFi credentials once...
+  WiFi.mode(WIFI_STA);
+
+  unsigned long timeout; // wifi connection timeout(s)
+  int wifi_status = WiFi.waitForConnectResult();
+  
+  WiFi.begin(ssid_1, pass_1);
+  delay(2000);
+
+  if (wifi_status != WL_CONNECTED) {    
+    Serial.println(F("Waiting for WiFi connection..."));
+    
+    timeout = millis() + 5000;
+    while (millis() < timeout) {
+      ledstate = !ledstate;
+      digitalWrite(LED_PIN, ledstate);
+      delay(500);
+      Serial.print(".");
+    }
+  }
+
+  wifi_status = WiFi.waitForConnectResult();
+
+  if (wifi_status != WL_CONNECTED) {
+    WiFi.begin(ssid_2, pass_2);
+    delay(2000);
+  
+    timeout = millis() + 5000;
+    while (millis() < timeout) {
+      ledstate = !ledstate;
+      digitalWrite(LED_PIN, ledstate);
+      delay(500);
+      Serial.print(".");
+    }
+  }
+
+  wifi_status = WiFi.waitForConnectResult();
+
+  if (wifi_status != WL_CONNECTED) {
+    Serial.println("WiFi Failed. Rebooting...");
+    Serial.flush();
+    ESP.reset();
+  }
+ 
+}
+
 void setup() {  
 
-  Serial.begin(115200);
+  Serial.begin(230400);
 
 #ifdef __DEBUG__
   while (!Serial); // wait for debug console connection
 #endif
 
-  // If you need to inject WiFi credentials once...
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(ssid, pass);
+  scan_and_connect_wifi();
 
   //
   // Static pre-configuration
@@ -76,32 +128,34 @@ void setup() {
     thx.publishStatus("{ \"status\" : \"server-ready\" }"); // set MQTT status (unretained)
 
     server.on("/", []() {
-      Serial.println("HTTP root requested...");
+      Serial.println("\nHTTP root requested...");
       server.send(200, "text/plain", "Welcome to Terminator D1");
     });
 
     server.on("/help", []() {
-      Serial.println("HTTP help requested...");
-      server.send(200, "text/plain", "[on, off, toggle]");
+      Serial.println("\nHTTP help requested...");
+      server.send(200, "text/plain", "[on, off, toggle] where toggle has default 5 seconds and starts with terminated state");
     });
 
     server.on("/on", []() {
-      Serial.println("HTTP on requested...");
+      if (server.method() != HTTP_GET) return;
+      Serial.println("\nHTTP on requested...");
       terminator_on();
       server.send(200, "text/plain", "Toggled ON.");
     });
 
     server.on("/off", []() {
-      Serial.println("HTTP off requested...");
+      if (server.method() != HTTP_GET) return;
+      Serial.println("\nHTTP off requested...");
       terminator_off();
       server.send(200, "text/plain", "Toggled OFF.");
     });
 
     server.on("/toggle", []() {
-      Serial.println("HTTP toggle requested...");
+      if (server.method() != HTTP_GET) return;
+      Serial.println("\nHTTP toggle requested...");
       terminator_on();
-      set_toggle_delay(5000);
-      terminator_off();
+      set_toggle_delay(5000);      
       server.send(200, "text/plain", "Toggled OFF/ON after 5 seconds.");
     });
 
@@ -113,12 +167,12 @@ void setup() {
     server.begin();
 
     Serial.println("SETUP: HTTP server started");
+    digitalWrite(LED_PIN, HIGH);
     Serial.println("...");
   });
 
   /*
      Supported messages
-
 
     {
     "command" : "on"
@@ -216,7 +270,7 @@ void process_state() {
   if ( (toggle_delay > 0) && (toggle_delay < millis()) ) {
     Serial.println("PROC: Toggle delay expired. Switching...");
     toggle_delay = -1;
-    relay_toggle();
+    terminator_off();
     Serial.print("PROC: Result state: ");
     Serial.println(relay_state);
   } else {
