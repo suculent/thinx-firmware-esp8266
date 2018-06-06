@@ -1515,7 +1515,7 @@ void THiNX::finalize() {
 void THiNX::sync_sntp() {
   Serial.print("*TH: Setting time using SNTP...");
   // find closest server at http://www.pool.ntp.org/zone/
-  configTime(8 * 3600, 0, "0.europe.pool.ntp.org", "cz.pool.ntp.org");
+  configTime(timezone_offset * 3600, 3600, "0.europe.pool.ntp.org", "cz.pool.ntp.org");
   time_t now = time(nullptr);
   while (now < 8 * 3600 * 2) {
     delay(500);
