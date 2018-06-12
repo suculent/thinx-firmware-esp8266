@@ -25,7 +25,7 @@ char* THiNX::thinx_owner_key;
 bool THiNX::forceHTTP = false;
 
 const char THiNX::time_format[] = "%T";
-const char THiNX::date_format[] = "%Y-%M-%d";
+const char THiNX::date_format[] = "%Y-%m-%d";
 
 #ifdef __USE_WIFI_MANAGER__
 char THiNX::thx_api_key[65] = {0};
@@ -328,13 +328,14 @@ void THiNX::checkin() {
   if(!wifi_connected) {
     Serial.println(F("*TH: Cannot checkin while not connected, exiting."));
   } else {
+    String body = checkin_body();
     if (thx_ca_cert_len == 0) {
-      senddata(checkin_body()); // HTTP fallback
+      senddata(body); // HTTP fallback
     } else {
       if (forceHTTP) {
-        senddata(checkin_body()); // HTTP fallback
+        senddata(body); // HTTP fallback
       } else {
-        send_data(checkin_body()); // HTTPS
+        send_data(body); // HTTPS
       }
     }
 
@@ -419,7 +420,7 @@ String THiNX::checkin_body() {
 
 void THiNX::senddata(String body) {
 
-    char buf[1024];
+    char buf[512];
     int pos = 0;
 
   // Serial.print("Sending data over HTTP to: "); Serial.println(thinx_cloud_url);
@@ -462,7 +463,7 @@ void THiNX::senddata(String body) {
 
     thx_wifi_client.stop();
 
-    Serial.printf("Received %u bytes\n", pos);
+    Serial.printf("*TH: Received %u bytes\n", pos);
     String payload = String(buf);
     parse(payload);
 
@@ -475,7 +476,7 @@ void THiNX::senddata(String body) {
 /* Secure version */
 void THiNX::send_data(String body) {
 
-  char buf[1024];
+  char buf[512];
   int pos = 0;
 
   Serial.println("Secure API checkin...");
@@ -529,7 +530,7 @@ void THiNX::send_data(String body) {
       }
     }
 
-    Serial.printf("Received %u bytes\n", pos);
+    Serial.printf("*TH: Received %u bytes\n", pos);
     String payload = String(buf);
     parse(payload);
 
@@ -592,9 +593,9 @@ void THiNX::parse(String payload) {
   String body = payload.substring(start_index, endIndex);
 
 #ifdef __DEBUG__
-  Serial.print(F("*TH: Parsing response:\n'"));
-  Serial.print(body);
-  Serial.println("'");
+  //Serial.print(F("*TH: Parsing response:\n'"));
+  //Serial.print(body);
+  //Serial.println("'");
 #endif
 
   DynamicJsonBuffer jsonBuffer(1024);
@@ -787,13 +788,13 @@ void THiNX::parse(String payload) {
         }
 
         if (registration.containsKey(F("timestamp"))) {
-          Serial.print("Updating time: ");
+          Serial.print(F("*TH: Updating THiNX time: "));
           last_checkin_timestamp = (long)registration[F("timestamp")] + timezone_offset * 3600;
           last_checkin_millis = millis();
-          Serial.println(time(NULL));
+          Serial.print(thinx_time(NULL));
+          Serial.print(" ");
+          Serial.println(thinx_date(NULL));
         }
-
-        Serial.println("Saving device info for registration."); Serial.flush();
 
         save_device_info();
 
@@ -1017,7 +1018,7 @@ void THiNX::publishStatusRetain(String message, bool retain) {
     }
     mqtt_client->loop();
   } else {
-    Serial.println(F("*TH: MQTT not active."));
+    Serial.println(F("*TH: MQTT not active while trying to publish retained status."));
   }
 }
 
@@ -1039,7 +1040,7 @@ void THiNX::publish(String message, String topic, bool retain)  {
     }
     mqtt_client->loop();
   } else {
-    Serial.println(F("MQTT not active."));
+    Serial.println(F("*TH: MQTT not active while trying to publish message."));
   }
 }
 
@@ -1076,7 +1077,6 @@ bool THiNX::start_mqtt() {
     }
   }
 
-
   last_mqtt_reconnect = 0;
 
   if (strlen(thinx_api_key) < 5) {
@@ -1094,7 +1094,7 @@ bool THiNX::start_mqtt() {
   if (mqtt_client->connect(MQTT::Connect(id)
     .set_will(willTopic.c_str(), F("{ \"status\" : \"disconnected\" }"))
     .set_auth(user, pass)
-    .set_keepalive(60))) {
+    .set_keepalive(30))) {
 
     mqtt_connected = true;
     performed_mqtt_checkin = true;
@@ -1284,7 +1284,8 @@ void THiNX::save_device_info()
     Serial.println(F("*TH: Saving configuration to SPIFFS..."));
     f.println(String((char*)json_info)); // String instead of const char* due to LoadStoreAlignmentCause...
     f.close();
-    Serial.println(F("*TH: Saved configuration (SPIFFS)."));
+  } else {
+    Serial.println(F("*TH: Saving configuration failed!"));
   }
   #else
   Serial.println(F("*TH: Saving configuration to EEPROM: "));
@@ -1535,12 +1536,6 @@ void THiNX::sync_sntp() {
 
 void THiNX::loop() {
 
-  if (thinx_phase < COMPLETED) {
-    // Serial.print("Phase: "); Serial.println(thinx_phase);
-  }
-
-  // CASE thinx_phase == CONNECT_WIFI
-
   if (thinx_phase == CONNECT_WIFI) {
     // If not connected manually or using WiFiManager, start connection in progress...
     if (WiFi.status() != WL_CONNECTED) {
@@ -1573,7 +1568,6 @@ void THiNX::loop() {
         }
       }
 
-      Serial.println(F("*TH: LOOP » CONNECT_API"));
       thinx_phase = CONNECT_API;
       return;
     }
@@ -1587,14 +1581,14 @@ void THiNX::loop() {
         Serial.print(F("*TH: MQTT device topic: "));
         Serial.print(mqtt_device_channel);
         Serial.println(F(" successfully subscribed."));
-        Serial.println(F("*TH: Publishing `status: connected` to MQTT"));
+        Serial.println(F("*TH: Publishing connected `status: connected` to MQTT"));
         // Publish status on status channel
         mqtt_client->publish(
           mqtt_device_status_channel,
           F("{ \"status\" : \"connected\" }")
         );
         mqtt_client->loop();
-        Serial.println(F("*TH: LOOP » FINALIZE"));
+        //Serial.println(F("*TH: LOOP » FINALIZE"));
         thinx_phase = FINALIZE;
         return;
       }
@@ -1604,13 +1598,13 @@ void THiNX::loop() {
   if ( thinx_phase == CONNECT_MQTT ) {
     if (strlen(thinx_udid) > 4) {
       if (mqtt_connected == false) {
-        Serial.println(F("*TH: PHASE » CONNECT_MQTT"));
         mqtt_connected = start_mqtt();
         mqtt_client->loop();
-          if (mqtt_connected) {
-              Serial.println(F("*TH: PHASE » CHECKIN_MQTT"));
-              thinx_phase = CHECKIN_MQTT; // == CONNECT_MQTT+1
-          }
+        if (mqtt_connected) {
+            thinx_phase = CHECKIN_MQTT;
+        } else {
+          // tries again next time
+        }
         return;
       } else {
         thinx_phase = FINALIZE;
@@ -1623,14 +1617,30 @@ void THiNX::loop() {
     }
   }
 
+  if (mqtt_connected == true) {
+    mqtt_connected = mqtt_client->connected();
+    if (!mqtt_connected) {
+      Serial.println(F("*TH: MQTT RECONNECT"));
+      mqtt_connected = start_mqtt();
+      mqtt_client->loop();
+      if (mqtt_connected) {
+          thinx_phase = CHECKIN_MQTT;
+      } else {
+        // tries again next time
+      }
+    }
+  }
+
   // CASE thinx_phase == CONNECT_API
 
   // Force re-checkin after specified interval
-  if (millis() > checkin_timeout) {
-    if (checkin_interval > 0) {
-      Serial.println(F("*TH: LOOP » CONNECT_API"));
-      thinx_phase = CONNECT_API;
-      checkin_interval = millis() + checkin_timeout;
+  if (thinx_phase > FINALIZE) {
+    if (millis() > checkin_timeout) {
+      if (checkin_interval > 0) {
+        Serial.println(F("*TH: LOOP » Checkin interval arrived..."));
+        thinx_phase = CONNECT_API;
+        checkin_timeout = millis() + checkin_interval;
+      }
     }
   }
 
@@ -1641,10 +1651,8 @@ void THiNX::loop() {
       return;
     }
     if (strlen(thinx_api_key) > 4) {
-      Serial.println(F("*TH: LOOP » CONNECT_API in phase"));
       checkin(); // warning, this blocking and takes time, thus return...
       if (mqtt_connected == false) {
-        Serial.println(F("*TH: LOOP » CONNECT_MQTT"));
         thinx_phase = CONNECT_MQTT;
       } else {
         Serial.println(F("*TH: LOOP » FINALIZE (mqtt connected)"));

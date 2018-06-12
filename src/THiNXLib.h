@@ -1,7 +1,7 @@
 #include <Arduino.h>
 
-#define __DEBUG__ // enables stack/heap debugging
-#define __DEBUG_JSON__ // enables API request debugging
+//#define __DEBUG__ // enables stack/heap debugging
+//#define __DEBUG_JSON__ // enables API request debugging
 
 #define __ENABLE_WIFI_MIGRATION__ // enable automatic WiFi disconnect/reconnect on Configuration Push (THINX_ENV_SSID and THINX_ENV_PASS)
 #define __USE_WIFI_MANAGER__ // if disabled, you need to `WiFi.begin(ssid, pass)` on your own
@@ -9,14 +9,14 @@
 
 // Provides placeholder for THINX_FIRMWARE_VERSION_SHORT
 #ifndef VERSION
-#define VERSION "2.3.182"
+#define VERSION "2.3.183"
 #endif
 
 #ifndef THX_REVISION
 #ifdef THINX_FIRMWARE_VERSION_SHORT
 #define THX_REVISION THINX_FIRMWARE_VERSION_SHORT
 #else
-#define THX_REVISION "182"
+#define THX_REVISION "183"
 #endif
 #endif
 
@@ -220,14 +220,14 @@ private:
     void update_and_reboot(String);
 
     int timezone_offset = 2;
-    long checkin_timeout = 3600 * 1000;          // next timeout millis()
-    long checkin_interval = 3600 * 1000;  // can be set externaly, defaults to 1h
+    unsigned long checkin_timeout = 3600 * 1000;          // next timeout millis()
+    unsigned long checkin_interval = 3600 * 1000;  // can be set externaly, defaults to 1h
 
-    long last_checkin_millis;
-    long last_checkin_timestamp;
+    unsigned long last_checkin_millis;
+    unsigned long last_checkin_timestamp;
 
-    long reboot_timeout = 86400 * 1000;          // next timeout millis()
-    long reboot_interval = 86400 * 1000;  // can be set externaly, defaults to 24h
+    unsigned long reboot_timeout = 86400 * 1000;          // next timeout millis()
+    unsigned long reboot_interval = 86400 * 1000;  // can be set externaly, defaults to 24h
 
     // MQTT
     bool start_mqtt();                      // connect to broker and subscribe
