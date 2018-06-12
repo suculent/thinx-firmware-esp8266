@@ -324,6 +324,7 @@ void THiNX::connect_wifi() {
 */
 
 void THiNX::checkin() {
+  Serial.println(thinx_time(NULL));
   Serial.println(F("\n*TH: Contacting API..."));
   if(!wifi_connected) {
     Serial.println(F("*TH: Cannot checkin while not connected, exiting."));

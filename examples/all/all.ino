@@ -80,9 +80,11 @@ void setup() {
 
   //
   // Initialization
-  //x
+  //
 
-  // THiNX::forceHTTP = true; disable HTTPS to speed-up checkin in development
+  //THiNX::accessPointName = "THiNX-AP";
+  //THiNX::accessPointPassword = "<enter-ap-mode-password>";
+  THiNX::forceHTTP = true; disable HTTPS to speed-up checkin in development
 
   thx = THiNX(apikey, owner_id);
 
@@ -101,7 +103,7 @@ void setup() {
   // Called after library gets connected and registered.
   thx.setFinalizeCallback([]{
     Serial.println("*INO: Finalize callback called.");
-  thx.publishStatus("STATUS:RETAINED"); // set MQTT status (unretained)
+  thx.publishStatusUnretained("{ \"status\" : \"Hello, world!\" }"); // set MQTT status
   });
 
   // Called when new configuration is pushed OTA
