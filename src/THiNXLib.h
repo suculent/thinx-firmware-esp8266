@@ -1,7 +1,7 @@
 #include <Arduino.h>
 
-//#define __DEBUG__ // enables stack/heap debugging
-//#define __DEBUG_JSON__ // enables API request debugging
+#define __DEBUG__ // enables stack/heap debugging
+#define __DEBUG_JSON__ // enables API request debugging
 
 #define __ENABLE_WIFI_MIGRATION__ // enable automatic WiFi disconnect/reconnect on Configuration Push (THINX_ENV_SSID and THINX_ENV_PASS)
 #define __USE_WIFI_MANAGER__ // if disabled, you need to `WiFi.begin(ssid, pass)` on your own
@@ -9,14 +9,14 @@
 
 // Provides placeholder for THINX_FIRMWARE_VERSION_SHORT
 #ifndef VERSION
-#define VERSION "2.3.183"
+#define VERSION "2.3.184"
 #endif
 
 #ifndef THX_REVISION
 #ifdef THINX_FIRMWARE_VERSION_SHORT
 #define THX_REVISION THINX_FIRMWARE_VERSION_SHORT
 #else
-#define THX_REVISION "183"
+#define THX_REVISION "184"
 #endif
 #endif
 
@@ -137,13 +137,16 @@ public:
 
     // MQTT Support
 
-    // publish to device status channel only
-    void publishStatus(String);               // send String to status channel
-    void publishStatusUnretained(String);     // send String to status channel (unretained)
-    void publishStatusRetain(String, bool);   // send String to status channel (optionally retained)
+    // publish to device status topic only
+    void publishStatus(String);               // DEPRECATED, send String to status topic
+    void publishStatusUnretained(String);     // DEPRECATED, send String to status topic (unretained)
+    void publishStatusRetain(String, bool);   // DEPRECATED, send String to status topic (optionally retained)
+    void publish_status(char *message, bool retain);  // send string to status topic, set retain
+    void publish_status_unretained(char *);   // send string to status topic, unretained
 
-    // publish to specified channel
+    // publish to specified topic
     void publish(String, String, bool);       // send String to any channel, optinally with retain
+    void publish(char * message, char * topic, bool retain);
 
     static const char time_format[];
     static const char date_format[];
@@ -233,7 +236,6 @@ private:
     bool start_mqtt();                      // connect to broker and subscribe
     int mqtt_connected;                    // success or failure on subscription
     String mqtt_payload;                    // mqtt_payload store for parsing
-    int last_mqtt_reconnect;                // interval
     int performed_mqtt_checkin;              // one-time flag
     int all_done;                              // finalize flag
 
@@ -272,4 +274,7 @@ private:
 
     // SSL/TLS
     void sync_sntp();                     // Synchronize time using SNTP instead of THiNX
+
+    // debug
+    void printStackHeap(String);
 };
