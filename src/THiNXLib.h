@@ -59,6 +59,7 @@ public:
     static String statusString;
     static String accessPointName;
     static String accessPointPassword;
+    static String lastWill;
 
 #ifdef __USE_WIFI_MANAGER__
     static WiFiManagerParameter *api_key_param;
@@ -132,6 +133,7 @@ public:
     void setPushConfigCallback( void (*func)(String) );
     void setFinalizeCallback( void (*func)(void) );
     void setMQTTCallback( void (*func)(String) );
+    void setLastWill(String nextWill);        // disconnect MQTT and reconnect with different lastWill than default
 
     int wifi_connection_in_progress;
 

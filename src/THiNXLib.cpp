@@ -50,6 +50,7 @@ double THiNX::longitude = 0.0;
 String THiNX::statusString = "Registered";
 String THiNX::accessPointName = "THiNX-AP";
 String THiNX::accessPointPassword = "PASSWORD";
+String THiNX::lastWill = "{ \"status\" : \"disconnected\" }";
 
 /* Constructor */
 
@@ -1070,6 +1071,12 @@ void THiNX::publish(char * message, char * topic, bool retain)  {
 * Starts the MQTT client and attach callback function forwarding payload to parser.
 */
 
+void setLastWill(String nextWill) {
+  THiNX::lastWill = nextWill;
+  mqtt_client->disconnect();
+  (void)start_mqtt();
+}
+
 bool THiNX::start_mqtt() {
 
   if (mqtt_client != NULL) {
@@ -1110,7 +1117,7 @@ bool THiNX::start_mqtt() {
   bool willRetain = false;
 
   if (mqtt_client->connect(MQTT::Connect(id)
-    .set_will(willTopic.c_str(), F("{ \"status\" : \"disconnected\" }"))
+    .set_will(willTopic.c_str(), lastWill.c_str())
     .set_auth(user, pass)
     .set_keepalive(120))) {
 
