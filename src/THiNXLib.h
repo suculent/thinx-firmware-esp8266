@@ -9,14 +9,14 @@
 
 // Provides placeholder for THINX_FIRMWARE_VERSION_SHORT
 #ifndef VERSION
-#define VERSION "2.3.180"
+#define VERSION "2.3.184"
 #endif
 
 #ifndef THX_REVISION
 #ifdef THINX_FIRMWARE_VERSION_SHORT
 #define THX_REVISION THINX_FIRMWARE_VERSION_SHORT
 #else
-#define THX_REVISION "180"
+#define THX_REVISION "184"
 #endif
 #endif
 
@@ -53,11 +53,13 @@ public:
     static unsigned char thx_ca_cert[];
     static unsigned int thx_ca_cert_len;
 
+    static bool forceHTTP;                        // set to true for disabling HTTPS
     static double latitude;
     static double longitude;
     static String statusString;
     static String accessPointName;
     static String accessPointPassword;
+    static String lastWill;
 
 #ifdef __USE_WIFI_MANAGER__
     static WiFiManagerParameter *api_key_param;
@@ -92,7 +94,7 @@ public:
     phase thinx_phase;
 
     // Public API
-    void initWithAPIKey(const char *);
+    void init_with_api_key(const char *);
     void loop();
 
     String checkin_body();                  // TODO: Refactor to C-string
@@ -131,18 +133,22 @@ public:
     void setPushConfigCallback( void (*func)(String) );
     void setFinalizeCallback( void (*func)(void) );
     void setMQTTCallback( void (*func)(String) );
+    void setLastWill(String nextWill);        // disconnect MQTT and reconnect with different lastWill than default
 
     int wifi_connection_in_progress;
 
     // MQTT Support
 
-    // publish to device status channel only
-    void publishStatus(String);               // send String to status channel
-    void publishStatusUnretained(String);     // send String to status channel (unretained)
-    void publishStatusRetain(String, bool);   // send String to status channel (optionally retained)
+    // publish to device status topic only
+    void publishStatus(String);               // DEPRECATED, send String to status topic
+    void publishStatusUnretained(String);     // DEPRECATED, send String to status topic (unretained)
+    void publishStatusRetain(String, bool);   // DEPRECATED, send String to status topic (optionally retained)
+    void publish_status(char *message, bool retain);  // send string to status topic, set retain
+    void publish_status_unretained(char *);   // send string to status topic, unretained
 
-    // publish to specified channel
+    // publish to specified topic
     void publish(String, String, bool);       // send String to any channel, optinally with retain
+    void publish(char * message, char * topic, bool retain);
 
     static const char time_format[];
     static const char date_format[];
@@ -219,20 +225,19 @@ private:
     void update_and_reboot(String);
 
     int timezone_offset = 2;
-    long checkin_timeout = 3600 * 1000;          // next timeout millis()
-    long checkin_interval = 3600 * 1000;  // can be set externaly, defaults to 1h
+    unsigned long checkin_timeout = 3600 * 1000;          // next timeout millis()
+    unsigned long checkin_interval = 3600 * 1000;  // can be set externaly, defaults to 1h
 
-    long last_checkin_millis;
-    long last_checkin_timestamp;
+    unsigned long last_checkin_millis;
+    unsigned long last_checkin_timestamp;
 
-    long reboot_timeout = 86400 * 1000;          // next timeout millis()
-    long reboot_interval = 86400 * 1000;  // can be set externaly, defaults to 24h
+    unsigned long reboot_timeout = 86400 * 1000;          // next timeout millis()
+    unsigned long reboot_interval = 86400 * 1000;  // can be set externaly, defaults to 24h
 
     // MQTT
     bool start_mqtt();                      // connect to broker and subscribe
     int mqtt_connected;                    // success or failure on subscription
     String mqtt_payload;                    // mqtt_payload store for parsing
-    int last_mqtt_reconnect;                // interval
     int performed_mqtt_checkin;              // one-time flag
     int all_done;                              // finalize flag
 
@@ -271,4 +276,7 @@ private:
 
     // SSL/TLS
     void sync_sntp();                     // Synchronize time using SNTP instead of THiNX
+
+    // debug
+    void printStackHeap(String);
 };

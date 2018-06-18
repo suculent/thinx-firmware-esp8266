@@ -13,7 +13,7 @@ THiNXLib	KEYWORD1
 # Methods and Functions (KEYWORD2)
 #######################################
 
-initWithAPIKey	KEYWORD2
+init_with_api_key	KEYWORD2
 mqtt_callback	KEYWORD1
 mqtt_client		KEYWORD1
 
