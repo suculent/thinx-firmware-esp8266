@@ -180,7 +180,7 @@ private:
     //
 
 #ifdef THX_REVISION
-    const char* thx_revision = strdup(String(THX_REVISION).c_str());
+    const char* thx_revision = strdup(THX_REVISION);
 #else
     const char* thx_revision = "0";
 #endif

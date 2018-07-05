@@ -1073,8 +1073,11 @@ void THiNX::publish(char * message, char * topic, bool retain)  {
 
 void setLastWill(String nextWill) {
   THiNX::lastWill = nextWill;
-  mqtt_client->disconnect();
-  (void)start_mqtt();
+}
+
+void THiNX::setLastWill(String nextWill) {
+    mqtt_client->disconnect();
+    start_mqtt();
 }
 
 bool THiNX::start_mqtt() {
@@ -1109,16 +1112,12 @@ bool THiNX::start_mqtt() {
     return false;
   }
 
-  const char* id = thinx_mac();
-  const char* user = thinx_udid;
-  const char* pass = thinx_api_key;
-  String willTopic = thinx_mqtt_status_channel();
   int willQos = 0;
   bool willRetain = false;
 
-  if (mqtt_client->connect(MQTT::Connect(id)
-    .set_will(willTopic.c_str(), lastWill.c_str())
-    .set_auth(user, pass)
+  if (mqtt_client->connect(MQTT::Connect(thinx_mac())
+    .set_will(thinx_mqtt_status_channel().c_str(), lastWill.c_str())
+    .set_auth(thinx_udid, thinx_api_key)
     .set_keepalive(120))) {
 
     mqtt_connected = true;
