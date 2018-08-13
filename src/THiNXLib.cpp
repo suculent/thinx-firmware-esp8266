@@ -149,7 +149,6 @@ THiNX::THiNX(const char * __apikey, const char * __owner_id) {
   #endif
 
   if (strlen(__apikey) > 4) {
-    Serial.println(F("*TH: With custom API Key..."));
     thinx_api_key = strdup(__apikey);
   } else {
       if (strlen(thinx_api_key) > 4) {
@@ -161,7 +160,6 @@ THiNX::THiNX(const char * __apikey, const char * __owner_id) {
   }
 
   if (strlen(__owner_id) > 4) {
-    Serial.println(F("*TH: With custom Owner ID..."));
     thinx_owner = strdup(__owner_id);
   } else {
       if (strlen(thinx_owner) > 4) {
@@ -1164,15 +1162,17 @@ bool THiNX::start_mqtt() {
     mqtt_connected = false;
     Serial.println(F("*TH: MQTT Not connected."));
 
+    /*
     #ifdef __DEBUG__
           Serial.println(F("*TH: Failed to load root CA certificate for MQTT, falling back to HTTP!"));
-          forceHTTP = false;
+          forceHTTP = true;
           mqtt_client = new PubSubClient(thx_wifi_client, thinx_mqtt_url);
           return start_mqtt();
     #else
           Serial.println(F("*TH: Failed to connect using MQTTS!"));
           //ESP.restart();
     #endif
+    */
 
     return false;
   }
@@ -1233,7 +1233,7 @@ void THiNX::restore_device_info() {
 
   #else
   if (!SPIFFS.exists("/thx.cfg")) {
-    Serial.println(F("*TH: No saved configuration."));
+    //Serial.println(F("*TH: No saved configuration."));
     return;
   }
   File f = SPIFFS.open("/thx.cfg", "r");
@@ -1467,7 +1467,6 @@ bool THiNX::fsck() {
 #endif
   bool fileSystemReady = false;
   if(flashCorrectlyConfigured) {
-    Serial.println(F("*TH: Starting SPIFFS..."));
     #if defined(ESP8266)
       fileSystemReady = SPIFFS.begin();
     #else
@@ -1480,7 +1479,6 @@ bool THiNX::fsck() {
       ESP.restart();
       return false;
     }
-    Serial.println(F("*TH: SPIFFS Initialization completed."));
   }  else {
     Serial.print(F("*TH: Flash incorrectly configured, SPIFFS cannot start."));
 #if defined(ESP8266)
@@ -1644,6 +1642,7 @@ void THiNX::loop() {
     }
   }
 
+  /*
   if (thinx_phase > CHECKIN_MQTT) {
     mqtt_connected = mqtt_client->connected();
     if (!mqtt_connected) {
@@ -1656,7 +1655,7 @@ void THiNX::loop() {
         // tries again next time
       }
     }
-  }
+  }*/
 
   // CASE thinx_phase == CONNECT_API
 
