@@ -9,14 +9,14 @@
 
 // Provides placeholder for THINX_FIRMWARE_VERSION_SHORT
 #ifndef VERSION
-#define VERSION "2.3.184"
+#define VERSION "2.3.185"
 #endif
 
 #ifndef THX_REVISION
 #ifdef THINX_FIRMWARE_VERSION_SHORT
 #define THX_REVISION THINX_FIRMWARE_VERSION_SHORT
 #else
-#define THX_REVISION "184"
+#define THX_REVISION "185"
 #endif
 #endif
 
@@ -100,7 +100,7 @@ public:
     String checkin_body();                  // TODO: Refactor to C-string
 
     // MQTT
-    PubSubClient *mqtt_client = NULL;
+    PubSubClient *mqtt_client = nullptr;
     char mqtt_device_channel[128];
     char mqtt_device_channels[128];
     char mqtt_device_status_channel[128];
@@ -220,8 +220,9 @@ private:
     void connect_wifi();                    // start connecting
 
     void senddata(String);                  // HTTP, will deprecate?
-    void send_data(String);                  // HTTP, will deprecate?
-    void parse(String);
+    void send_data(String);                 // HTTPS
+    void fetch_data();                      // fetch and parse; max return char[] later
+    void parse(String);                     // needs to be refactored to char[] from String
     void update_and_reboot(String);
 
     int timezone_offset = 2;

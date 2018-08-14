@@ -329,16 +329,11 @@ void THiNX::checkin() {
     Serial.println(F("*TH: Cannot checkin while not connected, exiting."));
   } else {
     String body = checkin_body();
-    if (thx_ca_cert_len == 0) {
+    if (thx_ca_cert_len == 0 || forceHTTP) {
       senddata(body); // HTTP fallback
     } else {
-      if (forceHTTP) {
-        senddata(body); // HTTP fallback
-      } else {
-        send_data(body); // HTTPS
-      }
+      send_data(body); // HTTPS
     }
-
     checkin_interval = millis() + checkin_timeout;
   }
 }
@@ -420,9 +415,6 @@ String THiNX::checkin_body() {
 
 void THiNX::senddata(String body) {
 
-    char buf[512];
-    int pos = 0;
-
   // Serial.print("Sending data over HTTP to: "); Serial.println(thinx_cloud_url);
 
   if (thx_wifi_client.connect(thinx_cloud_url, 7442)) {
@@ -440,32 +432,7 @@ void THiNX::senddata(String body) {
     thx_wifi_client.println();
     thx_wifi_client.println(body);
 
-    long interval = 30000;
-    unsigned long currentMillis = millis(), previousMillis = millis();
-
-    // Wait until client available or timeout...
-    while(!thx_wifi_client.available()){
-      delay(1);
-      if( (currentMillis - previousMillis) > interval ){
-        thx_wifi_client.stop();
-        return;
-      }
-      currentMillis = millis();
-    }
-
-    // Read while connected
-    while ( thx_wifi_client.connected() ) {
-      if ( thx_wifi_client.available() ) {
-          buf[pos] = thx_wifi_client.read();
-          pos++;
-      }
-    }
-
-    thx_wifi_client.stop();
-
-    Serial.printf("*TH: Received %u bytes\n", pos);
-    String payload = String(buf);
-    parse(payload);
+    fetch_data();
 
   } else {
     Serial.println(F("*TH: API connection failed."));
@@ -509,7 +476,7 @@ void THiNX::send_data(String body) {
     https_client.println();
     https_client.println(body);
 
-
+    fetch_data();
 
   } else {
     Serial.println(F("*TH: API connection failed."));
@@ -517,21 +484,79 @@ void THiNX::send_data(String body) {
   }
 }
 
+void THiNX::fetch_data() {
+
+  Serial.println(F("*TH: Waiting for API response..."));
+
+  char buf[1024];
+  int pos = 0;
+
+  long interval = 30000;
+  unsigned long currentMillis = millis(), previousMillis = millis();
+
+  // Wait until client available or timeout...
+  while(!thx_wifi_client.available()){
+    delay(1);
+    if( (currentMillis - previousMillis) > interval ){
+      thx_wifi_client.stop();
+      return;
+    }
+    currentMillis = millis();
+  }
+
+  // Read while connected
+  bool headers_passed = false;
+  while ( thx_wifi_client.connected() ) {
+    String line = "    ";
+    // Wait for empty line to drop headers and process only JSON data in parser...
+    if (!headers_passed) {
+        line = thx_wifi_client.readStringUntil('\n');
+        //Serial.print("HEADERS > ");
+        //Serial.println(line);
+        if (line.length() < 3) {
+          headers_passed = true;
+        }
+    } else {
+      if ( thx_wifi_client.available() ) {
+          buf[pos] = thx_wifi_client.read();
+          pos++;
+      }
+    }
+  }
+
+  buf[pos] = '\0'; // add null termination for any case...
+
+  thx_wifi_client.stop(); // ??
+
+  Serial.printf("*TH: Received %u bytes\n", pos);
+  //printStackHeap("allocating string");
+  String payload = String(buf);
+  Serial.println(payload);
+  //printStackHeap("string allocated");
+  parse(payload);
+
+}
+
 /*
 * Response Parser
 */
 
-void THiNX::parse(String payload) {
+int strpos(char *hay, char *needle, int offset)
+{
+    char haystack[strlen(hay)];
+    strncpy(haystack, hay+offset, strlen(hay)-offset);
+    char *p = strstr(haystack, needle);
+    if (p)
+        return p - haystack+offset;
+    return -1;
+}
 
-  // TODO: Should parse response only for this device_id (which must be internal and not a mac)
+void THiNX::parse(String payload) {
 
   payload_type ptype = Unknown;
 
-  int start_index = 0;
+  int start_index = -1;
   int endIndex = payload.length();
-
-  //Serial.print(F("*TH: Parsing payload:\n'"));
-  //Serial.print(payload);
 
   int reg_index = payload.indexOf("{\"registration\"");
   int upd_index = payload.indexOf("{\"UPDATE\"");
@@ -541,25 +566,34 @@ void THiNX::parse(String payload) {
 
   if (upd_index > start_index) {
     start_index = upd_index;
+    Serial.println("ptype: UPDATE");
     ptype = UPDATE;
   }
 
   if (reg_index > start_index) {
     start_index = reg_index;
     endIndex = payload.indexOf("}}") + 2;
+    Serial.println("ptype: REGISTRATION");
     ptype = REGISTRATION;
   }
 
   if (not_index > start_index) {
     start_index = not_index;
     endIndex = payload.indexOf("}}") + 2; // is this still needed?
+    Serial.println("ptype: NOTIFICATION");
     ptype = NOTIFICATION;
   }
 
   if (cfg_index > start_index) {
     start_index = cfg_index;
     endIndex = payload.indexOf("}}") + 2; // is this still needed?
+    Serial.println("ptype: CONFIGURATION");
     ptype = CONFIGURATION;
+  }
+
+  if (ptype == Unknown) {
+    Serial.println("ptype: UNKNOWN! EXITING.");
+    return;
   }
 
   if (undefined_owner > start_index) {
@@ -570,9 +604,9 @@ void THiNX::parse(String payload) {
   String body = payload.substring(start_index, endIndex);
 
 #ifdef __DEBUG__
-  //Serial.print(F("*TH: Parsing response:\n'"));
-  //Serial.print(body);
-  //Serial.println("'");
+  Serial.print(F("*TH: Parsing response:\n'"));
+  Serial.print(body);
+  Serial.println("'");
 #endif
 
   DynamicJsonBuffer jsonBuffer(1024);
@@ -587,7 +621,10 @@ void THiNX::parse(String payload) {
 
     case UPDATE: {
 
+      Serial.println(F("ptype case UPDATE")); Serial.flush();
+
       JsonObject& update = root["registration"];
+
       Serial.println(F("TODO: Parse update payload..."));
 
       String mac = update["mac"];
@@ -1006,6 +1043,7 @@ void THiNX::publishStatusRetain(String message, bool retain) {
 }
 
 void THiNX::publish_status(char *message, bool retain) {
+  Serial.println(F("*TH: publish_status")); Serial.flush();
   if (mqtt_client != NULL) {
     if (!mqtt_client->connected()) {
       Serial.println(F("*TH: MQTT cannot publish messages while not connected."));
@@ -1081,6 +1119,7 @@ void THiNX::setLastWill(String nextWill) {
 bool THiNX::start_mqtt() {
 
   if (mqtt_client != NULL) {
+    Serial.println(F("*TH: start_mqtt")); Serial.flush();
     mqtt_connected = mqtt_client->connected();
     if (mqtt_connected) {
       return true;
@@ -1644,6 +1683,7 @@ void THiNX::loop() {
 
   /*
   if (thinx_phase > CHECKIN_MQTT) {
+    Serial.println(F("*TH: start_mqtt")); Serial.flush();
     mqtt_connected = mqtt_client->connected();
     if (!mqtt_connected) {
       Serial.println(F("*TH: MQTT RECONNECT ON CONNECTION CHECK..."));
