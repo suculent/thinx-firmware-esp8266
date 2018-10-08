@@ -394,7 +394,7 @@ String THiNX::checkin_body() {
   root["platform"] = strdup(THINX_PLATFORM);
   #endif
 
-  DynamicJsonBuffer wrapperBuffer(1024);
+  DynamicJsonBuffer wrapperBuffer(512);
   JsonObject& wrapper = wrapperBuffer.createObject();
   wrapper["registration"] = root;
 
@@ -414,8 +414,6 @@ String THiNX::checkin_body() {
 */
 
 void THiNX::senddata(String body) {
-
-  // Serial.print("Sending data over HTTP to: "); Serial.println(thinx_cloud_url);
 
   if (thx_wifi_client.connect(thinx_cloud_url, 7442)) {
 
@@ -488,7 +486,7 @@ void THiNX::fetch_data() {
 
   Serial.println(F("*TH: Waiting for API response..."));
 
-  char buf[1024];
+  char buf[512];
   int pos = 0;
 
   long interval = 30000;
@@ -592,7 +590,7 @@ void THiNX::parse(String payload) {
   }
 
   if (ptype == Unknown) {
-    Serial.println("ptype: UNKNOWN! EXITING.");
+    Serial.println("ptype: Not a THiNX message.");
     return;
   }
 
@@ -609,7 +607,7 @@ void THiNX::parse(String payload) {
   Serial.println("'");
 #endif
 
-  DynamicJsonBuffer jsonBuffer(1024);
+  DynamicJsonBuffer jsonBuffer(512);
   JsonObject& root = jsonBuffer.parseObject(body.c_str());
 
   if ( !root.success() ) {
@@ -944,8 +942,8 @@ String THiNX::thinx_mqtt_status_channel() {
   return String(mqtt_device_status_channel);
 }
 
-long THiNX::epoch() {
-  long since_last_checkin = (millis() - last_checkin_millis) / 1000;
+unsigned long THiNX::epoch() {
+  unsigned long since_last_checkin = (millis() - last_checkin_millis) / 1000;
   return last_checkin_timestamp + since_last_checkin;
 }
 
@@ -1226,6 +1224,8 @@ void THiNX::restore_device_info() {
 
   int json_end = 0;
 
+  Serial.println(F("*TH: Restoring device info..."));
+
   #ifndef __USE_SPIFFS__
 
   int value;
@@ -1237,6 +1237,7 @@ void THiNX::restore_device_info() {
   for (long a = 0; a < buf_len; a++) {
     value = EEPROM.read(a);
     json_output += char(value);
+
     // validate at least data start
     if (a == 0) {
       if (value != '{') {
@@ -1262,6 +1263,9 @@ void THiNX::restore_device_info() {
     // Serial.flush(); // to debug reading EEPROM bytes
   }
 
+  Serial.print("Restore json_output: ");
+  Serial.println(json_output);
+
   // Validating bracket count
   if (json_end != 0) {
     Serial.println(F("*TH: JSON invalid... bailing out."));
@@ -1271,11 +1275,11 @@ void THiNX::restore_device_info() {
   Serial.println(F("*TH: Converting data to String..."));
 
   #else
-  if (!SPIFFS.exists("/thx.cfg")) {
-    //Serial.println(F("*TH: No saved configuration."));
+  if (!SPIFFS.exists("/thinx.cfg")) {
+    Serial.println(F("*TH: No saved configuration."));
     return;
   }
-  File f = SPIFFS.open("/thx.cfg", "r");
+  File f = SPIFFS.open("/thinx.cfg", "r");
   Serial.println(F("*TH: Found persistent data..."));
   if (!f) {
     Serial.println(F("*TH: No remote configuration found so far..."));
@@ -1286,14 +1290,19 @@ void THiNX::restore_device_info() {
     return;
   }
 
-  f.readBytesUntil('\n', json_info, 511);
+  f.readBytesUntil('\r', json_info, sizeof(json_info));
+  //Serial.print("Loaded json_info: ");
+  //Serial.print("length: ");
+  //Serial.print(f.size());
+  //Serial.println(String(json_info));
   #endif
 
   DynamicJsonBuffer jsonBuffer(512);
   JsonObject& config = jsonBuffer.parseObject((char*)json_info); // must not be String!
 
   if (!config.success()) {
-    // Serial.println(F("*TH: No JSON data to be parsed..."));
+    Serial.println(F("*TH: No JSON data to be parsed..."));
+    Serial.println(json_info);
     return;
 
   } else {
@@ -1304,6 +1313,7 @@ void THiNX::restore_device_info() {
 
     if (config["udid"]) {
       const char *udid = config["udid"];
+      Serial.println(F("*TH: Loading UDID..."));
       if ( strlen(udid) > 2 ) {
         thinx_udid = strdup(udid);
       } else {
@@ -1314,15 +1324,18 @@ void THiNX::restore_device_info() {
     }
 
     if (config["apikey"]) {
+      Serial.println(F("*TH: Loading Keys..."));
       thinx_api_key = strdup(config["apikey"]);
     }
 
     if (config["owner"]) {
       thinx_owner = strdup(config["owner"]);
+      Serial.println(F("*TH: Loading Owner..."));
     }
 
     if (config["ott"]) {
       available_update_url = strdup(config["ott"]);
+      Serial.println(F("*TH: Loading OTT..."));
     }
 
     #ifdef __USE_SPIFFS__
@@ -1339,17 +1352,42 @@ void THiNX::restore_device_info() {
 
 void THiNX::save_device_info()
 {
-  deviceInfo(); // update json_output
+  DynamicJsonBuffer jsonBuffer(512);
+  JsonObject& root = jsonBuffer.createObject();
 
-  // disabled for it crashes when closing the file (LoadStoreAlignmentCause) when using String
+  // Mandatories
+
+  if (strlen(thinx_owner) > 1) {
+    root["owner"] = strdup(thinx_owner); // allow owner change
+  }
+
+  if (strlen(thinx_api_key) > 1) {
+    root["apikey"] = strdup(thinx_api_key); // allow dynamic API Key
+  }
+
+  if (strlen(thinx_udid) > 1) {
+    root["udid"] = strdup(thinx_udid); // allow setting UDID, skip 0
+  }
+
+  // Optionals
+  if (strlen(available_update_url) > 1) {
+    root["update"] = strdup(available_update_url); // allow update
+    Serial.println(F("*TH: available_update_url..."));
+  }
+
   #ifdef __USE_SPIFFS__
-  File f = SPIFFS.open("/thx.cfg", "w");
+  File f = SPIFFS.open("/thinx.cfg", "w");
   if (f) {
     Serial.println(F("*TH: Saving configuration to SPIFFS..."));
-    f.println(String((char*)json_info)); // String instead of const char* due to LoadStoreAlignmentCause...
+    root.printTo(f);
+    //root.printTo(Serial);
+    f.print('\r');
+    f.println();
     f.close();
+    Serial.println(F("*TH: Saved configuration to SPIFFS."));
   } else {
     Serial.println(F("*TH: Saving configuration failed!"));
+    delay(5000);
   }
   #else
   Serial.println(F("*TH: Saving configuration to EEPROM: "));
@@ -1361,39 +1399,6 @@ void THiNX::save_device_info()
   EEPROM.commit();
   Serial.println(F("*TH: Saved configuration (EEPROM)."));
   #endif
-}
-
-/*
-* Fills output buffer with persistent dconfiguration JSON.
-*/
-
-void THiNX::deviceInfo() {
-
-  DynamicJsonBuffer jsonBuffer(512);
-  JsonObject& root = jsonBuffer.createObject();
-
-  // Mandatories
-
-  if (strlen(thinx_owner) > 1) {
-    root["owner"] = thinx_owner; // allow owner change
-  }
-
-  if (strlen(thinx_api_key) > 1) {
-    root["apikey"] = thinx_api_key; // allow dynamic API Key
-  }
-
-  if (strlen(thinx_udid) > 1) {
-    root["udid"] = thinx_udid; // allow setting UDID, skip 0
-  }
-
-  // Optionals
-  if (strlen(available_update_url) > 1) {
-    root["update"] = available_update_url; // allow update
-    Serial.println(F("*TH: available_update_url..."));
-  }
-
-  json_output = "";
-  root.printTo(json_output);
 }
 
 /*
@@ -1576,7 +1581,6 @@ void THiNX::finalize() {
 
 /* This is necessary for SSL/TLS and should replace THiNX timestamp */
 void THiNX::sync_sntp() {
-  Serial.print("*TH: Setting time using SNTP...");
   // THiNX API returns timezone_offset in current DST, if applicable
   configTime(timezone_offset * 3600, 0, "0.europe.pool.ntp.org", "cz.pool.ntp.org");
   time_t now = time(nullptr);
@@ -1588,7 +1592,7 @@ void THiNX::sync_sntp() {
   Serial.println();
   struct tm timeinfo;
   gmtime_r(&now, &timeinfo);
-  Serial.print("*TH: SNTP time: ");
+  Serial.print(F("*TH: SNTP time: "));
   Serial.print(asctime(&timeinfo));
 }
 
@@ -1617,9 +1621,12 @@ void THiNX::loop() {
       wifi_connected = true;
 
       // Synchronize SNTP time
+      Serial.println(""); // newline after "Time difference for DST"
       sync_sntp();
 
       // Start MDNS broadcast
+#ifdef __DISABLE_PROXY__
+#else
       if (!MDNS.begin(thinx_alias)) {
         Serial.println(F("*TH: Error setting up mDNS"));
       } else {
@@ -1631,6 +1638,7 @@ void THiNX::loop() {
           thinx_mqtt_url = strdup(String(MDNS.hostname(0)).c_str());
         }
       }
+#endif
 
       thinx_phase = CONNECT_API;
       return;

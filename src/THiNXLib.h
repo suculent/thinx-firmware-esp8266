@@ -6,17 +6,18 @@
 #define __ENABLE_WIFI_MIGRATION__ // enable automatic WiFi disconnect/reconnect on Configuration Push (THINX_ENV_SSID and THINX_ENV_PASS)
 #define __USE_WIFI_MANAGER__ // if disabled, you need to `WiFi.begin(ssid, pass)` on your own
 #define __USE_SPIFFS__ // if disabled, uses EEPROM instead
+#define __DISABLE_PROXY__ // skips using Proxy until required (security measure)
 
 // Provides placeholder for THINX_FIRMWARE_VERSION_SHORT
 #ifndef VERSION
-#define VERSION "2.3.186"
+#define VERSION "2.3.187"
 #endif
 
 #ifndef THX_REVISION
 #ifdef THINX_FIRMWARE_VERSION_SHORT
 #define THX_REVISION THINX_FIRMWARE_VERSION_SHORT
 #else
-#define THX_REVISION "186"
+#define THX_REVISION "187"
 #endif
 #endif
 
@@ -69,8 +70,8 @@ public:
 #endif
 
     THiNX();
-    THiNX(const char *, const char *); // (const char * __apikey, const char * __owner_id)
-    THiNX(const char *);  // (const char * __apikey)
+    THiNX(const char * __apikey, const char * __owner_id);
+    THiNX(const char * __apikey);
 
     enum payload_type {
         Unknown = 0,
@@ -153,7 +154,7 @@ public:
     static const char time_format[];
     static const char date_format[];
 
-    long epoch();                    // estimated timestamp since last checkin as
+    unsigned long epoch();                    // estimated timestamp since last checkin as
     String thinx_time(const char*);                            // estimated current Time
     String thinx_date(const char*);                            // estimated current Date
     void setCheckinInterval(long interval);
@@ -249,7 +250,6 @@ private:
     void import_build_time_constants();     // sets variables from thinx.h file
     void save_device_info();                // saves variables to SPIFFS or EEPROM
     void restore_device_info();             // reads variables from SPIFFS or EEPROM
-    void deviceInfo();                    // TODO: Refactor to C-string
 
     // Updates
     void notify_on_successful_update();     // send a MQTT notification back to Web UI
