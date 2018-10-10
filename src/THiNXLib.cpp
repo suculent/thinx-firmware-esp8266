@@ -557,40 +557,36 @@ void THiNX::parse(String payload) {
   int endIndex = payload.length();
 
   int reg_index = payload.indexOf("{\"registration\"");
-  int upd_index = payload.indexOf("{\"UPDATE\"");
+  int upd_index = payload.indexOf("{\"FIRMWARE_UPDATE\"");
   int not_index = payload.indexOf("{\"notification\"");
   int cfg_index = payload.indexOf("{\"configuration\"");
   int undefined_owner = payload.indexOf("old_protocol_owner:-undefined-");
 
   if (upd_index > start_index) {
     start_index = upd_index;
-    Serial.println("ptype: UPDATE");
     ptype = UPDATE;
   }
 
   if (reg_index > start_index) {
     start_index = reg_index;
     endIndex = payload.indexOf("}}") + 2;
-    Serial.println("ptype: REGISTRATION");
     ptype = REGISTRATION;
   }
 
   if (not_index > start_index) {
     start_index = not_index;
     endIndex = payload.indexOf("}}") + 2; // is this still needed?
-    Serial.println("ptype: NOTIFICATION");
     ptype = NOTIFICATION;
   }
 
   if (cfg_index > start_index) {
     start_index = cfg_index;
     endIndex = payload.indexOf("}}") + 2; // is this still needed?
-    Serial.println("ptype: CONFIGURATION");
     ptype = CONFIGURATION;
   }
 
   if (ptype == Unknown) {
-    Serial.println("ptype: Not a THiNX message.");
+    Serial.println(F()"ptype: Not a THiNX message."));
     return;
   }
 
@@ -600,13 +596,6 @@ void THiNX::parse(String payload) {
   }
 
   String body = payload.substring(start_index, endIndex);
-
-#ifdef __DEBUG__
-  Serial.print(F("*TH: Parsing response:\n'"));
-  Serial.print(body);
-  Serial.println("'");
-#endif
-
   DynamicJsonBuffer jsonBuffer(512);
   JsonObject& root = jsonBuffer.parseObject(body.c_str());
 
@@ -673,13 +662,6 @@ void THiNX::parse(String payload) {
       } else if (thinx_auto_update || thinx_forced_update){
 
         Serial.println(F("*TH: Starting update A..."));
-
-
-        // FROM LUA: update variants
-        // local files = payload['files']
-        // local ott   = payload['ott']
-        // local url   = payload['url']
-        // local type  = payload['type']
 
         String type = update["type"];
         Serial.print(F("*TH: Payload type: ")); Serial.println(type);
