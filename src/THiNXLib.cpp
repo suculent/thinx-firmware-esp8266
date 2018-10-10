@@ -398,11 +398,6 @@ String THiNX::checkin_body() {
   JsonObject& wrapper = wrapperBuffer.createObject();
   wrapper["registration"] = root;
 
-#ifdef __DEBUG_JSON__
-  wrapper.printTo(Serial);
-  Serial.println();
-#endif
-
   json_output = "";
   wrapper.printTo(json_output);
   return json_output;
@@ -529,7 +524,6 @@ void THiNX::fetch_data() {
   Serial.printf("*TH: Received %u bytes\n", pos);
   //printStackHeap("allocating string");
   String payload = String(buf);
-  Serial.println(payload);
   //printStackHeap("string allocated");
   parse(payload);
 
@@ -1632,17 +1626,13 @@ void THiNX::loop() {
     thinx_mqtt_channel(); // initialize channel variable
     if (strlen(mqtt_device_channel) > 5) {
       if (mqtt_client->subscribe(mqtt_device_channel)) {
-        Serial.print(F("*TH: MQTT device topic: "));
-        Serial.print(mqtt_device_channel);
-        Serial.println(F(" successfully subscribed."));
-        Serial.println(F("*TH: Publishing connected `status: connected` to MQTT"));
+        Serial.println(F("*TH: MQTT connected."));
         // Publish status on status topic
         mqtt_client->publish(
           mqtt_device_status_channel,
           F("{ \"status\" : \"connected\" }")
         );
         mqtt_client->loop();
-        //Serial.println(F("*TH: LOOP » FINALIZE"));
         thinx_phase = FINALIZE;
         return;
       }
