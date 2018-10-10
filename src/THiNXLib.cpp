@@ -586,7 +586,7 @@ void THiNX::parse(String payload) {
   }
 
   if (ptype == Unknown) {
-    Serial.println(F()"ptype: Not a THiNX message."));
+    Serial.println(F("ptype: Not a THiNX message."));
     return;
   }
 
