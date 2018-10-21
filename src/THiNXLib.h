@@ -1,16 +1,14 @@
 #include <Arduino.h>
 
-#define __DEBUG__ // enables stack/heap debugging
-#define __DEBUG_JSON__ // enables API request debugging
-
+// #define __DEBUG__ // enables stack/heap debugging
 #define __ENABLE_WIFI_MIGRATION__ // enable automatic WiFi disconnect/reconnect on Configuration Push (THINX_ENV_SSID and THINX_ENV_PASS)
-#define __USE_WIFI_MANAGER__ // if disabled, you need to `WiFi.begin(ssid, pass)` on your own
+// #define __USE_WIFI_MANAGER__ // if disabled, you need to `WiFi.begin(ssid, pass)` on your own; saves about 3% of sketch space, excludes DNSServer and WebServer
 #define __USE_SPIFFS__ // if disabled, uses EEPROM instead
 #define __DISABLE_PROXY__ // skips using Proxy until required (security measure)
 
 // Provides placeholder for THINX_FIRMWARE_VERSION_SHORT
 #ifndef VERSION
-#define VERSION "2.3.188"
+#define VERSION "2.4.188"
 #endif
 
 #ifndef THX_REVISION
@@ -279,5 +277,7 @@ private:
     void sync_sntp();                     // Synchronize time using SNTP instead of THiNX
 
     // debug
+#ifdef __DEBUG__
     void printStackHeap(String);
+#endif
 };

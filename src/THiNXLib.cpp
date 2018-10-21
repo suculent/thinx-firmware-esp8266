@@ -16,6 +16,7 @@ extern "C" {
 #endif
 
 #ifndef THINX_COMMIT_ID
+// any commit ID is sufficient to allow update
 #define THINX_COMMIT_ID "0c48a9ab0c4f89c4b8fb72173553d3e74986632d0"
 #endif
 
@@ -27,12 +28,12 @@ bool THiNX::forceHTTP = false;
 const char THiNX::time_format[] = "%T";
 const char THiNX::date_format[] = "%Y-%m-%d";
 
+#include "thinx_root_ca.h"
+
 #ifdef __USE_WIFI_MANAGER__
 char THiNX::thx_api_key[65] = {0};
 char THiNX::thx_owner_key[65] = {0};
 int THiNX::should_save_config = 0;
-
-#include "thinx_root_ca.h"
 
 WiFiManagerParameter * THiNX::api_key_param;
 WiFiManagerParameter * THiNX::owner_param;
@@ -1823,6 +1824,7 @@ bool THiNX::check_hash(char * filename, char * expected) {
   }
 }
 
+#ifdef __DEBUG__
 /* Convenience method for debugging memory issues. */
 void THiNX::printStackHeap(String tag) {
   extern cont_t g_cont;
@@ -1832,5 +1834,6 @@ void THiNX::printStackHeap(String tag) {
   Serial.printf("F=%4d ", 4 * (sp - g_cont.stack));
   Serial.print("H="); Serial.println(heap);
 }
+#endif
 
 #endif // IMPORTANT LINE FOR UNIT-TESTING!
