@@ -12,10 +12,10 @@
 
 #include <THiNXLib.h>
 
-const char *apikey = "";
-const char *owner_id = "";
-const char *ssid = "THiNX-IoT";
-const char *pass = "<enter-your-ssid-password>";
+char *apikey = "";
+char *owner_id = "";
+char *ssid = "THiNX-IoT";
+char *pass = "<enter-your-ssid-password>";
 
 THiNX thx;
 
@@ -45,8 +45,8 @@ void pushConfigCallback (String config) {
     if ((strlen(ssid) > 2) && (strlen(pass) > 0)) {
       WiFi.disconnect();
       WiFi.begin(ssid, pass);
-      ssid = ""; pass = "";      
-      long timeout = millis() + 20000;
+      ssid = ""; pass = "";
+      unsigned long timeout = millis() + 20000;
       Serial.println("Attempting WiFi migration...");
       while (WiFi.status() != WL_CONNECTED) {
         if (millis() > timeout) break;

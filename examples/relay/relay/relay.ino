@@ -14,14 +14,14 @@
 
 #include <THiNXLib.h>
 
-const char *apikey = "c81a4c9d1e10979bdc9dfe12141c476c05055e096d0c6413fb00a25217715dfd";
-const char *owner_id = "cedc16bb6bb06daaa3ff6d30666d91aacd6e3efbf9abbc151b4dcade59af7c12";
+char *apikey = "c81a4c9d1e10979bdc9dfe12141c476c05055e096d0c6413fb00a25217715dfd";
+char *owner_id = "cedc16bb6bb06daaa3ff6d30666d91aacd6e3efbf9abbc151b4dcade59af7c12";
 
-const char *ssid_1 = "SSID-1";
-const char *pass_1 = "password-1";
+char *ssid_1 = "SSID-1";
+char *pass_1 = "password-1";
 
-const char *ssid_2 = "SSID-2";
-const char *pass_2 = "password-2";
+char *ssid_2 = "SSID-2";
+char *pass_2 = "password-2";
 
 int ledstate;
 
@@ -44,13 +44,13 @@ void scan_and_connect_wifi() {
 
   unsigned long timeout; // wifi connection timeout(s)
   int wifi_status = WiFi.waitForConnectResult();
-  
+
   WiFi.begin(ssid_1, pass_1);
   delay(2000);
 
-  if (wifi_status != WL_CONNECTED) {    
+  if (wifi_status != WL_CONNECTED) {
     Serial.println(F("Waiting for WiFi connection..."));
-    
+
     timeout = millis() + 5000;
     while (millis() < timeout) {
       ledstate = !ledstate;
@@ -65,7 +65,7 @@ void scan_and_connect_wifi() {
   if (wifi_status != WL_CONNECTED) {
     WiFi.begin(ssid_2, pass_2);
     delay(2000);
-  
+
     timeout = millis() + 5000;
     while (millis() < timeout) {
       ledstate = !ledstate;
@@ -82,10 +82,10 @@ void scan_and_connect_wifi() {
     Serial.flush();
     ESP.reset();
   }
- 
+
 }
 
-void setup() {  
+void setup() {
 
   Serial.begin(230400);
 
@@ -102,7 +102,7 @@ void setup() {
   THiNX::accessPointName = "THiNX-AP";
   THiNX::accessPointPassword = "PASSWORD";
   THiNX::forceHTTP = true; // disable HTTPS for faster checkins, enable for production security
-  
+
   //
   // Initialization
   //
@@ -155,14 +155,14 @@ void setup() {
       if (server.method() != HTTP_GET) return;
       Serial.println("\nHTTP toggle requested...");
       terminator_on();
-      set_toggle_delay(5000);      
+      set_toggle_delay(5000);
       server.send(200, "text/plain", "Toggled OFF/ON after 5 seconds.");
     });
 
     server.onNotFound([](void){
       server.send(404, "text/plain", "No go.");
     });
-    
+
 
     server.begin();
 
@@ -252,12 +252,12 @@ void set_state(bool state) {
     Serial.print("TECH: Setting state to ");
     Serial.println(state);
     relay_state = state;
-    digitalWrite(relay_pin, relay_state); // ! because connected to NC port of relay    
+    digitalWrite(relay_pin, relay_state); // ! because connected to NC port of relay
   }
 }
 
 /* Sets delay based on current time */
-void set_toggle_delay(long delay_time) {  
+void set_toggle_delay(long delay_time) {
   toggle_delay = millis() + delay_time;
   Serial.print("Setting toggle delay to: ");
   Serial.println(toggle_delay);

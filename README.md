@@ -117,7 +117,7 @@ void pushConfigCallback (String config) {
     if ((strlen(ssid) > 2) && (strlen(pass) > 0)) {
       WiFi.disconnect();
       WiFi.begin(ssid, pass);
-      long timeout = millis() + 20000;
+      unsigned long timeout = millis() + 20000;
       Serial.println("Attempting WiFi migration...");
       while (WiFi.status() != WL_CONNECTED) {
         yield();

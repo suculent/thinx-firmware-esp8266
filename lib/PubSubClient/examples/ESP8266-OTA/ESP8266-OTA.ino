@@ -49,7 +49,7 @@ void receive_ota(const MQTT::Publish& pub) {
                    .set_retain());
     client.disconnect();
 
-    Serial.printf("Update Success: %u\nRebooting...\n", millis() - startTime);
+    Serial.printf("Update Success: %lu\nRebooting...\n", millis() - startTime);
     ESP.restart();
     delay(10000);
   }
