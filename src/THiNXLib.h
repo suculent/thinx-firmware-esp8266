@@ -8,16 +8,19 @@
 
 // Provides placeholder for THINX_FIRMWARE_VERSION_SHORT
 #ifndef VERSION
-#define VERSION "2.4.188"
+#define VERSION "2.4.190"
 #endif
 
 #ifndef THX_REVISION
 #ifdef THINX_FIRMWARE_VERSION_SHORT
 #define THX_REVISION THINX_FIRMWARE_VERSION_SHORT
 #else
-#define THX_REVISION "188"
+#define THX_REVISION "190"
 #endif
 #endif
+
+//#define MQTT_DISABLED
+#define __DISABLE_MQTT__
 
 #ifdef __USE_WIFI_MANAGER__
 #include <DNSServer.h>
@@ -99,7 +102,7 @@ public:
     String checkin_body();                  // TODO: Refactor to C-string
 
     // MQTT
-    PubSubClient *mqtt_client = nullptr;
+    PubSubClient * mqtt_client = nullptr;
     char mqtt_device_channel[128];
     char mqtt_device_channels[128];
     char mqtt_device_status_channel[128];
@@ -224,7 +227,7 @@ private:
     void parse(String);                     // needs to be refactored to char[] from String
     void update_and_reboot(String);
 
-    int timezone_offset = 2;
+    int timezone_offset = 1; // should use simpleDSTadjust
     unsigned long checkin_timeout = 3600 * 1000;          // next timeout millis()
     unsigned long checkin_interval = 3600 * 1000;  // can be set externaly, defaults to 1h
 

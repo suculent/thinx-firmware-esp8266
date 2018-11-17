@@ -85,19 +85,16 @@ THiNX::THiNX(const char * __apikey, const char * __owner_id) {
 
   Serial.print(F("\n*TH: THiNXLib rev. "));
   Serial.print(thx_revision);
-  Serial.print(" commit-id:");
-
-  if (strlen(thx_commit_id) > 8) {
-    thinx_commit_id = strdup(thx_commit_id); // -D build env var
-  } else {
-    thinx_commit_id = strdup(THINX_COMMIT_ID); // value from thinx.h
-  }
+  Serial.print(" version:");
+  Serial.println(VERSION);
 
   Serial.println(thinx_commit_id); // returned string is "not declared in expansion of THX_CID, why?
 
+#ifdef DEBUG
   // see lines ../hardware/cores/esp8266/Esp.cpp:80..100
-  wdt_disable(); // causes wdt reset after 8 seconds!
-  wdt_enable(60000); // must be called from wdt_disable() state!
+  //wdt_disable(); // causes wdt reset after 8 seconds!
+  //wdt_enable(60000); // must be called from wdt_disable() state!
+#endif
 
   if (once != true) {
     once = true;
@@ -235,9 +232,7 @@ void THiNX::connect() {
           WiFi.begin(THINX_ENV_SSID, THINX_ENV_PASS);
           Serial.println(F("*TH: Enabling connection state (197)"));
         } else {
-          Serial.println(F("*TH: LOOP > CONNECT > NO CREDS"));
-          wifi_connection_in_progress = true;
-          Serial.println(F("*TH: WARNING: Dead branch (201)"));
+          Serial.println(F("*TH: LOOP > CONNECT > NO CUSTOM CREDS"));
         }
         wifi_connection_in_progress = true; // prevents re-entering connect_wifi(); should timeout
       }
@@ -434,50 +429,6 @@ void THiNX::senddata(String body) {
   }
 }
 
-/* Secure version */
-void THiNX::send_data(String body) {
-
-  char buf[512];
-  int pos = 0;
-
-  Serial.println(F("Secure API checkin..."));
-
-  if (https_client.connect(thinx_cloud_url, 7443)) {
-
-    // Load root certificate in DER format into WiFiClientSecure object
-    bool res = https_client.setCACert_P(thx_ca_cert, thx_ca_cert_len);
-    if (!res) {
-      Serial.println(F("*TH: Failed to load root CA certificate!"));
-    }
-
-    // Verify validity of server's certificate
-    if (https_client.verifyCertChain(thinx_cloud_url)) {
-      Serial.println(F("*TH: Server certificate verified. Handshake will take about 120 seconds now... keep calm."));
-    } else {
-      Serial.println(F("*TH: ERROR: certificate verification failed!"));
-      return;
-    }
-
-    https_client.println(F("POST /device/register HTTP/1.1"));
-    https_client.print(F("Host: ")); https_client.println(thinx_cloud_url);
-    https_client.print(F("Authentication: ")); https_client.println(thinx_api_key);
-    https_client.println(F("Accept: application/json")); // application/json
-    https_client.println(F("Origin: device"));
-    https_client.println(F("Content-Type: application/json"));
-    https_client.println(F("User-Agent: THiNX-Client"));
-    https_client.print(F("Content-Length: "));
-    https_client.println(body.length());
-    https_client.println();
-    https_client.println(body);
-
-    fetch_data();
-
-  } else {
-    Serial.println(F("*TH: API connection failed."));
-    return;
-  }
-}
-
 void THiNX::fetch_data() {
 
   Serial.println(F("*TH: Waiting for API response..."));
@@ -528,6 +479,47 @@ void THiNX::fetch_data() {
   //printStackHeap("string allocated");
   parse(payload);
 
+}
+
+/* Secure version */
+void THiNX::send_data(String body) {
+
+  Serial.println(F("Secure API checkin..."));
+
+  if (https_client.connect(thinx_cloud_url, 7443)) {
+
+    // Load root certificate in DER format into WiFiClientSecure object
+    bool res = https_client.setCACert_P(thx_ca_cert, thx_ca_cert_len);
+    if (!res) {
+      Serial.println(F("*TH: Failed to load root CA certificate!"));
+    }
+
+    // Verify validity of server's certificate
+    if (https_client.verifyCertChain(thinx_cloud_url)) {
+      Serial.println(F("*TH: Server certificate verified. Handshake will take about 120 seconds now... keep calm."));
+    } else {
+      Serial.println(F("*TH: ERROR: certificate verification failed!"));
+      return;
+    }
+
+    https_client.println(F("POST /device/register HTTP/1.1"));
+    https_client.print(F("Host: ")); https_client.println(thinx_cloud_url);
+    https_client.print(F("Authentication: ")); https_client.println(thinx_api_key);
+    https_client.println(F("Accept: application/json")); // application/json
+    https_client.println(F("Origin: device"));
+    https_client.println(F("Content-Type: application/json"));
+    https_client.println(F("User-Agent: THiNX-Client"));
+    https_client.print(F("Content-Length: "));
+    https_client.println(body.length());
+    https_client.println();
+    https_client.println(body);
+
+    fetch_data();
+
+  } else {
+    Serial.println(F("*TH: API connection failed."));
+    return;
+  }
 }
 
 /*
@@ -748,7 +740,7 @@ void THiNX::parse(String payload) {
         return;
       }
 
-      bool success = registration["success"];
+      // bool success = registration["success"]; unused
       String status = registration["status"];
 
       if (status == "OK") {
@@ -874,7 +866,7 @@ void THiNX::parse(String payload) {
       if ((strlen(ssid) > 2) && (strlen(pass) > 0)) {
         WiFi.disconnect();
         WiFi.begin(ssid, pass);
-        long timeout = millis() + 20000;
+        unsigned long timeout = millis() + 20000;
         Serial.println(F("*TH: Attempting WiFi migration..."));
         while (WiFi.status() != WL_CONNECTED) {
           yield();
@@ -1022,6 +1014,8 @@ void THiNX::publish_status(char *message, bool retain) {
   if (mqtt_client != NULL) {
     if (!mqtt_client->connected()) {
       Serial.println(F("*TH: MQTT cannot publish messages while not connected."));
+      start_mqtt();
+      return;
     }
     if (retain) {
       mqtt_client->publish(
@@ -1124,9 +1118,6 @@ bool THiNX::start_mqtt() {
     return false;
   }
 
-  int willQos = 0;
-  bool willRetain = false;
-
   if (mqtt_client->connect(MQTT::Connect(thinx_mac())
     .set_will(thinx_mqtt_status_channel().c_str(), lastWill.c_str())
     .set_auth(thinx_udid, thinx_api_key)
@@ -1150,7 +1141,7 @@ bool THiNX::start_mqtt() {
           );
           mqtt_client->disconnect();
           pub.payload_stream()->stop();
-          Serial.printf("Update Success: %u\nRebooting...\n", millis() - startTime);
+          Serial.printf("Update Success: %lu\nRebooting...\n", millis() - startTime);
           ESP.restart();
         } else {
           Serial.println(F("*TH: ESP MQTT Stream update failed..."));
@@ -1198,8 +1189,6 @@ bool THiNX::start_mqtt() {
 */
 
 void THiNX::restore_device_info() {
-
-  int json_end = 0;
 
   Serial.println(F("*TH: Restoring device info..."));
 
@@ -1399,7 +1388,7 @@ void THiNX::update_and_reboot(String url) {
     mqtt_client->publish(MQTT::Publish(pub.topic(), "").set_retain());
     mqtt_client->disconnect();
 
-    Serial.printf("Update Success: %u\nRebooting...\n", millis() - startTime);
+    Serial.printf("Update Success: %lu\nRebooting...\n", millis() - startTime);
 
     // Notify on reboot for update
     if (mqtt_client != NULL) {
@@ -1776,7 +1765,7 @@ void THiNX::setRebootInterval(long interval) {
 bool THiNX::check_hash(char * filename, char * expected) {
   File file = SPIFFS.open(filename, "r");
   char aes_text[2 * SHA256_BLOCK_SIZE + 1];
-  BYTE hash[SHA256_BLOCK_SIZE];
+
   static uint8_t buf[512] = {0};
   static uint8_t obuf[512] = {0};
   size_t len = 0;
