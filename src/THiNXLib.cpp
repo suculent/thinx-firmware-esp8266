@@ -85,7 +85,7 @@ THiNX::THiNX(const char * __apikey, const char * __owner_id) {
 
   Serial.print(F("\n*TH: THiNXLib rev. "));
   Serial.print(thx_revision);
-  Serial.print(" version:");
+  Serial.print(" version: ");
   Serial.println(VERSION);
 
   Serial.println(thinx_commit_id); // returned string is "not declared in expansion of THX_CID, why?
@@ -121,7 +121,7 @@ THiNX::THiNX(const char * __apikey, const char * __owner_id) {
   thinx_forced_update = false;
   last_checkin_timestamp = 0; // 1/1/1970
 
-  checkin_interval = millis() + checkin_timeout / 4; // retry faster before first checkin
+  checkin_time = millis() + checkin_interval / 4; // retry faster before first checkin
   reboot_interval = millis() + reboot_timeout;
 
   // will be loaded from SPIFFS/EEPROM or retrieved on Registration later
@@ -330,7 +330,7 @@ void THiNX::checkin() {
     } else {
       send_data(body); // HTTPS
     }
-    checkin_interval = millis() + checkin_timeout;
+    checkin_time = millis() + checkin_interval;
   }
 }
 
@@ -955,7 +955,7 @@ String THiNX::thinx_date(const char* optional_format) {
 */
 
 const char * THiNX::thinx_mac() {
-  sprintf(mac_string, "5CCF7F%6X", ESP.getChipId()); // ESP8266 only!
+  sprintf(mac_string, "5CCF7F%06X", ESP.getChipId()); // ESP8266 only! needs alignment...
   return mac_string;
 }
 
@@ -1010,19 +1010,25 @@ void THiNX::publishStatusRetain(String message, bool retain) {
 }
 
 void THiNX::publish_status(char *message, bool retain) {
-  Serial.println(F("*TH: publish_status")); Serial.flush();
   if (mqtt_client != NULL) {
     if (!mqtt_client->connected()) {
-      Serial.println(F("*TH: MQTT cannot publish messages while not connected."));
+      Serial.println(F("*TH: reconnecting MQTT..."));
       start_mqtt();
-      return;
+      unsigned long reconnect_timeout = millis() + 10000;
+      while (!mqtt_client->connected()) {
+        mqtt_client->loop();
+        delay(1);
+        if (millis() > reconnect_timeout) break;
+      }
     }
     if (retain) {
       mqtt_client->publish(
         MQTT::Publish(mqtt_device_status_channel, message).set_retain()
       );
+      Serial.println(F("*TH: publish_status retained")); Serial.flush();
     } else {
       mqtt_client->publish(mqtt_device_status_channel, message); // this is weird but already tried to use object in retain version and does not consume
+      Serial.println(F("*TH: publish_status unretained")); Serial.flush();
     }
     mqtt_client->loop();
   } else {
@@ -1671,11 +1677,11 @@ void THiNX::loop() {
 
   // Force re-checkin after specified interval
   if (thinx_phase > FINALIZE) {
-    if (millis() > checkin_timeout) {
+    if (millis() > checkin_time) {
       if (checkin_interval > 0) {
         Serial.println(F("*TH: LOOP » Checkin interval arrived..."));
         thinx_phase = CONNECT_API;
-        checkin_timeout = millis() + checkin_interval;
+        checkin_interval = millis() + checkin_time;
       }
     }
   }
@@ -1701,8 +1707,10 @@ void THiNX::loop() {
     finalize();
   }
 
-  if ( thinx_phase > FINALIZE ) {
-    mqtt_client->loop();
+  if ( thinx_phase >= FINALIZE ) {
+    if (mqtt_client) {
+      mqtt_client->loop();
+    }
   }
 
   if ( (reboot_interval > 0) && (millis() > reboot_interval) ) {

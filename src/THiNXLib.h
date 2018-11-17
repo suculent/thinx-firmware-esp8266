@@ -228,8 +228,8 @@ private:
     void update_and_reboot(String);
 
     int timezone_offset = 1; // should use simpleDSTadjust
-    unsigned long checkin_timeout = 3600 * 1000;          // next timeout millis()
-    unsigned long checkin_interval = 3600 * 1000;  // can be set externaly, defaults to 1h
+    unsigned long checkin_interval = 86400 * 1000;          // next timeout millis()
+    unsigned long checkin_time = 0;  // can be set externaly, defaults to 1h
 
     unsigned long last_checkin_millis;
     unsigned long last_checkin_timestamp;
