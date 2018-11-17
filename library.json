@@ -11,7 +11,7 @@
     "type": "git",
     "url": "https://github.com/suculent/thinx-firmware-esp8266.git"
   },
-  "version": "2.4.188",
+  "version": "2.4.190",
   "frameworks": "arduino",
   "platforms": "esp8266"
 }
