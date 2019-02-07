@@ -27,6 +27,7 @@ bool THiNX::forceHTTP = false;
 
 const char THiNX::time_format[] = "%T";
 const char THiNX::date_format[] = "%Y-%m-%d";
+char * THiNX::thinx_mqtt_url = strdup(THINX_MQTT_URL);
 
 #include "thinx_root_ca.h"
 
@@ -39,7 +40,6 @@ WiFiManagerParameter * THiNX::api_key_param;
 WiFiManagerParameter * THiNX::owner_param;
 
 void THiNX::saveConfigCallback() {
-  Serial.println(F("*TH: WiFiManager's saveConfigCallback called. Counfiguration should be saved now!"));
   should_save_config = true;
   strcpy(thx_api_key, api_key_param->getValue());
   strcpy(thx_owner_key, owner_param->getValue());
@@ -52,6 +52,10 @@ String THiNX::statusString = "Registered";
 String THiNX::accessPointName = "THiNX-AP";
 String THiNX::accessPointPassword = "PASSWORD";
 String THiNX::lastWill = "{ \"status\" : \"disconnected\" }";
+
+bool THiNX::logging = false;
+
+// #define LOG `if (logging)`
 
 /* Constructor */
 
@@ -83,12 +87,12 @@ THiNX::THiNX(const char * __apikey, const char * __owner_id) {
   wifiManager.autoConnect(accessPointName.c_str());
   #endif
 
-  Serial.print(F("\n*TH: THiNXLib rev. "));
-  Serial.print(thx_revision);
-  Serial.print(" version: ");
-  Serial.println(VERSION);
+  if (logging) Serial.print(F("\n*TH: THiNXLib rev. "));
+  if (logging) Serial.print(THX_REVISION);
+  if (logging) Serial.print(" version: ");
+  if (logging) Serial.println(VERSION);
 
-  Serial.println(thinx_commit_id); // returned string is "not declared in expansion of THX_CID, why?
+  // if (logging) Serial.println(thinx_commit_id); // returned string is "not declared in expansion of THX_CID, why?
 
 #ifdef DEBUG
   // see lines ../hardware/cores/esp8266/Esp.cpp:80..100
@@ -150,9 +154,9 @@ THiNX::THiNX(const char * __apikey, const char * __owner_id) {
     thinx_api_key = strdup(__apikey);
   } else {
       if (strlen(thinx_api_key) > 4) {
-          Serial.print(F("*TH: With thinx.h API Key..."));
+          if (logging) Serial.print(F("*TH: With thinx.h API Key..."));
       } else {
-          Serial.print(F("*TH: No API Key!"));
+          if (logging) Serial.print(F("*TH: No API Key!"));
           return;
       }
   }
@@ -161,9 +165,9 @@ THiNX::THiNX(const char * __apikey, const char * __owner_id) {
     thinx_owner = strdup(__owner_id);
   } else {
       if (strlen(thinx_owner) > 4) {
-          Serial.print(F("*TH: With thinx.h owner..."));
+          if (logging) Serial.print(F("*TH: With thinx.h owner..."));
       } else {
-          Serial.print(F("*TH: No API Key!"));
+          if (logging) Serial.print(F("*TH: No API Key!"));
           return;
       }
   }
@@ -176,9 +180,9 @@ THiNX::THiNX(const char * __apikey, const char * __owner_id) {
 void THiNX::init_with_api_key(const char * __apikey) {
 
   #ifdef __USE_SPIFFS__
-  Serial.println(F("*TH: Checking filesystem, please don't turn off or reset the device now..."));
+  if (logging) Serial.println(F("*TH: Checking filesystem, please don't turn off or reset the device now..."));
   if (!fsck()) {
-    Serial.println(F("*TH: Filesystem check failed, disabling THiNX."));
+    if (logging) Serial.println(F("*TH: Filesystem check failed, disabling THiNX."));
     return;
   }
   #endif
@@ -192,7 +196,7 @@ void THiNX::init_with_api_key(const char * __apikey) {
     thinx_api_key = strdup(__apikey);
   } else {
     if (strlen(thinx_api_key) < 4) {
-      Serial.print(F("*TH: No API Key!"));
+      if (logging) Serial.print(F("*TH: No API Key!"));
       return;
     }
   }
@@ -212,11 +216,14 @@ char* THiNX::get_udid() {
 void THiNX::connect() {
 
   if (wifi_connected) {
-    Serial.println(F("*TH: connected"));
+    if (logging) Serial.println(F("*TH: connected"));
     return;
   }
 
-  Serial.print(F("*TH: connecting: ")); Serial.println(wifi_retry);
+  if (logging) {
+    Serial.print(F("*TH: connecting: "));
+    Serial.println(wifi_retry);
+  }
 
   #ifndef __USE_WIFI_MANAGER__
   if (WiFi.SSID()) {
@@ -238,19 +245,17 @@ void THiNX::connect() {
       }
       //
     }
-  } else {
-    Serial.print(F("*TH: No SSID."));
   }
   #endif
 
   if (WiFi.status() == WL_CONNECTED) {
-    Serial.println(F("THiNX > LOOP > ALREADY CONNECTED"));
+    if (logging) Serial.println(F("THiNX > LOOP > ALREADY CONNECTED"));
     wifi_connected = true; // prevents re-entering start() [this method]
     wifi_connection_in_progress = false;
   } else {
-    Serial.println(F("THiNX > LOOP > CONNECTING WiFi:"));
+    if (logging) Serial.println(F("THiNX > LOOP > CONNECTING WiFi:"));
     connect_wifi();
-    Serial.println(F("*TH: Enabling connection state (237)"));
+    if (logging) Serial.println(F("*TH: Enabling connection state (237)"));
     wifi_connection_in_progress = true;
   }
 }
@@ -272,7 +277,7 @@ void THiNX::connect_wifi() {
   if (wifi_connection_in_progress) {
     if (wifi_retry > 1000) {
       if (WiFi.getMode() == WIFI_STA) {
-        Serial.println(F("*TH: Starting AP with PASSWORD..."));
+        if (logging) Serial.println(F("*TH: Starting AP with PASSWORD..."));
         WiFi.mode(WIFI_AP);
         WiFi.softAP(accessPointName.c_str(), accessPointPassword.c_str()); // setup the AP on channel 1, not hidden, and allow 8 clients
         wifi_retry = 0;
@@ -281,17 +286,17 @@ void THiNX::connect_wifi() {
         return;
       } else {
         if (strlen(THINX_ENV_SSID) > 2) {
-          Serial.println(F("*TH: Connecting to AP with pre-defined credentials...")); Serial.flush();
+          if (logging) Serial.println(F("*TH: Connecting to AP with pre-defined credentials...")); Serial.flush();
           WiFi.mode(WIFI_STA);
           WiFi.begin(THINX_ENV_SSID, THINX_ENV_PASS);
-          Serial.println(F("*TH: Enabling connection state (283)"));
+          if (logging) Serial.println(F("*TH: Enabling connection state (283)"));
           wifi_connection_in_progress = true; // prevents re-entering connect_wifi()
           wifi_retry = 0; // waiting for sta...
         }
       }
 
     } else {
-      Serial.print("*TH: WiFi retry"); Serial.println(wifi_retry); Serial.flush();
+      if (logging) Serial.print("*TH: WiFi retry"); Serial.println(wifi_retry); Serial.flush();
       wifi_retry++;
     }
 
@@ -299,13 +304,13 @@ void THiNX::connect_wifi() {
 
     if (strlen(THINX_ENV_SSID) > 2) {
       if (wifi_retry == 0) {
-        Serial.println(F("*TH: Connecting to AP with pre-defined credentials..."));
+        if (logging) Serial.println(F("*TH: Connecting to AP with pre-defined credentials..."));
         // 1st run
         if (WiFi.getMode() != WIFI_STA) {
           WiFi.mode(WIFI_STA);
         } else {
           WiFi.begin(THINX_ENV_SSID, THINX_ENV_PASS);
-          Serial.println(F("*TH: Enabling connection state (272)"));
+          if (logging) Serial.println(F("*TH: Enabling connection state (272)"));
           wifi_connection_in_progress = true; // prevents re-entering connect_wifi()
         }
       }
@@ -319,10 +324,10 @@ void THiNX::connect_wifi() {
 */
 
 void THiNX::checkin() {
-  Serial.println(thinx_time(NULL));
-  Serial.println(F("\n*TH: Contacting API..."));
+  if (logging) Serial.println(thinx_time(NULL));
+  if (logging) Serial.println(F("\n*TH: Contacting API..."));
   if(!wifi_connected) {
-    Serial.println(F("*TH: Cannot checkin while not connected, exiting."));
+    if (logging) Serial.println(F("*TH: Cannot checkin while not connected, exiting."));
   } else {
     String body = checkin_body();
     if (thx_ca_cert_len == 0 || forceHTTP) {
@@ -423,15 +428,17 @@ void THiNX::senddata(String body) {
 
     fetch_data();
 
+    thx_wifi_client.stop();
+
   } else {
-    Serial.println(F("*TH: API connection failed."));
+    if (logging) Serial.println(F("*TH: API connection failed."));
     return;
   }
 }
 
 void THiNX::fetch_data() {
 
-  Serial.println(F("*TH: Waiting for API response..."));
+  if (logging) Serial.println(F("*TH: Waiting for API response..."));
 
   char buf[512];
   int pos = 0;
@@ -473,7 +480,7 @@ void THiNX::fetch_data() {
 
   thx_wifi_client.stop(); // ??
 
-  Serial.printf("*TH: Received %u bytes\n", pos);
+  if (logging) Serial.printf("*TH: Received %u bytes\n", pos);
   //printStackHeap("allocating string");
   String payload = String(buf);
   //printStackHeap("string allocated");
@@ -484,21 +491,21 @@ void THiNX::fetch_data() {
 /* Secure version */
 void THiNX::send_data(String body) {
 
-  Serial.println(F("Secure API checkin..."));
+  if (logging) Serial.println(F("Secure API checkin..."));
 
   if (https_client.connect(thinx_cloud_url, 7443)) {
 
     // Load root certificate in DER format into WiFiClientSecure object
     bool res = https_client.setCACert_P(thx_ca_cert, thx_ca_cert_len);
     if (!res) {
-      Serial.println(F("*TH: Failed to load root CA certificate!"));
+      if (logging) Serial.println(F("*TH: Failed to load root CA certificate!"));
     }
 
     // Verify validity of server's certificate
     if (https_client.verifyCertChain(thinx_cloud_url)) {
-      Serial.println(F("*TH: Server certificate verified. Handshake will take about 120 seconds now... keep calm."));
+      if (logging) Serial.println(F("*TH: Server certificate verified. Handshake will take about 120 seconds now... keep calm."));
     } else {
-      Serial.println(F("*TH: ERROR: certificate verification failed!"));
+      if (logging) Serial.println(F("*TH: ERROR: certificate verification failed!"));
       return;
     }
 
@@ -516,8 +523,10 @@ void THiNX::send_data(String body) {
 
     fetch_data();
 
+    https_client.stop();
+
   } else {
-    Serial.println(F("*TH: API connection failed."));
+    if (logging) Serial.println(F("*TH: API connection failed."));
     return;
   }
 }
@@ -573,12 +582,12 @@ void THiNX::parse(String payload) {
   }
 
   if (ptype == Unknown) {
-    Serial.println(F("ptype: Not a THiNX message."));
+    if (logging) Serial.println(F("ptype: Not a THiNX message."));
     return;
   }
 
   if (undefined_owner > start_index) {
-    Serial.println(F("ERROR: Not authorized. Please copy your owner_id into thinx.h from RTM Console > User Profile."));
+    if (logging) Serial.println(F("ERROR: Not authorized. Please copy your owner_id into thinx.h from RTM Console > User Profile."));
     return;
   }
 
@@ -587,7 +596,7 @@ void THiNX::parse(String payload) {
   JsonObject& root = jsonBuffer.parseObject(body.c_str());
 
   if ( !root.success() ) {
-    Serial.println(F("Failed parsing root node."));
+    if (logging) Serial.println(F("Failed parsing root node."));
     return;
   }
 
@@ -595,18 +604,18 @@ void THiNX::parse(String payload) {
 
     case UPDATE: {
 
-      Serial.println(F("ptype case UPDATE")); Serial.flush();
+      if (logging) Serial.println(F("ptype case UPDATE")); Serial.flush();
 
       JsonObject& update = root["registration"];
 
-      Serial.println(F("TODO: Parse update payload..."));
+      if (logging) Serial.println(F("TODO: Parse update payload..."));
 
       String mac = update["mac"];
       String this_mac = String(thinx_mac());
-      Serial.println(String("mac: ") + mac);
+      if (logging) Serial.println(String("mac: ") + mac);
 
       if (!mac.equals(this_mac)) {
-        Serial.println(F("*TH: Warning: firmware is dedicated to device with different MAC."));
+        if (logging) Serial.println(F("*TH: Warning: firmware is dedicated to device with different MAC."));
       }
 
       String udid = root["udid"];
@@ -616,20 +625,20 @@ void THiNX::parse(String payload) {
 
       // Check current firmware based on commit id and store Updated state...
       String commit = update["commit"];
-      Serial.println(String("commit: ") + commit);
+      if (logging) Serial.println(String("commit: ") + commit);
 
       // Check current firmware based on version and store Updated state...
       String version = update["version"];
-      Serial.println(String("version: ") + version);
+      if (logging) Serial.println(String("version: ") + version);
 
       //if ((commit == thinx_commit_id) && (version == thinx_version_id)) { WHY?
       if (strlen(available_update_url) > 5) {
-        Serial.println(F("*TH: firmware has same thx_commit_id as current and update availability is stored. Firmware has been installed."));
+        if (logging) Serial.println(F("*TH: firmware has same thx_commit_id as current and update availability is stored. Firmware has been installed."));
         available_update_url = strdup("");
         notify_on_successful_update();
         return;
       } else {
-        Serial.println(F("*TH: Info: firmware has same thx_commit_id as current and no update is available."));
+        if (logging) Serial.println(F("*TH: Info: firmware has same thx_commit_id as current and no update is available."));
       }
 
       save_device_info();
@@ -638,7 +647,7 @@ void THiNX::parse(String payload) {
       // we must ask user to commence firmware update.
       if (thinx_auto_update == false) {
         if (mqtt_client != NULL) {
-          Serial.println(F("*TH: Update availability notification..."));
+          if (logging) Serial.println(F("*TH: Update availability notification..."));
           mqtt_client->publish(
             thinx_mqtt_channel().c_str(),
             F("{ title: \"Update Available\", body: \"There is an update available for this device. Do you want to install it now?\", type: \"actionable\", response_type: \"bool\" }")
@@ -648,10 +657,10 @@ void THiNX::parse(String payload) {
 
       } else if (thinx_auto_update || thinx_forced_update){
 
-        Serial.println(F("*TH: Starting update A..."));
+        if (logging) Serial.println(F("*TH: Starting update A..."));
 
         String type = update["type"];
-        Serial.print(F("*TH: Payload type: ")); Serial.println(type);
+        if (logging) Serial.print(F("*TH: Payload type: ")); if (logging) Serial.println(type);
 
         String files = update["files"];
 
@@ -663,17 +672,17 @@ void THiNX::parse(String payload) {
 
         String hash = update["hash"];
         if (hash.length() > 2) {
-          Serial.print(F("*TH: #")); Serial.println(hash);
+          if (logging) Serial.print(F("*TH: #")); if (logging) Serial.println(hash);
           expected_hash = strdup(hash.c_str());
         }
 
         String md5 = update["md5"];
         if (md5.length() > 2) {
-          Serial.print(F("*TH: #")); Serial.println(md5);
+          if (logging) Serial.print(F("*TH: #")); if (logging) Serial.println(md5);
           expected_md5 = strdup(md5.c_str());
         }
 
-        Serial.println(F("Saving device info before firmware update.")); Serial.flush();
+        if (logging) Serial.println(F("Saving device info before firmware update.")); Serial.flush();
         save_device_info();
 
         if (url) {
@@ -683,8 +692,8 @@ void THiNX::parse(String payload) {
           );
 
           mqtt_client->loop();
-          Serial.print(F("*TH: Force update URL must not contain HTTP!!!: "));
-          Serial.println(url);
+          if (logging) Serial.print(F("*TH: Force update URL must not contain HTTP!!!: "));
+          if (logging) Serial.println(url);
           url.replace("http://", "");
           // TODO: must not contain HTTP, extend with http://thinx.cloud/"
           update_and_reboot(url);
@@ -700,7 +709,7 @@ void THiNX::parse(String payload) {
       JsonObject& notification = root["notification"];
 
       if ( !notification.success() ) {
-        Serial.println(F("*TH: Failed parsing notification node."));
+        if (logging) Serial.println(F("*TH: Failed parsing notification node."));
         return;
       }
 
@@ -708,24 +717,24 @@ void THiNX::parse(String payload) {
       if ((type == "bool") || (type == "boolean")) {
         bool response = notification["response"];
         if (response == true) {
-          Serial.println(F("*TH: User allowed update using boolean."));
+          if (logging) Serial.println(F("*TH: User allowed update using boolean."));
           if (strlen(available_update_url) > 4) {
             update_and_reboot(available_update_url);
           }
         } else {
-          Serial.println(F("*TH: User denied update using boolean."));
+          if (logging) Serial.println(F("*TH: User denied update using boolean."));
         }
       }
 
       if ((type == "string") || (type == "String")) {
         String response = notification["response"];
         if (response == "yes") {
-          Serial.println(F("*TH: User allowed update using string."));
+          if (logging) Serial.println(F("*TH: User allowed update using string."));
           if (strlen(available_update_url) > 4) {
             update_and_reboot(available_update_url);
           }
         } else if (response == "no") {
-          Serial.println(F("*TH: User denied update using string."));
+          if (logging) Serial.println(F("*TH: User denied update using string."));
         }
       }
 
@@ -736,7 +745,7 @@ void THiNX::parse(String payload) {
       JsonObject& registration = root["registration"];
 
       if ( !registration.success() ) {
-        Serial.println(F("*TH: Failed parsing registration node."));
+        if (logging) Serial.println(F("*TH: Failed parsing registration node."));
         return;
       }
 
@@ -769,12 +778,12 @@ void THiNX::parse(String payload) {
         }
 
         if (registration.containsKey(F("timestamp"))) {
-          Serial.print(F("*TH: Updating THiNX time: "));
+          if (logging) Serial.print(F("*TH: Updating THiNX time: "));
           last_checkin_timestamp = (long)registration[F("timestamp")] + timezone_offset * 3600;
           last_checkin_millis = millis();
-          Serial.print(thinx_time(NULL));
-          Serial.print(" ");
-          Serial.println(thinx_date(NULL));
+          if (logging) Serial.print(thinx_time(NULL));
+          if (logging) Serial.print(" ");
+          if (logging) Serial.println(thinx_date(NULL));
         }
 
         save_device_info();
@@ -788,25 +797,25 @@ void THiNX::parse(String payload) {
           thinx_udid = strdup(udid.c_str());
         }
 
-        Serial.println(F("Saving device info for update.")); Serial.flush();
+        if (logging) Serial.println(F("Saving device info for update.")); Serial.flush();
         save_device_info();
 
         String mac = registration["mac"];
-        Serial.println(String("*TH: Update for MAC: ") + mac);
+        if (logging) Serial.println(String("*TH: Update for MAC: ") + mac);
         // TODO: must be current or 'ANY'
 
         // commit should not be same except for forced update
         String commit = registration["commit"];
-        Serial.println(String("commit: ") + commit);
+        if (logging) Serial.println(String("commit: ") + commit);
         if (commit == thinx_commit_id) {
-          Serial.println(F("*TH: Info: new firmware has same thx_commit_id as current."));
+          if (logging) Serial.println(F("*TH: Info: new firmware has same thx_commit_id as current."));
         }
 
         String version = registration["version"];
-        Serial.println(String(F("*TH: version: ")) + version);
+        if (logging) Serial.println(String(F("*TH: version: ")) + version);
 
         if (thinx_auto_update == false) {
-          Serial.println(String(F("*TH: Skipping auto-update (disabled).")));
+          if (logging) Serial.println(String(F("*TH: Skipping auto-update (disabled).")));
           return;
         }
 
@@ -814,29 +823,29 @@ void THiNX::parse(String payload) {
 
         String url = registration["url"];
         if (url.length() > 2) {
-          Serial.println(F("*TH: Starting direct update..."));
+          if (logging) Serial.println(F("*TH: Starting direct update..."));
           update_url = url;
         }
 
         String ott = registration["ott"];
         if (ott.length() > 2) {
-          Serial.println(F("*TH: Starting OTT update..."));
+          if (logging) Serial.println(F("*TH: Starting OTT update..."));
           update_url = "http://thinx.cloud:7442/device/firmware?ott="+ott;
         }
 
         String hash = registration["hash"];
         if (hash.length() > 2) {
-          Serial.print(F("*TH: #")); Serial.println(hash);
+          if (logging) Serial.print(F("*TH: #")); if (logging) Serial.println(hash);
           expected_hash = strdup(hash.c_str());
         }
 
         String md5 = registration["md5"];
         if (md5.length() > 2) {
-          Serial.print(F("*TH: #")); Serial.println(md5);
+          if (logging) Serial.print(F("*TH: #")); if (logging) Serial.println(md5);
           expected_md5 = strdup(md5.c_str());
         }
 
-        Serial.println(update_url);
+        if (logging) Serial.println(update_url);
         update_and_reboot(update_url);
         return;
 
@@ -849,7 +858,7 @@ void THiNX::parse(String payload) {
       JsonObject& configuration = root["configuration"];
 
       if ( !configuration.success() ) {
-        Serial.println(F("*TH: Failed parsing configuration node."));
+        if (logging) Serial.println(F("*TH: Failed parsing configuration node."));
         return;
       }
 
@@ -867,15 +876,15 @@ void THiNX::parse(String payload) {
         WiFi.disconnect();
         WiFi.begin(ssid, pass);
         unsigned long timeout = millis() + 20000;
-        Serial.println(F("*TH: Attempting WiFi migration..."));
+        if (logging) Serial.println(F("*TH: Attempting WiFi migration..."));
         while (WiFi.status() != WL_CONNECTED) {
           yield();
           if (millis() > timeout) break;
         }
         if (WiFi.status() != WL_CONNECTED) {
-          Serial.println(F("*TH: WiFi migration failed."));
+          if (logging) Serial.println(F("*TH: WiFi migration failed."));
         } else {
-          Serial.println(F("*TH: WiFi migration successful.")); // TODO: Notify using publish() to device status topic
+          if (logging) Serial.println(F("*TH: WiFi migration successful.")); // TODO: Notify using publish() to device status topic
         }
       }
       #endif
@@ -928,7 +937,7 @@ String THiNX::thinx_time(const char* optional_format) {
   char res[32];
   (void) localtime_r(&stamp, &lt);
   if (strftime(res, sizeof(res), format, &lt) == 0) {
-      Serial.println(F("cannot format supplied time into buffer"));
+      if (logging) Serial.println(F("cannot format supplied time into buffer"));
   }
   return String(res);
 }
@@ -945,7 +954,7 @@ String THiNX::thinx_date(const char* optional_format) {
   char res[32];
   (void) localtime_r(&stamp, &lt);
   if (strftime(res, sizeof(res), format, &lt) == 0) {
-      Serial.println(F("cannot format supplied date into buffer"));
+      if (logging) Serial.println(F("cannot format supplied date into buffer"));
   }
   return String(res);
 }
@@ -965,14 +974,14 @@ const char * THiNX::thinx_mac() {
 
 void THiNX::notify_on_successful_update() {
   if (mqtt_client != NULL) {
-    Serial.println(F("*TH: notify_on_successful_update()"));
+    if (logging) Serial.println(F("*TH: notify_on_successful_update()"));
     mqtt_client->publish(
       mqtt_device_status_channel,
       F("{ title: \"Update Successful\", body: \"The device has been successfully updated.\", type: \"success\" }")
     );
     mqtt_client->loop();
   } else {
-    Serial.println(F("*TH: Device updated but MQTT not active to notify. TODO: Store."));
+    if (logging) Serial.println(F("*TH: Device updated but MQTT not active to notify. TODO: Store."));
   }
 }
 
@@ -1005,14 +1014,14 @@ void THiNX::publishStatusRetain(String message, bool retain) {
     }
     mqtt_client->loop();
   } else {
-    Serial.println(F("*TH: MQTT not active while trying to publish retained status."));
+    if (logging) Serial.println(F("*TH: MQTT not active while trying to publish retained status."));
   }
 }
 
 void THiNX::publish_status(char *message, bool retain) {
   if (mqtt_client != NULL) {
     if (!mqtt_client->connected()) {
-      Serial.println(F("*TH: reconnecting MQTT..."));
+      if (logging) Serial.println(F("*TH: reconnecting MQTT..."));
       start_mqtt();
       unsigned long reconnect_timeout = millis() + 10000;
       while (!mqtt_client->connected()) {
@@ -1025,14 +1034,14 @@ void THiNX::publish_status(char *message, bool retain) {
       mqtt_client->publish(
         MQTT::Publish(mqtt_device_status_channel, message).set_retain()
       );
-      Serial.println(F("*TH: publish_status retained")); Serial.flush();
+      if (logging) Serial.println(F("*TH: publish_status retained")); Serial.flush();
     } else {
       mqtt_client->publish(mqtt_device_status_channel, message); // this is weird but already tried to use object in retain version and does not consume
-      Serial.println(F("*TH: publish_status unretained")); Serial.flush();
+      if (logging) Serial.println(F("*TH: publish_status unretained")); Serial.flush();
     }
     mqtt_client->loop();
   } else {
-    Serial.println(F("*TH: MQTT not active while trying to publish retained status."));
+    if (logging) Serial.println(F("*TH: MQTT not active while trying to publish retained status."));
   }
 }
 
@@ -1055,7 +1064,7 @@ void THiNX::publish(String message, String topic, bool retain)  {
     }
     mqtt_client->loop();
   } else {
-    Serial.println(F("*TH: MQTT not active while trying to publish message."));
+    if (logging) Serial.println(F("*TH: MQTT not active while trying to publish message."));
   }
 }
 
@@ -1074,7 +1083,7 @@ void THiNX::publish(char * message, char * topic, bool retain)  {
     }
     mqtt_client->loop();
   } else {
-    Serial.println(F("*TH: MQTT not active while trying to publish message."));
+    if (logging) Serial.println(F("*TH: MQTT not active while trying to publish message."));
   }
 }
 
@@ -1094,7 +1103,7 @@ void THiNX::setLastWill(String nextWill) {
 bool THiNX::start_mqtt() {
 
   if (mqtt_client != NULL) {
-    Serial.println(F("*TH: start_mqtt")); Serial.flush();
+    if (logging) Serial.println(F("*TH: start_mqtt")); Serial.flush();
     mqtt_connected = mqtt_client->connected();
     if (mqtt_connected) {
       return true;
@@ -1102,25 +1111,25 @@ bool THiNX::start_mqtt() {
   }
 
   if (strlen(thinx_udid) < 4) {
-    Serial.println(F("*TH: MQTT NO-UDID!")); Serial.flush();
+    if (logging) Serial.println(F("*TH: MQTT NO-UDID!")); Serial.flush();
     return false;
   }
 
   if (forceHTTP == true) {
-    Serial.println(F("*TH: Contacting MQTT server over HTTP..."));
+    if (logging) Serial.println(F("*TH: Contacting MQTT server over HTTP..."));
     mqtt_client = new PubSubClient(thx_wifi_client, thinx_mqtt_url);
   } else {
-    Serial.println(F("*TH: Contacting MQTT server over HTTPS..."));
+    if (logging) Serial.println(F("*TH: Contacting MQTT server over HTTPS..."));
     bool res = https_client.setCACert_P(thx_ca_cert, thx_ca_cert_len);
     if (res) {
       mqtt_client = new PubSubClient(https_client, thinx_mqtt_url);
     } else {
-      Serial.println(F("*TH: Failed to load root CA certificate for MQTT!"));
+      if (logging) Serial.println(F("*TH: Failed to load root CA certificate for MQTT!"));
     }
   }
 
   if (strlen(thinx_api_key) < 5) {
-    Serial.println(F("*TH: API Key not set, exiting."));
+    if (logging) Serial.println(F("*TH: API Key not set, exiting."));
     return false;
   }
 
@@ -1136,7 +1145,7 @@ bool THiNX::start_mqtt() {
 
       // Stream has been never tested so far...
       if (pub.has_stream()) {
-        Serial.println(F("*TH: MQTT Type: Stream..."));
+        if (logging) Serial.println(F("*TH: MQTT Type: Stream..."));
         uint32_t startTime = millis();
         uint32_t size = pub.payload_len();
         if ( ESP.updateSketch(*pub.payload_stream(), size, true, false) ) {
@@ -1147,10 +1156,10 @@ bool THiNX::start_mqtt() {
           );
           mqtt_client->disconnect();
           pub.payload_stream()->stop();
-          Serial.printf("Update Success: %lu\nRebooting...\n", millis() - startTime);
+          if (logging) Serial.printf("Update Success: %lu\nRebooting...\n", millis() - startTime);
           ESP.restart();
         } else {
-          Serial.println(F("*TH: ESP MQTT Stream update failed..."));
+          if (logging) Serial.println(F("*TH: ESP MQTT Stream update failed..."));
           mqtt_client->publish(
             mqtt_device_status_channel,
             "{ \"status\" : \"mqtt_update_failed\" }"
@@ -1158,8 +1167,8 @@ bool THiNX::start_mqtt() {
         }
 
       } else {
-        Serial.println(F("*TH: MQTT Type: String or JSON..."));
-        Serial.println(pub.payload_string());
+        if (logging) Serial.println(F("*TH: MQTT Type: String or JSON..."));
+        if (logging) Serial.println(pub.payload_string());
         parse(pub.payload_string());
         if (_mqtt_callback) {
             _mqtt_callback(pub.payload_string());
@@ -1171,16 +1180,16 @@ bool THiNX::start_mqtt() {
 
   } else {
     mqtt_connected = false;
-    Serial.println(F("*TH: MQTT Not connected."));
+    if (logging) Serial.println(F("*TH: MQTT Not connected."));
 
     /*
     #ifdef __DEBUG__
-          Serial.println(F("*TH: Failed to load root CA certificate for MQTT, falling back to HTTP!"));
+          if (logging) Serial.println(F("*TH: Failed to load root CA certificate for MQTT, falling back to HTTP!"));
           forceHTTP = true;
           mqtt_client = new PubSubClient(thx_wifi_client, thinx_mqtt_url);
           return start_mqtt();
     #else
-          Serial.println(F("*TH: Failed to connect using MQTTS!"));
+          if (logging) Serial.println(F("*TH: Failed to connect using MQTTS!"));
           //ESP.restart();
     #endif
     */
@@ -1196,7 +1205,7 @@ bool THiNX::start_mqtt() {
 
 void THiNX::restore_device_info() {
 
-  Serial.println(F("*TH: Restoring device info..."));
+  if (logging) Serial.println(F("*TH: Restoring device info..."));
 
   #ifndef __USE_SPIFFS__
 
@@ -1204,7 +1213,7 @@ void THiNX::restore_device_info() {
   long buf_len = 512;
   long data_len = 0;
 
-  Serial.println(F("*TH: Restoring configuration from EEPROM..."));
+  if (logging) Serial.println(F("*TH: Restoring configuration from EEPROM..."));
 
   for (long a = 0; a < buf_len; a++) {
     value = EEPROM.read(a);
@@ -1225,7 +1234,7 @@ void THiNX::restore_device_info() {
     if (value == 0) {
       json_info[a] = char(value);
       data_len++;
-      Serial.print("*TH: "); Serial.print(a); Serial.println(F(" bytes read from EEPROM."));
+      if (logging) Serial.print("*TH: "); if (logging) Serial.print(a); if (logging) Serial.println(F(" bytes read from EEPROM."));
       // Validate JSON
       break;
     } else {
@@ -1235,46 +1244,47 @@ void THiNX::restore_device_info() {
     // Serial.flush(); // to debug reading EEPROM bytes
   }
 
-  Serial.print("Restore json_output: ");
-  Serial.println(json_output);
+  if (logging) Serial.print("Restore json_output: ");
+  if (logging) Serial.println(json_output);
 
   // Validating bracket count
   if (json_end != 0) {
-    Serial.println(F("*TH: JSON invalid... bailing out."));
+    if (logging) Serial.println(F("*TH: JSON invalid... bailing out."));
     return;
   }
 
-  Serial.println(F("*TH: Converting data to String..."));
+  if (logging) Serial.println(F("*TH: Converting data to String..."));
 
   #else
   if (!SPIFFS.exists("/thinx.cfg")) {
-    Serial.println(F("*TH: No saved configuration."));
+    if (logging) Serial.println(F("*TH: No saved configuration."));
     return;
   }
   File f = SPIFFS.open("/thinx.cfg", "r");
-  Serial.println(F("*TH: Found persistent data..."));
+  if (logging) Serial.println(F("*TH: Found persistent data..."));
   if (!f) {
-    Serial.println(F("*TH: No remote configuration found so far..."));
+    if (logging) Serial.println(F("*TH: No remote configuration found so far..."));
     return;
   }
   if (f.size() == 0) {
-    Serial.println(F("*TH: Remote configuration file empty..."));
+    if (logging) Serial.println(F("*TH: Remote configuration file empty..."));
     return;
   }
 
   f.readBytesUntil('\r', json_info, sizeof(json_info));
-  //Serial.print("Loaded json_info: ");
-  //Serial.print("length: ");
-  //Serial.print(f.size());
-  //Serial.println(String(json_info));
+  if (logging) Serial.print("Loaded json_info: ");
+  if (logging) Serial.print("length: ");
+  if (logging) Serial.print(f.size());
+  if (logging) Serial.print("data: ");
+  if (logging) Serial.println(String(json_info));
   #endif
 
   DynamicJsonBuffer jsonBuffer(512);
   JsonObject& config = jsonBuffer.parseObject((char*)json_info); // must not be String!
 
   if (!config.success()) {
-    Serial.println(F("*TH: No JSON data to be parsed..."));
-    Serial.println(json_info);
+    if (logging) Serial.println(F("*TH: No JSON data to be parsed..."));
+    if (logging) Serial.println(json_info);
     return;
 
   } else {
@@ -1285,7 +1295,7 @@ void THiNX::restore_device_info() {
 
     if (config["udid"]) {
       const char *udid = config["udid"];
-      Serial.println(F("*TH: Loading UDID..."));
+      if (logging) Serial.println(F("*TH: Loading UDID..."));
       if ( strlen(udid) > 2 ) {
         thinx_udid = strdup(udid);
       } else {
@@ -1296,22 +1306,22 @@ void THiNX::restore_device_info() {
     }
 
     if (config["apikey"]) {
-      Serial.println(F("*TH: Loading Keys..."));
+      if (logging) Serial.println(F("*TH: Loading Keys..."));
       thinx_api_key = strdup(config["apikey"]);
     }
 
     if (config["owner"]) {
       thinx_owner = strdup(config["owner"]);
-      Serial.println(F("*TH: Loading Owner..."));
+      if (logging) Serial.println(F("*TH: Loading Owner..."));
     }
 
     if (config["ott"]) {
       available_update_url = strdup(config["ott"]);
-      Serial.println(F("*TH: Loading OTT..."));
+      if (logging) Serial.println(F("*TH: Loading OTT..."));
     }
 
     #ifdef __USE_SPIFFS__
-    Serial.print(F("*TH: Closing SPIFFS file."));
+    if (logging) Serial.println(F("*TH: Closing SPIFFS file."));
     f.close();
     #else
     #endif
@@ -1344,32 +1354,32 @@ void THiNX::save_device_info()
   // Optionals
   if (strlen(available_update_url) > 1) {
     root["update"] = strdup(available_update_url); // allow update
-    Serial.println(F("*TH: available_update_url..."));
+    if (logging) Serial.println(F("*TH: available_update_url..."));
   }
 
   #ifdef __USE_SPIFFS__
   File f = SPIFFS.open("/thinx.cfg", "w");
   if (f) {
-    Serial.println(F("*TH: Saving configuration to SPIFFS..."));
+    if (logging) Serial.println(F("*TH: Saving configuration to SPIFFS..."));
     root.printTo(f);
     //root.printTo(Serial);
     f.print('\r');
     f.println();
     f.close();
-    Serial.println(F("*TH: Saved configuration to SPIFFS."));
+    if (logging) Serial.println(F("*TH: Saved configuration to SPIFFS."));
   } else {
-    Serial.println(F("*TH: Saving configuration failed!"));
+    if (logging) Serial.println(F("*TH: Saving configuration failed!"));
     delay(5000);
   }
   #else
-  Serial.println(F("*TH: Saving configuration to EEPROM: "));
+  if (logging) Serial.println(F("*TH: Saving configuration to EEPROM: "));
   for (long addr = 0; addr < strlen((const char*)json_info); addr++) {
     uint8_t byte = json_info[addr];
     EEPROM.put(addr, json_info[addr]);
     if (byte == 0) break;
   }
   EEPROM.commit();
-  Serial.println(F("*TH: Saved configuration (EEPROM)."));
+  if (logging) Serial.println(F("*TH: Saved configuration (EEPROM)."));
   #endif
 }
 
@@ -1382,19 +1392,19 @@ void THiNX::save_device_info()
 
 void THiNX::update_and_reboot(String url) {
 
-  Serial.print("*TH: Update with URL: ");
-  Serial.println(url);
+  if (logging) Serial.print("*TH: Update with URL: ");
+  if (logging) Serial.println(url);
 
   // #define __USE_STREAM_UPDATER__ ; // Warning, this is MQTT-based streamed update!
   #ifdef __USE_STREAM_UPDATER__
-  Serial.println(F("*TH: Starting MQTT & reboot..."));
+  if (logging) Serial.println(F("*TH: Starting MQTT & reboot..."));
   uint32_t size = pub.payload_len();
   if (ESP.updateSketch(*pub.payload_stream(), size, true, false)) {
-    Serial.println(F("Clearing retained message."));
+    if (logging) Serial.println(F("Clearing retained message."));
     mqtt_client->publish(MQTT::Publish(pub.topic(), "").set_retain());
     mqtt_client->disconnect();
 
-    Serial.printf("Update Success: %lu\nRebooting...\n", millis() - startTime);
+    if (logging) Serial.printf("Update Success: %lu\nRebooting...\n", millis() - startTime);
 
     // Notify on reboot for update
     if (mqtt_client != NULL) {
@@ -1411,21 +1421,21 @@ void THiNX::update_and_reboot(String url) {
 
   // TODO: Download the file and check expected_hash first...
 
-  Serial.println(F("*TH: Starting ESP8266 HTTP Update & reboot..."));
+  if (logging) Serial.println(F("*TH: Starting ESP8266 HTTP Update & reboot..."));
   t_httpUpdate_return ret = ESPhttpUpdate.update(url.c_str(), expected_md5);
 
   switch(ret) {
     case HTTP_UPDATE_FAILED:
-    Serial.printf("HTTP_UPDATE_FAILED Error (%d): %s", ESPhttpUpdate.getLastError(), ESPhttpUpdate.getLastErrorString().c_str());
+    if (logging) Serial.printf("HTTP_UPDATE_FAILED Error (%d): %s", ESPhttpUpdate.getLastError(), ESPhttpUpdate.getLastErrorString().c_str());
     setDashboardStatus(ESPhttpUpdate.getLastErrorString());
     break;
 
     case HTTP_UPDATE_NO_UPDATES:
-    Serial.println(F("HTTP_UPDATE_NO_UPDATES"));
+    if (logging) Serial.println(F("HTTP_UPDATE_NO_UPDATES"));
     break;
 
     case HTTP_UPDATE_OK:
-    Serial.println(F("HTTP_UPDATE_OK"));
+    if (logging) Serial.println(F("HTTP_UPDATE_OK"));
     ESP.restart();
     break;
   }
@@ -1489,16 +1499,16 @@ bool THiNX::fsck() {
       fileSystemReady = SPIFFS.begin(true); // formatOnFail=true
     #endif
     if (!fileSystemReady) {
-      Serial.println(F("*TH: Formatting SPIFFS..."));
+      if (logging) Serial.println(F("*TH: Formatting SPIFFS..."));
       fileSystemReady = SPIFFS.format();;
-      Serial.println(F("*TH: Format complete, rebooting...")); Serial.flush();
+      if (logging) Serial.println(F("*TH: Format complete, rebooting...")); Serial.flush();
       ESP.restart();
       return false;
     }
   }  else {
-    Serial.print(F("*TH: Flash incorrectly configured, SPIFFS cannot start."));
+    if (logging) Serial.print(F("*TH: Flash incorrectly configured, SPIFFS cannot start."));
 #if defined(ESP8266)
-    Serial.println(ideSize + ", real size: " + realSize);
+    if (logging) Serial.println(ideSize + ", real size: " + realSize);
 #endif
   }
   return fileSystemReady ? true : false;
@@ -1513,13 +1523,13 @@ void THiNX::evt_save_api_key() {
   if (should_save_config) {
     if (strlen(thx_api_key) > 4) {
       thinx_api_key = thx_api_key;
-      Serial.print(F("Saving thx_api_key from Captive Portal."));
+      if (logging) Serial.print(F("Saving thx_api_key from Captive Portal."));
     }
     if (strlen(thx_owner_key) > 4) {
       thinx_owner_key = thx_owner_key;
-      Serial.print(F("Saving thx_owner_key from Captive Portal."));
+      if (logging) Serial.print(F("Saving thx_owner_key from Captive Portal."));
     }
-    Serial.println(F("Saving device info for API key.")); Serial.flush();
+    if (logging) Serial.println(F("Saving device info for API key.")); Serial.flush();
     save_device_info();
     should_save_config = false;
   }
@@ -1542,12 +1552,17 @@ void THiNX::setMQTTCallback( void (*func)(String) ) {
     _mqtt_callback = func;
 }
 
+void THiNX::setMQTTBroker(char * url, int port) {
+    thinx_mqtt_url = url;
+    if (logging) Serial.println("Port is ignored, defaults to 1883");
+}
+
 void THiNX::finalize() {
   thinx_phase = COMPLETED;
   if (_finalize_callback) {
     _finalize_callback();
   } else {
-    Serial.println(F("*TH: Checkin completed (no _finalize_callback)."));
+    if (logging) Serial.println(F("*TH: Checkin completed (no _finalize_callback)."));
   }
 }
 
@@ -1558,14 +1573,14 @@ void THiNX::sync_sntp() {
   time_t now = time(nullptr);
   while (now < 8 * 3600 * 2) {
     delay(500);
-    Serial.print(".");
+    if (logging) Serial.print(".");
     now = time(nullptr);
   }
-  Serial.println();
+  if (logging) Serial.println();
   struct tm timeinfo;
   gmtime_r(&now, &timeinfo);
-  Serial.print(F("*TH: SNTP time: "));
-  Serial.print(asctime(&timeinfo));
+  if (logging) Serial.print(F("*TH: SNTP time: "));
+  if (logging) Serial.print(asctime(&timeinfo));
 }
 
 /*
@@ -1581,7 +1596,7 @@ void THiNX::loop() {
     if (WiFi.status() != WL_CONNECTED) {
       wifi_connected = false;
       if (wifi_connection_in_progress != true) {
-        Serial.println(F("*TH: CONNECTING »"));
+        if (logging) Serial.println(F("*TH: CONNECTING »"));
         connect(); // blocking
         wifi_connection_in_progress = true;
         wifi_connection_in_progress = true;
@@ -1593,17 +1608,17 @@ void THiNX::loop() {
       wifi_connected = true;
 
       // Synchronize SNTP time
-      Serial.println(""); // newline after "Time difference for DST"
+      if (logging) Serial.println(""); // newline after "Time difference for DST"
       sync_sntp();
 
       // Start MDNS broadcast
 #ifdef __DISABLE_PROXY__
 #else
       if (!MDNS.begin(thinx_alias)) {
-        Serial.println(F("*TH: Error setting up mDNS"));
+        if (logging) Serial.println(F("*TH: Error setting up mDNS"));
       } else {
         // Query MDNS proxy
-        Serial.println(F("*TH: Searching for thinx-connect on local network..."));
+        if (logging) Serial.println(F("*TH: Searching for thinx-connect on local network..."));
         int n = MDNS.queryService("thinx", "tcp"); // TODO: WARNING! may be _tcp!
         if (n > 0) {
           thinx_cloud_url = strdup(String(MDNS.hostname(0)).c_str());
@@ -1622,7 +1637,7 @@ void THiNX::loop() {
     thinx_mqtt_channel(); // initialize channel variable
     if (strlen(mqtt_device_channel) > 5) {
       if (mqtt_client->subscribe(mqtt_device_channel)) {
-        Serial.println(F("*TH: MQTT connected."));
+        if (logging) Serial.println(F("*TH: MQTT connected."));
         // Publish status on status topic
         mqtt_client->publish(
           mqtt_device_status_channel,
@@ -1651,7 +1666,7 @@ void THiNX::loop() {
         return;
       }
     } else {
-      Serial.println(F("*TH: LOOP » FINALIZE"));
+      if (logging) Serial.println(F("*TH: LOOP » FINALIZE"));
       thinx_phase = FINALIZE;
       return;
     }
@@ -1659,11 +1674,11 @@ void THiNX::loop() {
 
   /*
   if (thinx_phase > CHECKIN_MQTT) {
-    Serial.println(F("*TH: start_mqtt")); Serial.flush();
+    if (logging) Serial.println(F("*TH: start_mqtt")); Serial.flush();
     mqtt_connected = mqtt_client->connected();
     if (!mqtt_connected) {
-      Serial.println(F("*TH: MQTT RECONNECT ON CONNECTION CHECK..."));
-      Serial.println(thinx_time(NULL));
+      if (logging) Serial.println(F("*TH: MQTT RECONNECT ON CONNECTION CHECK..."));
+      if (logging) Serial.println(thinx_time(NULL));
       mqtt_connected = start_mqtt();
       if (mqtt_connected) {
           thinx_phase = CHECKIN_MQTT;
@@ -1679,7 +1694,7 @@ void THiNX::loop() {
   if (thinx_phase > FINALIZE) {
     if (millis() > checkin_time) {
       if (checkin_interval > 0) {
-        Serial.println(F("*TH: LOOP » Checkin interval arrived..."));
+        if (logging) Serial.println(F("*TH: LOOP » Checkin interval arrived..."));
         thinx_phase = CONNECT_API;
         checkin_interval = millis() + checkin_time;
       }
@@ -1689,7 +1704,7 @@ void THiNX::loop() {
   // If connected, perform the MQTT loop and bail out ASAP
   if (thinx_phase == CONNECT_API) {
     if (WiFi.getMode() == WIFI_AP) {
-      Serial.println(F("*TH: LOOP « (AP_MODE)"));
+      if (logging) Serial.println(F("*TH: LOOP « (AP_MODE)"));
       return;
     }
     if (strlen(thinx_api_key) > 4) {
@@ -1697,7 +1712,7 @@ void THiNX::loop() {
       if (mqtt_connected == false) {
         thinx_phase = CONNECT_MQTT;
       } else {
-        Serial.println(F("*TH: LOOP » FINALIZE (mqtt connected)"));
+        if (logging) Serial.println(F("*TH: LOOP » FINALIZE (mqtt connected)"));
         thinx_phase = FINALIZE;
       }
     }
@@ -1714,7 +1729,7 @@ void THiNX::loop() {
   }
 
   if ( (reboot_interval > 0) && (millis() > reboot_interval) ) {
-    Serial.println(F("Rebooting...")); Serial.flush();
+    if (logging) Serial.println(F("Rebooting...")); Serial.flush();
     setDashboardStatus(F("Rebooting..."));
     ESP.restart();
   }
@@ -1722,7 +1737,7 @@ void THiNX::loop() {
   #ifdef __USE_WIFI_MANAGER__
     // Save API key on change
     if (should_save_config) {
-      Serial.println(F("*TH: Saving API key on change..."));
+      if (logging) Serial.println(F("*TH: Saving API key on change..."));
       evt_save_api_key();
       should_save_config = false;
     }
@@ -1737,7 +1752,7 @@ void THiNX::setLocation(double lat, double lon) {
   // uses mqtt_connected status because this happens only after first checkin
   // and thus prevents premature request to backend.
   if (wifi_connected && thinx_phase > FINALIZE) {
-    Serial.println(F("*TH: LOOP » setLocation checkin"));
+    if (logging) Serial.println(F("*TH: LOOP » setLocation checkin"));
     checkin();
   }
 }
@@ -1745,7 +1760,7 @@ void THiNX::setLocation(double lat, double lon) {
 void THiNX::setDashboardStatus(String newstatus) {
   statusString = newstatus;
   if (wifi_connected && thinx_phase > FINALIZE) {
-    Serial.println(F("*TH: LOOP » setDashboardStatus checkin"));
+    if (logging) Serial.println(F("*TH: LOOP » setDashboardStatus checkin"));
     checkin();
     if (mqtt_client) {
       String message = String("{ \"status\" : \"") + newstatus + String("\" }");
@@ -1805,18 +1820,18 @@ bool THiNX::check_hash(char * filename, char * expected) {
       sprintf(aes_text + 2 * i, "%02X", obuf[i]);
     }
 
-    Serial.printf("AES # %s at %u\n", aes_text, fpos);
-    Serial.printf("EXPECTED # %s", expected);
+    if (logging) Serial.printf("AES # %s at %u\n", aes_text, fpos);
+    if (logging) Serial.printf("EXPECTED # %s", expected);
 
     end = millis() - start;
-    Serial.printf("%u bytes hashed in %u ms\n\n", flen, end);
+    if (logging) Serial.printf("%u bytes hashed in %u ms\n\n", flen, end);
 
     file.close();
 
     return strcmp(expected, aes_text);
 
   } else {
-    Serial.println(F("Failed to open file for reading"));
+    if (logging) Serial.println(F("Failed to open file for reading"));
     return false;
   }
 }
@@ -1827,9 +1842,9 @@ void THiNX::printStackHeap(String tag) {
   extern cont_t g_cont;
   register uint32_t *sp asm("a1");
   unsigned long heap = system_get_free_heap_size();
-  Serial.printf("[%s] STACK U=%4d ", tag.c_str(), cont_get_free_stack(&g_cont));
-  Serial.printf("F=%4d ", 4 * (sp - g_cont.stack));
-  Serial.print("H="); Serial.println(heap);
+  if (logging) Serial.printf("[%s] STACK U=%4d ", tag.c_str(), cont_get_free_stack(&g_cont));
+  if (logging) Serial.printf("F=%4d ", 4 * (sp - g_cont.stack));
+  if (logging) Serial.print("H="); if (logging) Serial.println(heap);
 }
 #endif
 
