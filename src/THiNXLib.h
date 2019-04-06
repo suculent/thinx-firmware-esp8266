@@ -1,6 +1,6 @@
 #include <Arduino.h>
 
-// #define __DEBUG__ // enables stack/heap debugging
+//#define __DEBUG__ // enables stack/heap debugging
 #define __ENABLE_WIFI_MIGRATION__ // enable automatic WiFi disconnect/reconnect on Configuration Push (THINX_ENV_SSID and THINX_ENV_PASS)
 // #define __USE_WIFI_MANAGER__ // if disabled, you need to `WiFi.begin(ssid, pass)` on your own; saves about 3% of sketch space, excludes DNSServer and WebServer
 #define __USE_SPIFFS__ // if disabled, uses EEPROM instead
@@ -8,14 +8,14 @@
 
 // Provides placeholder for THINX_FIRMWARE_VERSION_SHORT
 #ifndef VERSION
-#define VERSION "2.4.191"
+#define VERSION "2.5.195"
 #endif
 
 #ifndef THX_REVISION
 #ifdef THINX_FIRMWARE_VERSION_SHORT
 #define THX_REVISION THINX_FIRMWARE_VERSION_SHORT
 #else
-#define THX_REVISION "191"
+#define THX_REVISION "195"
 #endif
 #endif
 
@@ -50,10 +50,6 @@
 class THiNX {
 
 public:
-
-  // Root certificate used by thinx.cloud
-    static unsigned char thx_ca_cert[];
-    static unsigned int thx_ca_cert_len;
 
     static bool logging;                          // disable all logging to prevent interference with serial comm
     static bool forceHTTP;                        // set to true for disabling HTTPS
@@ -172,11 +168,14 @@ public:
     void setStatus(String);                 // deprecated 2.2 (3)
     void setLocation(double,double);        // performs checkin while updating Location
 
+    bool wifi_connected;                         // WiFi connected in station mode
+    int mqtt_connected;                    // success or failure on subscription
+
 private:
 
     char* thinx_udid;
 
-    bool wifi_connected;                         // WiFi connected in station mode
+
     bool info_loaded = false;
 
     static char* thinx_api_key;
@@ -205,8 +204,8 @@ private:
     void configCallback();
 
     // WiFi Manager
-    WiFiClient thx_wifi_client;
-    WiFiClientSecure https_client;
+    WiFiClient http_client;
+    BearSSL::WiFiClientSecure https_client;
     int status;                             // global WiFi status
     bool once;                              // once token for initialization
 
@@ -229,12 +228,12 @@ private:
     void senddata(String);                  // HTTP, will deprecate?
     void send_data(String);                 // HTTPS
     void fetch_data();                      // fetch and parse; max return char[] later
-    void parse(String);                     // needs to be refactored to char[] from String
+    void parse(const char*);                     // needs to be refactored to char[] from String
     void update_and_reboot(String);
 
     int timezone_offset = 1; // should use simpleDSTadjust
     unsigned long checkin_interval = 60 * 1000;          // next timeout millis()
-    unsigned long checkin_time = 60 * 1000;  // can be set externaly, defaults to 1h
+    unsigned long checkin_time = 60 * 1000;  // can be set externaly, defaults to 1h (3600 * 1000)
 
     unsigned long last_checkin_millis;
     unsigned long last_checkin_timestamp;
@@ -244,7 +243,7 @@ private:
 
     // MQTT
     bool start_mqtt();                      // connect to broker and subscribe
-    int mqtt_connected;                    // success or failure on subscription
+
     String mqtt_payload;                    // mqtt_payload store for parsing
     int performed_mqtt_checkin;              // one-time flag
     int all_done;                              // finalize flag
@@ -284,8 +283,17 @@ private:
     // SSL/TLS
     void sync_sntp();                     // Synchronize time using SNTP instead of THiNX
 
+    String deferred_update_url;
+
     // debug
 #ifdef __DEBUG__
     void printStackHeap(String);
 #endif
+
+    void do_connect_wifi();
+    void do_mqtt_connect();
+    void do_mqtt_checkin();
+    void do_connect_api();
+    void do_deferred_update();
+
 };
