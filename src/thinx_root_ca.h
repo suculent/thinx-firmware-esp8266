@@ -4,6 +4,7 @@
 const char fingerprint[] PROGMEM = "E6 A3 B4 5B 06 2D 50 9B 33 82 28 2D 19 6E FE 97 D5 95 6C CB";
 //const char fingerprint[] PROGMEM = "03 EE 9F 42 20 39 37 9B B9 50 A9 C9 4D BD F6 A7 6D 63 C4 49";
 
+/* required by BearSSL
 // Root certificate used by thinx.cloud
 static const char thx_ca_cert[] PROGMEM = R"EOF(
 -----BEGIN CERTIFICATE-----
@@ -24,3 +25,4 @@ RLtTcm1D9SZImlJnt1ir/md2cXjbDaJWFBM5JDGFoqgCWjBH4d1QB7wCCZAA62RjYJsWvIjJEubS
 fZGL+T0yjWW06XyxV3bqxbYoOb8VZRzI9neWagqNdwvYkQsEjgfbKbYK7p2CNTUQ
 -----END CERTIFICATE-----
 )EOF";
+*/

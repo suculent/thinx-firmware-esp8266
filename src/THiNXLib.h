@@ -1,6 +1,5 @@
 #include <Arduino.h>
 
-//#define __DEBUG__ // enables stack/heap debugging
 #define __ENABLE_WIFI_MIGRATION__ // enable automatic WiFi disconnect/reconnect on Configuration Push (THINX_ENV_SSID and THINX_ENV_PASS)
 // #define __USE_WIFI_MANAGER__ // if disabled, you need to `WiFi.begin(ssid, pass)` on your own; saves about 3% of sketch space, excludes DNSServer and WebServer
 #define __USE_SPIFFS__ // if disabled, uses EEPROM instead
@@ -8,19 +7,16 @@
 
 // Provides placeholder for THINX_FIRMWARE_VERSION_SHORT
 #ifndef VERSION
-#define VERSION "2.5.195"
+#define VERSION "2.5.218"
 #endif
 
 #ifndef THX_REVISION
 #ifdef THINX_FIRMWARE_VERSION_SHORT
 #define THX_REVISION THINX_FIRMWARE_VERSION_SHORT
 #else
-#define THX_REVISION "195"
+#define THX_REVISION "218"
 #endif
 #endif
-
-//#define MQTT_DISABLED
-#define __DISABLE_MQTT__
 
 #ifdef __USE_WIFI_MANAGER__
 #include <DNSServer.h>
@@ -37,7 +33,6 @@
 #include <ESP8266mDNS.h>
 #include <ESP8266HTTPClient.h>
 #include <ESP8266httpUpdate.h>
-
 #include <WiFiClientSecure.h>
 
 #include <ArduinoJson.h>
@@ -45,7 +40,7 @@
 // Using better than Arduino-bundled version of MQTT https://github.com/Imroy/pubsubclient
 #include <PubSubClient.h>
 
-#include "sha256.h"
+//#include "sha256.h"
 
 class THiNX {
 
@@ -59,7 +54,7 @@ public:
     static String accessPointName;
     static String accessPointPassword;
 
-    static char* thinx_mqtt_url;               // up to 1k but generally something where FQDN fits
+    static char* thinx_mqtt_url;
 
     static String lastWill;
 
@@ -99,7 +94,8 @@ public:
     void init_with_api_key(const char *);
     void loop();
 
-    String checkin_body();                  // TODO: Refactor to C-string
+    char mac_string[17];
+    char* generate_checkin_body();                  // TODO: Refactor to C-string
 
     // MQTT
     PubSubClient * mqtt_client = nullptr;
@@ -134,7 +130,7 @@ public:
 
     void setPushConfigCallback( void (*func)(String) );
     void setFinalizeCallback( void (*func)(void) );
-    void setMQTTCallback( void (*func)(String) );
+    void setMQTTCallback( void (*func)(byte*) );
     void setMQTTBroker( char * url, int port );
     void setLastWill(String nextWill);        // disconnect MQTT and reconnect with different lastWill than default
 
@@ -173,13 +169,14 @@ public:
 
 private:
 
-    char* thinx_udid;
-
+    // Memory allocation debugging
+    static uint32_t last_free_heap_size;
+    void printStackHeap(String tag);
 
     bool info_loaded = false;
-
     static char* thinx_api_key;
     static char* thinx_owner_key;
+    char* thinx_udid;
 
     //
     // Build-specific constants (override for Arduino IDE which does not set any Environments like PlatformIO)
@@ -213,27 +210,24 @@ private:
     static char thx_api_key[65];            // static due to accesibility to WiFiManager
     static char thx_owner_key[65];          // static due to accesibility to WiFiManager
 
-    char mac_string[17];
     const char * thinx_mac();
 
-    char json_info[512] = {0};               // statically allocated to prevent fragmentation
-
-    String json_output;
+    static char json_buffer[512];       // statically allocated to prevent fragmentation, should be rather dynamic
 
     // In order of appearance
-    bool fsck();                            // check filesystem if using SPIFFS
-    void connect();                         // start the connect loop
-    void connect_wifi();                    // start connecting
+    bool fsck();                              // check filesystem if using SPIFFS
+    void connect();                           // start the connect loop
+    void connect_wifi();                      // start connecting
 
-    void senddata(String);                  // HTTP, will deprecate?
-    void send_data(String);                 // HTTPS
-    void fetch_data();                      // fetch and parse; max return char[] later
+    void senddata(String);                    // HTTP, will deprecate?
+    void send_data(String);                   // HTTPS
+    void fetch_data();                        // fetch and parse; max return char[] later
     void parse(const char*);                     // needs to be refactored to char[] from String
     void update_and_reboot(String);
 
-    int timezone_offset = 1; // should use simpleDSTadjust
-    unsigned long checkin_interval = 60 * 1000;          // next timeout millis()
-    unsigned long checkin_time = 60 * 1000;  // can be set externaly, defaults to 1h (3600 * 1000)
+    int timezone_offset = 0; // should use simpleDSTadjust
+    unsigned long checkin_interval = 86400 * 1000;          // next timeout millis()
+    unsigned long checkin_time = 86400 * 1000;  // can be set externaly, defaults to 1h (3600 * 1000)
 
     unsigned long last_checkin_millis;
     unsigned long last_checkin_timestamp;
@@ -244,12 +238,11 @@ private:
     // MQTT
     bool start_mqtt();                      // connect to broker and subscribe
 
-    String mqtt_payload;                    // mqtt_payload store for parsing
     int performed_mqtt_checkin;              // one-time flag
     int all_done;                              // finalize flag
 
     void (*_config_callback)(String) = NULL;  // Called when server pushes new environment vars using MQTT
-    void (*_mqtt_callback)(String) = NULL;
+    void (*_mqtt_callback)(byte*) = NULL;
 
     // Data Storage
     void import_build_time_constants();     // sets variables from thinx.h file
@@ -266,7 +259,7 @@ private:
 
     // Finalize
     void (*_finalize_callback)(void) = NULL;
-    void finalize();                        // Complete the checkin, schedule, callback...
+    void finalize(); // Complete the checkin, schedule, callback...
 
     // Local WiFi Impl
     bool wifi_wait_for_connect;
@@ -276,24 +269,22 @@ private:
     uint8_t wifi_status;
 
     // SHA256
-    bool check_hash(char * filename, char * expected);
-    char * expected_hash;
-    char * expected_md5;
+    //bool check_hash(char * filename, char * expected);
+    //char * expected_hash;
+    //char * expected_md5;
 
-    // SSL/TLS
-    void sync_sntp();                     // Synchronize time using SNTP instead of THiNX
+    // Required for SSL/TLS: sync time using SNTP first. TODO: Remove duplicate impl.
+    void sync_sntp();
 
     String deferred_update_url;
-
-    // debug
-#ifdef __DEBUG__
-    void printStackHeap(String);
-#endif
 
     void do_connect_wifi();
     void do_mqtt_connect();
     void do_mqtt_checkin();
     void do_connect_api();
     void do_deferred_update();
+
+    bool mem_check();
+    void deviceInfo();
 
 };
