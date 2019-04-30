@@ -1104,7 +1104,6 @@ void THiNX::publish_status(const char *message, bool retain) {
     }
   }
 
-  // Happy path
   if (mqtt_client->connected()) {
     printStackHeap("thx-pre-publish-status(2)");
     Serial.println(message);
