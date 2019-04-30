@@ -140,12 +140,10 @@ public:
     // MQTT Support
 
     // publish to device status topic only
-
     void publish_status(const char *message, bool retain);  // send string to status topic, set retain
     void publish_status_unretained(const char *message);   // send string to status topic, unretained
 
     // publish to specified topic
-    void publish(String, String, bool);       // send String to any channel, optinally with retain
     void publish(char * message, char * topic, bool retain);
 
     static const char time_format[];
@@ -163,7 +161,7 @@ public:
     void setStatus(String);                 // deprecated 2.2 (3)
     void setLocation(double,double);        // performs checkin while updating Location
 
-    bool wifi_connected;                         // WiFi connected in station mode
+    bool wifi_connected;                    // WiFi connected in station mode
     int mqtt_connected;                    // success or failure on subscription
 
 private:

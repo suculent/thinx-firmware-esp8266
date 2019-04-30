@@ -1086,18 +1086,9 @@ void THiNX::publish_status(const char *message, bool retain) {
     return;
   }
 
-  // Happy path
-  if (mqtt_client->connected()) {
-    printStackHeap("thx-pre-publish-status(2)");
-    Serial.println(message);
-    mqtt_client->publish(mqtt_device_status_channel, (const uint8_t*)message, strlen(message), retain);
-    printStackHeap("thx-publish-pre-loop");
-    mqtt_client->loop();
-    printStackHeap("thx-publish-post-loop");
-
-  } else {
-
-    printStackHeap("thx-pre-publish-status(R2)");
+  // Check if connected and reconnect
+  if (!mqtt_client->connected()) {
+    printStackHeap("thx-pre-reconnect");
     // Reconnection
     if (logging) Serial.println(F("*TH: reconnecting MQTT in publish_status..."));
     printStackHeap("thx-pre-start");
@@ -1107,9 +1098,22 @@ void THiNX::publish_status(const char *message, bool retain) {
     while (!mqtt_client->connected()) {
       delay(10);
       if (millis() > reconnect_timeout) {
+        if (logging) Serial.println(F("*TH: Reconnecting time-out!"));
         break;
       }
     }
+  }
+
+  // Happy path
+  if (mqtt_client->connected()) {
+    printStackHeap("thx-pre-publish-status(2)");
+    Serial.println(message);
+    mqtt_client->publish(mqtt_device_status_channel, (const uint8_t*)message, strlen(message), retain);
+    printStackHeap("thx-publish-pre-loop");
+    mqtt_client->loop();
+    printStackHeap("thx-publish-post-loop");
+  } else {
+    if (logging) Serial.println(F("*TH: Sending failed, MQTT disconnected!"));
   }
 }
 
