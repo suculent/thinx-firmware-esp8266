@@ -113,10 +113,10 @@ THiNX::THiNX(const char * __apikey, const char * __owner_id) {
   #endif
 
   if (logging) {
-    Serial.print(F("\n*TH: THiNXLib rev. "));
-    Serial.print(THX_REVISION);
-    Serial.print(F(" version: "));
-    Serial.println(VERSION);
+    Serial.print(F("\nTHiNXLib v"));
+    Serial.print(VERSION);
+    Serial.print(F(" rev. "));
+    Serial.println(THX_REVISION);
   }
 
   json_buffer[0] = 0;
@@ -1089,7 +1089,8 @@ void THiNX::publish_status(const char *message, bool retain) {
   // Happy path
   if (mqtt_client->connected()) {
     printStackHeap("thx-pre-publish-status(2)");
-    mqtt_client->publish(mqtt_device_status_channel, (const uint8_t*)&message, strlen(&message), retain);
+    Serial.println(message);
+    mqtt_client->publish(mqtt_device_status_channel, (const uint8_t*)message, strlen(message), retain);
     printStackHeap("thx-publish-pre-loop");
     mqtt_client->loop();
     printStackHeap("thx-publish-post-loop");
@@ -1116,37 +1117,11 @@ void THiNX::publish_status(const char *message, bool retain) {
 * Sends a MQTT message to the Device Channel (/owner/udid)
 */
 
-// Old version, leaks strings, deprecated.
-void THiNX::publish(String message, String topic, bool retain)  {
-  String channel = String(mqtt_device_channel) + String("/") + String(topic);
-  if (mqtt_client != nullptr) {
-    if (retain == true) {
-      mqtt_client->publish(
-        MQTT::Publish(channel.c_str(), message.c_str()).set_retain()
-      );
-    } else {
-      mqtt_client->publish(channel.c_str(), message.c_str());
-    }
-    mqtt_client->loop();
-    delay(10);
-  } else {
-#ifdef DEBUG
-    if (logging) Serial.println(F("*TH: MQTT not active while trying to publish message."));
-#endif
-  }
-}
-
 void THiNX::publish(char * message, char * topic, bool retain)  {
   char channel[256] = {0};
   sprintf(channel, "%s/%s", mqtt_device_channel, topic);
   if (mqtt_client != nullptr) {
-    if (retain == true) {
-      mqtt_client->publish(
-        MQTT::Publish(channel, message).set_retain()
-      );
-    } else {
-      mqtt_client->publish(channel, message);
-    }
+    mqtt_client->publish(mqtt_device_status_channel, (const uint8_t*)message, strlen(message), retain);
     mqtt_client->loop();
     delay(10);
   } else {
