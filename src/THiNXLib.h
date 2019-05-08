@@ -8,14 +8,14 @@
 
 // Provides placeholder for THINX_FIRMWARE_VERSION_SHORT
 #ifndef VERSION
-#define VERSION "2.5.220"
+#define VERSION "2.5.227"
 #endif
 
 #ifndef THX_REVISION
 #ifdef THINX_FIRMWARE_VERSION_SHORT
 #define THX_REVISION THINX_FIRMWARE_VERSION_SHORT
 #else
-#define THX_REVISION "220"
+#define THX_REVISION "227"
 #endif
 #endif
 
@@ -140,11 +140,10 @@ public:
     // MQTT Support
 
     // publish to device status topic only
-    void publish_status(const char *message, bool retain);  // send string to status topic, set retain
-    void publish_status_unretained(const char *message);   // send string to status topic, unretained
+    void publish_status(const char *message, bool retain=false);  // send string to status topic, set retain
 
     // publish to specified topic
-    void publish(char * message, char * topic, bool retain);
+    void publish(const char * message, const char * topic, bool retain);
 
     static const char time_format[];
     static const char date_format[];
@@ -283,5 +282,4 @@ private:
 
     bool mem_check();
     void deviceInfo();
-
 };

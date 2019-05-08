@@ -1,11 +1,17 @@
 extern "C" {
-  #include "user_interface.h"
   #include "thinx.h"
-  #include <cont.h>
   #include <time.h>
   #include <stdlib.h>
+}
+
+// should deprecate
+#ifdef ESP8266
+extern "C" {
+  #include "user_interface.h"
+  #include <cont.h>
   extern cont_t g_cont;
 }
+#endif
 
 #include "THiNXLib.h"
 
@@ -63,6 +69,7 @@ uint32_t THiNX::last_free_heap_size;
 
 /* Convenience method for debugging memory issues. */
 void THiNX::printStackHeap(String tag) {
+  if (!logging) return;
   uint32_t heap = ESP.getFreeHeap();
   uint32_t diff = 0;
   String way = "=";
@@ -1070,12 +1077,6 @@ void THiNX::notify_on_successful_update() {
 * Sends a MQTT message to Device's status topic (/owner/udid/status)
 */
 
-void THiNX::publish_status_unretained(const char *message) {
-  publish_status(message, false);
-  mqtt_client->loop(); // kicks the MQTT immediately
-  delay(10);
-}
-
 void THiNX::publish_status(const char *message, bool retain) {
 
   // Early exit
@@ -1114,13 +1115,16 @@ void THiNX::publish_status(const char *message, bool retain) {
   } else {
     if (logging) Serial.println(F("*TH: Sending failed, MQTT disconnected!"));
   }
+
+  mqtt_client->loop(); // kicks the MQTT immediately
+  delay(10);
 }
 
 /*
 * Sends a MQTT message to the Device Channel (/owner/udid)
 */
 
-void THiNX::publish(char * message, char * topic, bool retain)  {
+void THiNX::publish(const char * message, const char * topic, bool retain)  {
   char channel[256] = {0};
   sprintf(channel, "%s/%s", mqtt_device_channel, topic);
   if (mqtt_client != nullptr) {
@@ -1156,6 +1160,9 @@ bool THiNX::start_mqtt() {
   if (mqtt_client != nullptr) {
     mqtt_connected = mqtt_client->connected();
     if (mqtt_connected) {
+#ifdef DEBUG
+    if (logging) Serial.println(F("*TH: MQTT Already connected.")); Serial.flush();
+#endif
       return true;
     }
   }
@@ -1193,21 +1200,27 @@ bool THiNX::start_mqtt() {
     return false;
   }
 
-  if (mqtt_client->connect(MQTT::Connect(thinx_mac())
-    .set_will(thinx_mqtt_status_channel().c_str(), lastWill.c_str())
+  // expecting mqtt_client to be unset so this gets initialized only once incl. callback
+  MQTT::Connect conn = MQTT::Connect(thinx_mac());
+  conn.set_will(thinx_mqtt_status_channel().c_str(), lastWill.c_str())
     .set_auth(thinx_udid, thinx_api_key)
-    .set_keepalive(60))) {
+    .set_keepalive(60);
+
+  if (mqtt_client->connect(conn)) {
 
     mqtt_connected = true;
     performed_mqtt_checkin = true;
+#ifdef DEBUG
+    if (logging) printStackHeap("pre-cb");
+#endif
+    // TODO: Replace with mqtt_function?
+    //mqtt_client->set_callback(mqtt_function);
 
-    mqtt_client->set_callback([this](const MQTT::Publish &pub){
-
+    mqtt_client->set_callback([this](const MQTT::Publish &pub) {
 
       // Stream has been never tested so far...
       if (pub.has_stream()) {
 
-        /*
 #ifdef DEBUG
         if (logging) Serial.println(F("*TH: MQTT Type: Stream..."));
 #endif
@@ -1230,7 +1243,6 @@ bool THiNX::start_mqtt() {
             "{ \"status\" : \"mqtt_update_failed\" }"
           );
         }
-        */
 
       } else {
         // if (logging) Serial.println(F("*TH: MQTT Message Incoming:"));
@@ -1246,6 +1258,10 @@ bool THiNX::start_mqtt() {
         free(p);
       }
     }); // end-of-callback
+
+#ifdef DEBUG
+    if (logging) printStackHeap("post-cb");
+#endif
 
     return true;
 
