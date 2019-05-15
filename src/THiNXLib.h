@@ -1,6 +1,6 @@
 #include <Arduino.h>
 
-// #define DEBUG // takes 8k of sketch and 1+1k of stack/heap size (when measured last time)
+//#define DEBUG // takes 8k of sketch and 1+1k of stack/heap size (when measured last time)
 #define __ENABLE_WIFI_MIGRATION__ // enable automatic WiFi disconnect/reconnect on Configuration Push (THINX_ENV_SSID and THINX_ENV_PASS)
 // #define __USE_WIFI_MANAGER__ // if disabled, you need to `WiFi.begin(ssid, pass)` on your own; saves about 3% of sketch space, excludes DNSServer and WebServer
 #define __USE_SPIFFS__ // if disabled, uses EEPROM instead
@@ -8,14 +8,14 @@
 
 // Provides placeholder for THINX_FIRMWARE_VERSION_SHORT
 #ifndef VERSION
-#define VERSION "2.5.227"
+#define VERSION "2.6.231"
 #endif
 
 #ifndef THX_REVISION
 #ifdef THINX_FIRMWARE_VERSION_SHORT
 #define THX_REVISION THINX_FIRMWARE_VERSION_SHORT
 #else
-#define THX_REVISION "227"
+#define THX_REVISION "231"
 #endif
 #endif
 
@@ -140,10 +140,13 @@ public:
     // MQTT Support
 
     // publish to device status topic only
-    void publish_status(const char *message, bool retain=false);  // send string to status topic, set retain
+
+    void publish_status(const char *message, bool retain);  // send string to status topic, set retain
+    void publish_status_unretained(const char *message);   // send string to status topic, unretained
 
     // publish to specified topic
-    void publish(const char * message, const char * topic, bool retain);
+    void publish(String, String, bool);       // send String to any channel, optinally with retain
+    void publish(char * message, char * topic, bool retain);
 
     static const char time_format[];
     static const char date_format[];
@@ -160,7 +163,7 @@ public:
     void setStatus(String);                 // deprecated 2.2 (3)
     void setLocation(double,double);        // performs checkin while updating Location
 
-    bool wifi_connected;                    // WiFi connected in station mode
+    bool wifi_connected;                         // WiFi connected in station mode
     int mqtt_connected;                    // success or failure on subscription
 
 private:
@@ -215,9 +218,10 @@ private:
     void connect();                           // start the connect loop
     void connect_wifi();                      // start connecting
 
-    void senddata(String);                    // HTTP, will deprecate?
-    void send_data(String);                   // HTTPS
-    void fetch_data();                        // fetch and parse; max return char[] later
+    void send_data(String);                    // HTTP, will deprecate?
+    void send_data_secure(String);                   // HTTPS
+    void fetch_data(WiFiClient *client);     // fetch and parse; max return char[] later
+    void fetch_data_secure(BearSSL::WiFiClientSecure *client);
     void parse(const char*);                     // needs to be refactored to char[] from String
     void update_and_reboot(String);
 
@@ -282,4 +286,5 @@ private:
 
     bool mem_check();
     void deviceInfo();
+
 };

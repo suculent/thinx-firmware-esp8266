@@ -328,6 +328,24 @@ void setup() {
   THiNX::accessPointName = "THiNX-AP";
   THiNX::accessPointPassword = "PASSWORD";
   THiNX::forceHTTP = true; // disable HTTPS for faster checkins, enable for production security
+
+  /* with https:
+   
+  HTTP server started at IP: 192.168.1.76
+
+  *TH: THiNXLib rev. 230 version: 2.5.230
+  cloud.thinx.esp8266-relay@1.0.0
+  Build timestamp: May 12 2019 @ 23:14:17
+  35160 MEM-DELTA: -5192
+  
+  34928 MEM-DELTA: -232
+  Secure API checkin...
+  *TH: API connection failed.
+  11456 MEM-DELTA: -23472
+  THiNX/MQTT connected, reporting initial status.
+  11344 MEM-DELTA: -112
+
+   */
   THiNX::logging = true;
 
   thx = THiNX(apikey, owner_id);    
@@ -358,13 +376,15 @@ void setup() {
     String message = String((const char*)raw_message);
     process_message(message);
   });   
+
+  debug_mem();
 }
 
 // logs free heap on change, helps debugging memory leaks
 unsigned long freeHeap = ESP.getFreeHeap();
 void debug_mem() {
   if (ESP.getFreeHeap() != freeHeap) {
-    Serial.print("MEM-DELTA: ");
+    Serial.print(ESP.getFreeHeap()); Serial.print(" MEM-DELTA: ");
     uint32_t newHeap = ESP.getFreeHeap();
     if (freeHeap > newHeap) {
       // + f-n
