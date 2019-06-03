@@ -6,6 +6,12 @@ An Arduino/ESP8266 library to wrap client for OTA updates and RTM (Remote Things
 
 # What's New
 
+### 2019-06-03: 2.7.231 
+
+* Firmware returns MCU type to prevent brick by incorrect OTA build type (from thinx.yml file)
+
+### Older releases
+
 * Added Relay example with twin WiFi access variants.
 * Fixes and improved support for timezones. You can set timezone per device on the [RTM Console](https://rtm.thinx.cloud) and current DST will be applied on checkin, if applicable. It will be also used for the SNTP later.
 * HTTPS can be optionally disabled for faster checkins with `THiNX:forceHTTP = true` (speeds up checkin from 120 seconds to 2 seconds)

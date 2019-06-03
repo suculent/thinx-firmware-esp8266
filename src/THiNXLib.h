@@ -1,6 +1,7 @@
 #include <Arduino.h>
 
 //#define DEBUG // takes 8k of sketch and 1+1k of stack/heap size (when measured last time)
+#define __DISABLE_HTTPS__ // to save memory if needed
 #define __ENABLE_WIFI_MIGRATION__ // enable automatic WiFi disconnect/reconnect on Configuration Push (THINX_ENV_SSID and THINX_ENV_PASS)
 // #define __USE_WIFI_MANAGER__ // if disabled, you need to `WiFi.begin(ssid, pass)` on your own; saves about 3% of sketch space, excludes DNSServer and WebServer
 #define __USE_SPIFFS__ // if disabled, uses EEPROM instead
@@ -8,7 +9,7 @@
 
 // Provides placeholder for THINX_FIRMWARE_VERSION_SHORT
 #ifndef VERSION
-#define VERSION "2.6.231"
+#define VERSION "2.7.231"
 #endif
 
 #ifndef THX_REVISION
@@ -34,7 +35,9 @@
 #include <ESP8266mDNS.h>
 #include <ESP8266HTTPClient.h>
 #include <ESP8266httpUpdate.h>
+#ifndef __DISABLE_HTTPS__
 #include <WiFiClientSecure.h>
+#endif
 
 #include <ArduinoJson.h>
 
@@ -201,7 +204,9 @@ private:
 
     // WiFi Manager
     WiFiClient http_client;
+#ifndef __DISABLE_HTTPS__
     BearSSL::WiFiClientSecure https_client;
+#endif
     int status;                             // global WiFi status
     bool once;                              // once token for initialization
 
@@ -218,10 +223,18 @@ private:
     void connect();                           // start the connect loop
     void connect_wifi();                      // start connecting
 
-    void send_data(String);                    // HTTP, will deprecate?
-    void send_data_secure(String);                   // HTTPS
-    void fetch_data(WiFiClient *client);     // fetch and parse; max return char[] later
+    #ifndef __DISABLE_HTTPS__
+    void send_data_secure(String);            // HTTPS
+    #else
+    void send_data(String);                   // HTTP
+    #endif
+
+    #ifndef __DISABLE_HTTPS__
     void fetch_data_secure(BearSSL::WiFiClientSecure *client);
+    #else
+    void fetch_data(WiFiClient *client);     // fetch and parse; max return char[] later
+    #endif
+
     void parse(const char*);                     // needs to be refactored to char[] from String
     void update_and_reboot(String);
 

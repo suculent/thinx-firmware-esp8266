@@ -23,7 +23,7 @@ extern "C" {
 // Static variables
 char* THiNX::thinx_api_key;
 char* THiNX::thinx_owner_key;
-bool  THiNX::forceHTTP = false;
+bool  THiNX::forceHTTP = true;
 char  THiNX::json_buffer[512];
 
 const char THiNX::time_format[] = "%T";
@@ -63,6 +63,7 @@ uint32_t THiNX::last_free_heap_size;
 
 /* Convenience method for debugging memory issues. */
 void THiNX::printStackHeap(String tag) {
+  if (!logging) return;
   uint32_t heap = ESP.getFreeHeap();
   uint32_t diff = 0;
   String way = "=";
@@ -112,12 +113,14 @@ THiNX::THiNX(const char * __apikey, const char * __owner_id) {
   wifiManager.autoConnect(accessPointName.c_str());
   #endif
 
+#ifdef DEBUG
   if (logging) {
     Serial.print(F("\n*TH: THiNXLib rev. "));
     Serial.print(THX_REVISION);
     Serial.print(F(" version: "));
     Serial.println(VERSION);
   }
+#endif
 
   json_buffer[0] = 0;
 
@@ -351,9 +354,17 @@ void THiNX::checkin() {
   } else {
     generate_checkin_body(); // returns json_buffer buffer
     if (forceHTTP) {
+#ifdef __DISABLE_HTTPS__
       send_data(json_buffer); // HTTP fallback
-    } else {
+#else
       send_data_secure(json_buffer); // HTTPS
+#endif
+    } else {
+#ifndef __DISABLE_HTTPS__
+      send_data_secure(json_buffer); // HTTPS
+#else
+      send_data(json_buffer); // HTTP
+#endif
     }
     checkin_time = millis() + checkin_interval;
   }
@@ -406,13 +417,28 @@ char* THiNX::generate_checkin_body() {
   root["rssi"] = String(WiFi.RSSI());
   // root["snr"] = String(100 + WiFi.RSSI() / WiFi.RSSI()); // approximate only
 
+  char platform_temp[24] = {0};
+  char *mcu_type;
+
+#ifdef ESP32
+  mcu_type = strdup("esp32");
+#endif
+#ifdef ESP8266
+  mcu_type = strdup("esp8266");
+#endif
+
   // Flag for THiNX CI
   #ifndef PLATFORMIO_IDE
   // THINX_PLATFORM is not overwritten by builder in Arduino IDE
-  root["platform"] = "arduino";
+  // root["platform"] = "arduino";
+  sprintf(platform_temp, "%s:%s", "arduino", mcu_type);
   #else
-  root["platform"] = strdup(THINX_PLATFORM);
+  // root["platform"] = strdup(THINX_PLATFORM);
+  sprintf(platform_temp, "%s:%s", THINX_PLATFORM, mcu_type);
   #endif
+
+  // since v2.7 (breaking change)
+  root["platform"] = String(platform_temp);
 
   DynamicJsonBuffer wrapperBuffer(512);
   JsonObject& wrapper = wrapperBuffer.createObject();
@@ -433,6 +459,7 @@ char* THiNX::generate_checkin_body() {
 * Registration - HTTP POST
 */
 
+#ifdef __DISABLE_HTTPS__
 void THiNX::send_data(String body) {
 
   if (logging) {
@@ -440,7 +467,7 @@ void THiNX::send_data(String body) {
     Serial.println(thinx_cloud_url);
   }
 
-  if (!https_client.connect(thinx_cloud_url, 7442)) {
+  if (!http_client.connect(thinx_cloud_url, 7442)) {
     if (logging) Serial.println(F("*TH: API connection failed."));
     return;
   }
@@ -463,7 +490,9 @@ void THiNX::send_data(String body) {
 
 void THiNX::fetch_data(WiFiClient *client) {
 
-  if (logging) Serial.println(F("*TH: Waiting for API response..."));
+#ifdef DEBUG
+  // if (logging) Serial.println(F("*TH: Waiting for API response..."));
+#endif
 
   char buf[512];
   int pos = 0;
@@ -473,11 +502,15 @@ void THiNX::fetch_data(WiFiClient *client) {
 
   // Wait until client available or timeout...
   unsigned long time_out = millis() + 30000;
-  if (logging) Serial.println(F("*TH: Waiting for client..."));
+#ifdef DEBUG
+  // if (logging) Serial.println(F("*TH: Waiting for client..."));
+#endif
 
   while(!client->available()){
     if (millis() > time_out) {
+#ifdef DEBUG
       if (logging) Serial.println(F("*TH: Client NOT available."));
+#endif
       return;
     }
     yield();
@@ -499,22 +532,26 @@ void THiNX::fetch_data(WiFiClient *client) {
   }
 
 #ifdef DEBUG
-  if (logging) Serial.println();
+  //if (logging) Serial.println();
 #endif
   buf[pos] = '\0'; // add null termination for any case...
   client->stop(); // ??
 #ifdef DEBUG
   if (pos == 0) {
+#ifdef DEBUG
     if (logging) Serial.printf("*TH: API Communication error, fix me now!\n");
+#endif
   }
 #endif
   parse(buf);
 
 }
+#endif
 
+#ifndef __DISABLE_HTTPS__
 void THiNX::fetch_data_secure(BearSSL::WiFiClientSecure *client) {
 
-  if (logging) Serial.println(F("*TH: Waiting for API response..."));
+  //if (logging) Serial.println(F("*TH: Waiting for API response..."));
 
   char buf[512];
   int pos = 0;
@@ -524,7 +561,7 @@ void THiNX::fetch_data_secure(BearSSL::WiFiClientSecure *client) {
 
   // Wait until client available or timeout...
   unsigned long time_out = millis() + 30000;
-  if (logging) Serial.println(F("*TH: Waiting for client..."));
+  //if (logging) Serial.println(F("*TH: Waiting for client..."));
 
   while(!client->available()){
     if (millis() > time_out) {
@@ -552,7 +589,7 @@ void THiNX::fetch_data_secure(BearSSL::WiFiClientSecure *client) {
   }
 
 #ifdef DEBUG
-  if (logging) Serial.println();
+  //if (logging) Serial.println();
 #endif
   buf[pos] = '\0'; // add null termination for any case...
   client->stop(); // ??
@@ -576,22 +613,33 @@ void THiNX::send_data_secure(String body) {
   https_client.setInsecure(); // does not validate anything, very dangerous!
 
   bool mfln = https_client.probeMaxFragmentLength(thinx_cloud_url, 7443, 512);
+#ifdef DEBUG
   if (logging) Serial.printf("MFLN supported: %s\n", mfln ? "yes" : "no");
+#endif
   if (mfln) {
+#ifdef DEBUG
+    if (logging) Serial.println("Setting MFLN buffer sizes to 512");
+#endif
     https_client.setBufferSizes(512, 512);
   }
-
-  if (logging) Serial.printf("MFLN status: %s\n", https_client.getMFLNStatus() ? "true" : "false");
-  if (logging) Serial.printf("Memory used: %d\n", ret - ESP.getFreeHeap());
 
   https_client.setInsecure();
 
   if (!https_client.connect(thinx_cloud_url, 7443)) {
+#ifdef DEBUG
     if (logging) Serial.println(F("*TH: API connection failed."));
+#endif
     return;
   } else {
+#ifdef DEBUG
     if (logging) Serial.println(F("HTTPS Client connected."));
+#endif
   }
+
+#ifdef DEBUG
+  if (logging) Serial.printf("MFLN status: %s\n", https_client.getMFLNStatus() ? "true" : "false");
+  if (logging) Serial.printf("Memory used: %d\n", ret - ESP.getFreeHeap());
+#endif
 
   https_client.println(F("POST /device/register HTTP/1.1"));
   https_client.print(F("Host: ")); https_client.println(thinx_cloud_url);
@@ -607,6 +655,7 @@ void THiNX::send_data_secure(String body) {
 
   fetch_data_secure(&https_client);
 }
+#endif
 
 /*
 * Response Parser
@@ -1152,11 +1201,11 @@ void THiNX::publish_status(const char *message, bool retain) {
 
   // Happy path
   if (mqtt_client->connected()) {
-    printStackHeap("thx-pre-publish-status(2)");
+    //printStackHeap("thx-pre-publish-status(2)");
     mqtt_client->publish(mqtt_device_status_channel, (const uint8_t*)message, strlen(message), retain);
-    printStackHeap("thx-publish-pre-loop");
+    //printStackHeap("thx-publish-pre-loop");
     mqtt_client->loop();
-    printStackHeap("thx-publish-post-loop");
+    //printStackHeap("thx-publish-post-loop");
 
   } else {
 
@@ -1265,7 +1314,11 @@ bool THiNX::start_mqtt() {
 #ifdef DEBUG
       if (logging) Serial.println(F("*TH: Initializing new MQTTS client."));
 #endif
+#ifndef __DISABLE_HTTPS__
       mqtt_client = new PubSubClient(https_client, thinx_mqtt_url, 8883);
+#else
+      Serial.println(F("HTTPS/MQTTS disabled!"));
+#endif
       delay(10);
     } else {
 #ifdef DEBUG
@@ -1628,10 +1681,18 @@ void THiNX::update_and_reboot(String url) {
     }
 #endif
 */
+#ifdef __DISABLE_HTTPS__
     ret = ESPhttpUpdate.update(http_client, thinx_cloud_url, 7442, url, "");
+#else
+    ret = ESPhttpUpdate.update(https_client, thinx_cloud_url, 7443, url.c_str());
+#endif
   } else {
     // if (logging) Serial.println(F("*TH: using https client on port 7443"));
+#ifndef __DISABLE_HTTPS__
     ret = ESPhttpUpdate.update(https_client, thinx_cloud_url, 7443, url.c_str());
+#else
+    ret = ESPhttpUpdate.update(http_client, thinx_cloud_url, 7442, url, "");
+#endif
   }
 
   switch(ret) {
@@ -1789,7 +1850,7 @@ void THiNX::sync_sntp() {
     if (logging) Serial.print(".");
     now = time(nullptr);
   }
-  if (logging) Serial.println();
+  //if (logging) Serial.println();
   struct tm timeinfo;
   gmtime_r(&now, &timeinfo);
   //if (logging) Serial.print(F("*TH: SNTP time: "));
