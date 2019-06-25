@@ -204,6 +204,7 @@ THiNX::THiNX(const char * __apikey, const char * __owner_id) {
       }
   }
 
+  thinx_mqtt_channel();
   init_with_api_key(thinx_api_key);
   wifi_connection_in_progress = false; // last
 }
@@ -418,7 +419,7 @@ char* THiNX::generate_checkin_body() {
   // root["snr"] = String(100 + WiFi.RSSI() / WiFi.RSSI()); // approximate only
 
   char platform_temp[24] = {0};
-  char *mcu_type;
+  char mcu_type = "unknown";
 
 #ifdef ESP32
   mcu_type = strdup("esp32");
@@ -2175,14 +2176,14 @@ void THiNX::loop() {
 
 #ifdef ESP32
 const char * THiNX::thinx_mac() {
-  sprintf(mac_string, "5CCF7F%6X", ESP.getEfuseMac());
+  sprintf(mac_string, "5CCF7F%.6X", ESP.getEfuseMac());
   return mac_string;
 }
 #endif
 
 #ifdef ESP8266
 const char * THiNX::thinx_mac() {
-  sprintf(mac_string, "5CCF7F%6X", ESP.getChipId());
+  sprintf(mac_string, "5CCF7F%.6X", ESP.getChipId());
   return mac_string;
 }
 #endif

@@ -8,6 +8,4 @@ engines:
  coverage:
    enabled: false
 exclude_paths:
-  - lib/ArduinoJson/**
-  - lib/PubSubClient/**
-  - lib/WiFiManager/**
+  - lib

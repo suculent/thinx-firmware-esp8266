@@ -9,14 +9,14 @@
 
 // Provides placeholder for THINX_FIRMWARE_VERSION_SHORT
 #ifndef VERSION
-#define VERSION "2.7.231"
+#define VERSION "2.7.232"
 #endif
 
 #ifndef THX_REVISION
 #ifdef THINX_FIRMWARE_VERSION_SHORT
 #define THX_REVISION THINX_FIRMWARE_VERSION_SHORT
 #else
-#define THX_REVISION "231"
+#define THX_REVISION "232"
 #endif
 #endif
 
@@ -138,7 +138,7 @@ public:
     void setMQTTBroker( char * url, int port );
     void setLastWill(String nextWill);        // disconnect MQTT and reconnect with different lastWill than default
 
-    int wifi_connection_in_progress;
+    bool wifi_connection_in_progress;
 
     // MQTT Support
 
@@ -167,7 +167,7 @@ public:
     void setLocation(double,double);        // performs checkin while updating Location
 
     bool wifi_connected;                         // WiFi connected in station mode
-    int mqtt_connected;                    // success or failure on subscription
+    bool mqtt_connected;                    // success or failure on subscription
 
 private:
 
