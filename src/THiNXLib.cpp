@@ -419,7 +419,7 @@ char* THiNX::generate_checkin_body() {
   // root["snr"] = String(100 + WiFi.RSSI() / WiFi.RSSI()); // approximate only
 
   char platform_temp[24] = {0};
-  char mcu_type = "unknown";
+  char *mcu_type = strdup("undefined");
 
 #ifdef ESP32
   mcu_type = strdup("esp32");
