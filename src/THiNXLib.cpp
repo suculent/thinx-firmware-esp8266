@@ -419,7 +419,7 @@ char* THiNX::generate_checkin_body() {
   // root["snr"] = String(100 + WiFi.RSSI() / WiFi.RSSI()); // approximate only
 
   char platform_temp[24] = {0};
-  char *mcu_type = strdup("undefined");
+  char *mcu_type = "unknown";
 
 #ifdef ESP32
   mcu_type = strdup("esp32");
@@ -1353,6 +1353,10 @@ bool THiNX::start_mqtt() {
 #ifdef DEBUG
         if (logging) Serial.println(F("*TH: MQTT Type: Stream..."));
 #endif
+        if (_update_callback != nullptr) {
+          _update_callback();
+        }
+
         uint32_t startTime = millis();
         uint32_t size = pub.payload_len();
         if ( ESP.updateSketch(*pub.payload_stream(), size, true, false) ) {
@@ -1653,6 +1657,11 @@ void THiNX::update_and_reboot(String url) {
   #ifdef __USE_STREAM_UPDATER__
   if (logging) Serial.println(F("*TH: Starting MQTT & reboot..."));
   uint32_t size = pub.payload_len();
+
+  if (_update_callback != nullptr) {
+    _update_callback();
+  }
+
   if (ESP.updateSketch(*pub.payload_stream(), size, true, false)) {
     if (logging) Serial.println(F("Clearing retained message."));
     mqtt_client->publish(MQTT::Publish(pub.topic(), "").set_retain());
@@ -1667,6 +1676,10 @@ void THiNX::update_and_reboot(String url) {
   #else
 
   // TODO: Download the file and check expected_hash first...
+
+  if (_update_callback != nullptr) {
+    _update_callback();
+  }
 
   if (logging) Serial.println(F("*TH: Starting ESP8266 HTTP Update & reboot..."));
   t_httpUpdate_return ret;
@@ -1821,6 +1834,10 @@ void THiNX::setPushConfigCallback( void (*func)(String) ) {
 
 void THiNX::setFinalizeCallback( void (*func)(void) ) {
   _finalize_callback = func;
+}
+
+void THiNX::setFirmwareUpdateCallback( void (*func)(void) ) {
+  _update_callback = func;
 }
 
 void THiNX::setMQTTCallback( void (*func)(byte*) ) {

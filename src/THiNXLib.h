@@ -1,6 +1,6 @@
 #include <Arduino.h>
 
-//#define DEBUG // takes 8k of sketch and 1+1k of stack/heap size (when measured last time)
+#define DEBUG // takes 8k of sketch and 1+1k of stack/heap size (when measured last time)
 #define __DISABLE_HTTPS__ // to save memory if needed
 #define __ENABLE_WIFI_MIGRATION__ // enable automatic WiFi disconnect/reconnect on Configuration Push (THINX_ENV_SSID and THINX_ENV_PASS)
 // #define __USE_WIFI_MANAGER__ // if disabled, you need to `WiFi.begin(ssid, pass)` on your own; saves about 3% of sketch space, excludes DNSServer and WebServer
@@ -9,14 +9,14 @@
 
 // Provides placeholder for THINX_FIRMWARE_VERSION_SHORT
 #ifndef VERSION
-#define VERSION "2.7.232"
+#define VERSION "2.7.233"
 #endif
 
 #ifndef THX_REVISION
 #ifdef THINX_FIRMWARE_VERSION_SHORT
 #define THX_REVISION THINX_FIRMWARE_VERSION_SHORT
 #else
-#define THX_REVISION "232"
+#define THX_REVISION "233"
 #endif
 #endif
 
@@ -134,6 +134,7 @@ public:
 
     void setPushConfigCallback( void (*func)(String) );
     void setFinalizeCallback( void (*func)(void) );
+    void setFirmwareUpdateCallback( void (*func)(void) );
     void setMQTTCallback( void (*func)(byte*) );
     void setMQTTBroker( char * url, int port );
     void setLastWill(String nextWill);        // disconnect MQTT and reconnect with different lastWill than default
@@ -256,6 +257,7 @@ private:
 
     void (*_config_callback)(String) = NULL;  // Called when server pushes new environment vars using MQTT
     void (*_mqtt_callback)(byte*) = NULL;
+    void (*_update_callback)(void) = NULL;
 
     // Data Storage
     void import_build_time_constants();     // sets variables from thinx.h file
