@@ -4,11 +4,11 @@
 
 const char * THINX_ALIAS = "unnamed";
 const char * THINX_API_KEY = "";
-const char * THINX_APP_VERSION = "thinx-lib-esp8266-arduino:2.7.234:2019-06-21";
+const char * THINX_APP_VERSION = "thinx-lib-esp8266-arduino:2.7.235:2019-09-24";
 const char * THINX_CLOUD_URL = "thinx.cloud";
 const char * THINX_COMMIT_ID = "0";
-const char * THINX_FIRMWARE_VERSION = "thinx-lib-esp8266-arduino:2.7.234";
-const char * THINX_FIRMWARE_VERSION_SHORT = "2.7.234";
+const char * THINX_FIRMWARE_VERSION = "thinx-lib-esp8266-arduino:2.7.235";
+const char * THINX_FIRMWARE_VERSION_SHORT = "2.7.235";
 const char * THINX_MQTT_URL = "thinx.cloud"; // should deprecate in favour of THINX_CLOUD_URL
 const char * THINX_OWNER = "0";
 const char * THINX_PLATFORM  = "platformio"; // will be overridden on build

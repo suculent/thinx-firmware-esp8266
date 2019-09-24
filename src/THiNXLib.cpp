@@ -29,6 +29,7 @@ char  THiNX::json_buffer[512];
 const char THiNX::time_format[] = "%T";
 const char THiNX::date_format[] = "%Y-%m-%d";
 char * THiNX::thinx_mqtt_url = strdup(THINX_MQTT_URL);
+char * THiNX::thinx_cloud_url = strdup(THINX_CLOUD_URL);
 
 #include "thinx_root_ca.h"
 
@@ -144,11 +145,9 @@ THiNX::THiNX(const char * __apikey, const char * __owner_id) {
 
   app_version = strdup("");
   available_update_url = strdup("");
-  thinx_cloud_url = strdup("thinx.cloud");
 
   thinx_firmware_version_short = strdup("");
   thinx_firmware_version = strdup("");
-  thinx_mqtt_url = strdup("thinx.cloud");
   thinx_version_id = strdup("");
   thinx_api_key = strdup("");
   thinx_forced_update = false;
@@ -261,16 +260,24 @@ void THiNX::connect() {
   }
 #endif
 
+  if (wifi_conection_timeout > 0 && (millis() > wifi_conection_timeout)) {
+    wifi_connection_in_progress = false;
+  }
+
 #ifndef __USE_WIFI_MANAGER__
   if (WiFi.SSID()) {
     if (wifi_connection_in_progress != true) {
       if (WiFi.getMode() == WIFI_AP) {
-        if (logging) Serial.println(WiFi.SSID());
+        if (logging) {
+          Serial.print("AP: ");
+          Serial.println(WiFi.SSID());
+        }
       } else {
         if (strlen(THINX_ENV_SSID) > 2) {
           WiFi.begin(THINX_ENV_SSID, THINX_ENV_PASS);
+          wifi_conection_timeout = millis() + 30000; // TODO: NICE-TO-HAVE: implement linear or exponential backoff
         }
-        wifi_connection_in_progress = true; // prevents re-entering connect_wifi(); should timeout
+        wifi_connection_in_progress = true; // prevents re-entering connect_wifi(); reset after wifi_conection_timeout
       }
     }
   }
@@ -296,10 +303,14 @@ void THiNX::connect_wifi() {
   #else
 
   if (wifi_connected) {
+#ifdef DEBUG
+    Serial.println("wifi_connected == true");
+#endif
     return;
   }
 
   if (wifi_connection_in_progress) {
+
     if (wifi_retry > 1000) {
       if (WiFi.getMode() == WIFI_STA) {
         if (logging) Serial.println(F("*TH: Starting AP with PASSWORD..."));
@@ -331,7 +342,7 @@ void THiNX::connect_wifi() {
           WiFi.mode(WIFI_STA);
         } else {
           WiFi.begin(THINX_ENV_SSID, THINX_ENV_PASS);
-          wifi_connection_in_progress = true; // prevents re-entering connect_wifi()
+          wifi_connection_in_progress = true; // prevents re-entering connect_wifi() until timeout
         }
       }
     }
@@ -1754,8 +1765,6 @@ void THiNX::import_build_time_constants() {
   thinx_commit_id = strdup(THINX_COMMIT_ID);
   #endif
 
-  thinx_mqtt_url = strdup(THINX_MQTT_URL);
-  thinx_cloud_url = strdup(THINX_CLOUD_URL);
   thinx_alias = strdup(THINX_ALIAS);
   thinx_owner = strdup(THINX_OWNER);
   thinx_mqtt_port = THINX_MQTT_PORT;
@@ -1996,6 +2005,11 @@ void THiNX::loop() {
 
   //printStackHeap("in");
 
+  if (WiFi.status() != WL_CONNECTED) {
+    wifi_connected = false;
+    thinx_phase = CONNECT_WIFI;
+  }
+
   if (thinx_phase == CONNECT_WIFI) {
     // If not connected manually or using WiFiManager, start connection in progress...
     if (WiFi.status() != WL_CONNECTED) {
@@ -2004,13 +2018,14 @@ void THiNX::loop() {
         //if (logging) Serial.println(F("*TH: CONNECTING »"));
         connect(); // blocking
         wifi_connection_in_progress = true;
-        wifi_connection_in_progress = true;
         return;
       } else {
         return;
       }
     } else {
+
       wifi_connected = true;
+      wifi_connection_in_progress = false;
 
       // Synchronize SNTP time
       //if (logging) Serial.println(""); // newline after "Time difference for DST"
