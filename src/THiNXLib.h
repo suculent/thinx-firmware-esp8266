@@ -9,14 +9,14 @@
 
 // Provides placeholder for THINX_FIRMWARE_VERSION_SHORT
 #ifndef VERSION
-#define VERSION "2.7.234"
+#define VERSION "2.7.235"
 #endif
 
 #ifndef THX_REVISION
 #ifdef THINX_FIRMWARE_VERSION_SHORT
 #define THX_REVISION THINX_FIRMWARE_VERSION_SHORT
 #else
-#define THX_REVISION "234"
+#define THX_REVISION "235"
 #endif
 #endif
 
@@ -59,6 +59,7 @@ public:
     static String accessPointPassword;
 
     static char* thinx_mqtt_url;
+    static char* thinx_cloud_url;              // up to 1k but generally something where FQDN fits
 
     static String lastWill;
 
@@ -113,7 +114,6 @@ public:
     // Values imported on from thinx.h
     const char* app_version;                  // max 80 bytes
     const char* available_update_url;         // up to 1k
-    const char* thinx_cloud_url;              // up to 1k but generally something where FQDN fits
     const char* thinx_commit_id;              // 40 bytes + 1
     const char* thinx_firmware_version_short; // 14 bytes
     const char* thinx_firmware_version;       // max 80 bytes
@@ -140,6 +140,7 @@ public:
     void setLastWill(String nextWill);        // disconnect MQTT and reconnect with different lastWill than default
 
     bool wifi_connection_in_progress;
+    unsigned long wifi_conection_timeout = NULL;
 
     // MQTT Support
 
@@ -175,6 +176,8 @@ private:
     // Memory allocation debugging
     static uint32_t last_free_heap_size;
     void printStackHeap(String tag);
+
+    unsigned long bytes_sent = 0;
 
     bool info_loaded = false;
     static char* thinx_api_key;
