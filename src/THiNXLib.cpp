@@ -148,6 +148,8 @@ THiNX::THiNX(const char * __apikey, const char * __owner_id) {
 
   thinx_firmware_version_short = strdup("");
   thinx_firmware_version = strdup("");
+  //thinx_mqtt_url = strdup("thinx.cloud");
+  //thinx_cloud_url = strdup("thinx.cloud");
   thinx_version_id = strdup("");
   thinx_api_key = strdup("");
   thinx_forced_update = false;
