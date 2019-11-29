@@ -1,0 +1,29 @@
+language: bash
+os: linux
+dist: bionic
+
+git:
+  depth: 1
+  submodules: false
+
+before_install:
+  - git submodule update --init  # no recursive update
+
+stages:
+  - build
+
+jobs:
+  include:
+    # Build stage. To save time, run all kinds of builds and tests in parallel.
+
+    - name: "Platformio (1)"
+      stage: build
+      script: $TRAVIS_BUILD_DIR/tests/platformio.sh
+      env:
+        - BUILD_PARITY=even
+
+notifications:
+  email:
+    on_success: change
+    on_failure: change
+
