@@ -390,8 +390,7 @@ void THiNX::checkin() {
 
 char* THiNX::generate_checkin_body() {
 
-  DynamicJsonBuffer jsonBuffer(512);
-  JsonObject& root = jsonBuffer.createObject();
+  DynamicJsonDocument root(512);
 
   root["mac"] = thinx_mac();
 
@@ -454,10 +453,9 @@ char* THiNX::generate_checkin_body() {
   // since v2.7 (breaking change)
   root["platform"] = String(platform_temp);
 
-  DynamicJsonBuffer wrapperBuffer(512);
-  JsonObject& wrapper = wrapperBuffer.createObject();
+  DynamicJsonDocument wrapper(512);
   wrapper["registration"] = root;
-  wrapper.printTo(json_buffer); // TODO: memset fill with zero before this?
+  deserializeJson(wrapper, json_buffer);
 #ifdef DEBUG
   if (logging) {
     Serial.print("json_buffer body length: ");
@@ -741,10 +739,10 @@ void THiNX::parse(const char * pload) {
   }
 
   String body = payload.substring(start_index, endIndex);
-  DynamicJsonBuffer jsonBuffer(512);
-  JsonObject& root = jsonBuffer.parseObject(body.c_str());
+  DynamicJsonDocument root(512);
+  auto error = deserializeJson(root, body.c_str());
 
-  if ( !root.success() ) {
+  if ( error ) {
     if (logging) Serial.println(F("Failed parsing root node."));
     return;
   }
@@ -753,7 +751,7 @@ void THiNX::parse(const char * pload) {
 
     case UPDATE: {
 
-      JsonObject& update = root["registration"];
+      JsonObject update = root["registration"];
       if (logging) Serial.println(F("TODO: Parse update payload..."));
 
       String mac = update["mac"];
@@ -869,9 +867,9 @@ void THiNX::parse(const char * pload) {
     case NOTIFICATION: {
 
       // Currently, this is used for update only, can be extended with request_category or similar.
-      JsonObject& notification = root["notification"];
+      JsonObject notification = root["notification"];
 
-      if ( !notification.success() ) {
+      if ( notification.isNull() ) {
 #ifdef DEBUG
         if (logging) Serial.println(F("*TH: Failed parsing notification node."));
 #endif
@@ -917,9 +915,9 @@ void THiNX::parse(const char * pload) {
 
     case REGISTRATION: {
 
-      JsonObject& registration = root["registration"];
+      JsonObject registration = root["registration"];
 
-      if ( !registration.success() ) {
+      if ( registration.isNull() ) {
 #ifdef DEBUG
         if (logging) Serial.println(F("*TH: Failed parsing registration node."));
 #endif
@@ -1053,9 +1051,9 @@ void THiNX::parse(const char * pload) {
 
     case CONFIGURATION: {
 
-      JsonObject& configuration = root["configuration"];
+      JsonObject configuration = root["configuration"];
 
-      if ( !configuration.success() ) {
+      if ( configuration.isNull() ) {
 #ifdef DEBUG
         if (logging) Serial.println(F("*TH: Failed parsing configuration node."));
 #endif
@@ -1223,10 +1221,11 @@ void THiNX::publish_status(const char *message, bool retain) {
 
   } else {
 
-    printStackHeap("thx-pre-publish-status(R2)");
+    printStackHeap("thx-pre-publish-status(R2-not-connected!)");
     // Reconnection
     if (logging) Serial.println(F("*TH: reconnecting MQTT in publish_status..."));
     printStackHeap("thx-pre-start");
+    mqtt_client = nullptr;
     start_mqtt();
     printStackHeap("thx-post-start");
     unsigned long reconnect_timeout = millis() + 10000;
@@ -1236,6 +1235,9 @@ void THiNX::publish_status(const char *message, bool retain) {
         break;
       }
     }
+
+    mqtt_client->publish(mqtt_device_status_channel, (const uint8_t*)message, strlen(message), retain);
+    mqtt_client->loop();
   }
 }
 
@@ -1493,36 +1495,41 @@ void THiNX::restore_device_info() {
   f.readBytesUntil('\r', json_buffer, sizeof(json_buffer));
   #endif
 
-  DynamicJsonBuffer jsonBuffer(512); // tightly enough to fit ott as well
-  JsonObject& config = jsonBuffer.parseObject((char*)json_buffer); // must not be String!
+  DynamicJsonDocument config_doc(512); // tightly enough to fit ott as well
+  auto error = deserializeJson(config_doc, (char*)json_buffer);
 
-  if (!config.success()) {
+  if (error) {
     if (logging) Serial.println(F("*TH: No JSON data to be parsed..."));
     if (logging) Serial.println(json_buffer);
     return;
 
   } else {
 
-    for (JsonObject::iterator it=config.begin(); it!=config.end(); ++it) {
-      String key = it->key;
-      //Serial.println();
-      String value = config[it->key];
-      // if (logging) Serial.println(value);
-      if (key == "owner") {
-        thinx_owner = strdup(value.c_str());
-      }
-      if (key == "apikey") {
-        thinx_api_key = strdup(value.c_str());
-      }
-      if (key == "udid") {
-        thinx_udid = strdup(value.c_str());
-      }
-      if (key == "alias") {
-        thinx_alias = strdup(value.c_str());
-      }
-      if (key == "ott") {
-        available_update_url = strdup(value.c_str());
-      }
+    JsonObject config = config_doc.as<JsonObject>();
+
+    const char* owner = config_doc["owner"];
+    if (owner) {
+      thinx_owner = strdup(owner);
+    }
+
+    const char* apikey = config_doc["apikey"];
+    if (apikey) {
+      thinx_api_key = strdup(apikey);
+    }
+
+    const char* udid = config_doc["udid"];
+    if (udid) {
+      thinx_udid = strdup(udid);
+    }
+
+    const char* alias = config_doc["alias"];
+    if (alias) {
+      thinx_alias = strdup(alias);
+    }
+
+    const char* ott = config_doc["ott"];
+    if (ott) {
+      available_update_url = strdup(ott);
     }
 
     #ifdef __USE_SPIFFS__
@@ -1543,8 +1550,7 @@ void THiNX::save_device_info()
     return;
   }
 
-  DynamicJsonBuffer jsonBuffer(512);
-  JsonObject& root = jsonBuffer.createObject();
+  DynamicJsonDocument root(512);
 
   // Mandatories
 
@@ -1574,7 +1580,7 @@ void THiNX::save_device_info()
   #ifdef __USE_SPIFFS__
   File f = SPIFFS.open("/thinx.cfg", "w");
   if (f) {
-    root.printTo(f);
+    serializeJson(root, f);
     f.print('\r');
     f.println();
     f.close();
@@ -1600,8 +1606,7 @@ void THiNX::save_device_info()
 
 void THiNX::deviceInfo() {
 
-  DynamicJsonBuffer jsonBuffer(512);
-  JsonObject& root = jsonBuffer.createObject();
+  DynamicJsonDocument root(512);
 
   // Mandatories
 
@@ -1631,7 +1636,7 @@ void THiNX::deviceInfo() {
   #ifdef __USE_SPIFFS__
   File f = SPIFFS.open("/thinx.cfg", "w");
   if (f) {
-    root.printTo(f);
+    deserializeJson(root, f);
     f.print('\r');
     f.println();
     f.close();
@@ -1661,13 +1666,13 @@ void THiNX::deviceInfo() {
 void THiNX::update_and_reboot(String url) {
 
   url.replace("http://", "");
-  url.replace("thinx.cloud:7442", "");
+  url.replace("thinx.cloud:7442", ""); // warning, this should use existing vars!
 
   if (logging) Serial.print("*TH: Update with URL: ");
   if (logging) Serial.println(url);
 
   // #define __USE_STREAM_UPDATER__ ; // Warning, this is MQTT-based streamed update!
-  #ifdef __USE_STREAM_UPDATER__
+#ifdef __USE_STREAM_UPDATER__
   if (logging) Serial.println(F("*TH: Starting MQTT & reboot..."));
   uint32_t size = pub.payload_len();
 
@@ -1686,7 +1691,7 @@ void THiNX::update_and_reboot(String url) {
   }
 
   ESP.restart();
-  #else
+#else
 
   // TODO: Download the file and check expected_hash first...
 
@@ -1697,27 +1702,22 @@ void THiNX::update_and_reboot(String url) {
   if (logging) Serial.println(F("*TH: Starting ESP8266 HTTP Update & reboot..."));
   t_httpUpdate_return ret;
   if (forceHTTP) {
-    /*
-#ifdef DEBUG
-    if (logging) { Serial.println(F("*TH: using http client and port 7442 host: "));
-      Serial.print(thinx_cloud_url);
-      Serial.print(F("*TH: URI: "));
-      Serial.println(url);
-      Serial.print(F("*TH: free heap: "));
-      Serial.println(ESP.getFreeHeap());
-    }
-#endif
-*/
+    if (logging) Serial.println(F("*TH: forceHTTP"));
 #ifdef __DISABLE_HTTPS__
+    if (logging) Serial.println(F("*TH: HTTP"));
     ret = ESPhttpUpdate.update(http_client, thinx_cloud_url, 7442, url, "");
 #else
+    if (logging) Serial.println(F("*TH: HTTPS"));
     ret = ESPhttpUpdate.update(https_client, thinx_cloud_url, 7443, url.c_str());
 #endif
   } else {
+    if (logging) Serial.println(F("*TH: !forceHTTP"));
     // if (logging) Serial.println(F("*TH: using https client on port 7443"));
 #ifndef __DISABLE_HTTPS__
+    if (logging) Serial.println(F("*TH: HTTPS"));
     ret = ESPhttpUpdate.update(https_client, thinx_cloud_url, 7443, url.c_str());
 #else
+    if (logging) Serial.println(F("*TH: HTTP"));
     ret = ESPhttpUpdate.update(http_client, thinx_cloud_url, 7442, url, "");
 #endif
   }

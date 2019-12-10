@@ -6,7 +6,16 @@ An Arduino/ESP8266 library to wrap client for OTA updates and RTM (Remote Things
 
 # What's New
 
-### 2019-06-03: 2.7.231 
+### 2019-12-10: 2.8.238
+
+* Compatibility with Arduino Core 2.6.2
+* Compatibility with ArduinoJSON 6.x (thus not included anymore)
+
+### 2019-09-24: 2.7.235
+
+* It's now possible to override `THiNX::thinx_mqtt_url` and `THiNX::thinx_cloud_url` from code, ignoring header values.
+
+### 2019-06-03: 2.7.231
 
 * Firmware returns MCU type to prevent brick by incorrect OTA build type (from thinx.yml file)
 
