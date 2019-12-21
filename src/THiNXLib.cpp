@@ -455,7 +455,7 @@ char* THiNX::generate_checkin_body() {
 
   DynamicJsonDocument wrapper(512);
   wrapper["registration"] = root;
-  deserializeJson(wrapper, json_buffer);
+  serializeJson(wrapper, json_buffer);
 #ifdef DEBUG
   if (logging) {
     Serial.print("json_buffer body length: ");
