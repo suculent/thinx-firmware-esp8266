@@ -9,14 +9,14 @@
 
 // Provides placeholder for THINX_FIRMWARE_VERSION_SHORT
 #ifndef VERSION
-#define VERSION "2.8.239"
+#define VERSION "2.8.243"
 #endif
 
 #ifndef THX_REVISION
 #ifdef THINX_FIRMWARE_VERSION_SHORT
 #define THX_REVISION THINX_FIRMWARE_VERSION_SHORT
 #else
-#define THX_REVISION "239"
+#define THX_REVISION "243"
 #endif
 #endif
 
@@ -100,7 +100,7 @@ public:
     void loop();
 
     char mac_string[17];
-    char* generate_checkin_body();                  // TODO: Refactor to C-string
+    void generate_checkin_body(); // uses static json_buffer
 
     // MQTT
     PubSubClient * mqtt_client = nullptr;
@@ -140,7 +140,7 @@ public:
     void setLastWill(String nextWill);        // disconnect MQTT and reconnect with different lastWill than default
 
     bool wifi_connection_in_progress;
-    unsigned long wifi_conection_timeout = NULL;
+    unsigned long wifi_conection_timeout = 0;
 
     // MQTT Support
 
