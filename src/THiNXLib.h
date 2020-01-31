@@ -1,6 +1,6 @@
 #include <Arduino.h>
 
-//#define DEBUG // takes 8k of sketch and 1+1k of stack/heap size (when measured last time)
+#define DEBUG // takes 8k of sketch and 1+1k of stack/heap size (when measured last time)
 #define __DISABLE_HTTPS__ // to save memory if needed
 #define __ENABLE_WIFI_MIGRATION__ // enable automatic WiFi disconnect/reconnect on Configuration Push (THINX_ENV_SSID and THINX_ENV_PASS)
 // #define __USE_WIFI_MANAGER__ // if disabled, you need to `WiFi.begin(ssid, pass)` on your own; saves about 3% of sketch space, excludes DNSServer and WebServer
@@ -9,14 +9,14 @@
 
 // Provides placeholder for THINX_FIRMWARE_VERSION_SHORT
 #ifndef VERSION
-#define VERSION "2.8.243"
+#define VERSION "2.8.244"
 #endif
 
 #ifndef THX_REVISION
 #ifdef THINX_FIRMWARE_VERSION_SHORT
 #define THX_REVISION THINX_FIRMWARE_VERSION_SHORT
 #else
-#define THX_REVISION "243"
+#define THX_REVISION "244"
 #endif
 #endif
 
@@ -109,7 +109,7 @@ public:
     char mqtt_device_status_channel[128];
     String thinx_mqtt_channel();
     String thinx_mqtt_channels();
-    String thinx_mqtt_status_channel();
+    char * generate_mqtt_status_channel(); // generate
 
     // Values imported on from thinx.h
     const char* app_version;                  // max 80 bytes
@@ -132,7 +132,7 @@ public:
 
     char * get_udid();
 
-    void setPushConfigCallback( void (*func)(String) );
+    void setPushConfigCallback( void (*func)(char*) );
     void setFinalizeCallback( void (*func)(void) );
     void setFirmwareUpdateCallback( void (*func)(void) );
     void setMQTTCallback( void (*func)(byte*) );
@@ -220,7 +220,7 @@ private:
 
     const char * thinx_mac();
 
-    static char json_buffer[512];       // statically allocated to prevent fragmentation, should be rather dynamic
+    static char json_buffer[768];       // statically allocated to prevent fragmentation, should be rather dynamic
 
     // In order of appearance
     bool fsck();                              // check filesystem if using SPIFFS
@@ -258,7 +258,7 @@ private:
     int performed_mqtt_checkin;              // one-time flag
     int all_done;                              // finalize flag
 
-    void (*_config_callback)(String) = NULL;  // Called when server pushes new environment vars using MQTT
+    void (*_config_callback)(char*) = NULL;  // Called when server pushes new environment vars using MQTT
     void (*_mqtt_callback)(byte*) = NULL;
     void (*_update_callback)(void) = NULL;
 
@@ -303,6 +303,5 @@ private:
     void do_deferred_update();
 
     bool mem_check();
-    void deviceInfo();
 
 };
