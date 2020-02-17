@@ -18,6 +18,22 @@
 
 #include <Arduino.h>
 
+#ifndef D4
+#define D4 (4)
+#endif
+#ifndef D5
+#define D5 (5)
+#endif
+#ifndef D6
+#define D6 (6)
+#endif
+#ifndef D7
+#define D7 (7)
+#endif
+#ifndef D8
+#define D8 (8)
+#endif
+
 // send a notice to THiNX builder, may deprecate with thinx.yml
 #define ARDUINO_IDE
 
