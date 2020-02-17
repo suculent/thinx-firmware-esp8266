@@ -23,10 +23,12 @@ THiNX thx;
 // Example of using injected Environment variables to change WiFi login credentials.
 //
 
-void pushConfigCallback (String config) {
+void pushConfigCallback (char * config_cstring) {
+
+  String config = String(config_cstring);
 
   // Set MQTT status (unretained)
-  thx.publishStatusUnretained("{ \"status\" : \"push configuration received\"}");
+  thx.publish_status_unretained((const char*)"{ \"status\" : \"push configuration received\"}")
 
   // Convert incoming JSON string to Object
   DynamicJsonBuffer jsonBuffer(512);
@@ -85,7 +87,7 @@ void setup() {
 
   //THiNX::accessPointName = "THiNX-AP";
   //THiNX::accessPointPassword = "<enter-ap-mode-password>";
-  THiNX::forceHTTP = true; disable HTTPS to speed-up checkin in development
+  THiNX::forceHTTP = true; // disable HTTPS to speed-up checkin in development
 
   thx = THiNX(apikey, owner_id);
 
@@ -104,15 +106,15 @@ void setup() {
   // Called after library gets connected and registered.
   thx.setFinalizeCallback([]{
     Serial.println("*INO: Finalize callback called.");
-  thx.publishStatusUnretained("{ \"status\" : \"Hello, world!\" }"); // set MQTT status
+  thx.publish_status_unretained((const char*)"{ \"status\" : \"Hello, world!\" }"); // set MQTT status
   });
 
   // Called when new configuration is pushed OTA
   thx.setPushConfigCallback(pushConfigCallback);
 
   // Callbacks can be defined inline
-  thx.setMQTTCallback([](String message) {
-    Serial.println(message);
+  thx.setMQTTCallback([](byte * message) {
+    Serial.println((char*)message);
   });
 
 }

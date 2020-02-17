@@ -64,7 +64,7 @@ void setup() {
   Serial.println("\nI'm awake.");
   Serial.setTimeout(2000);
 
-  // THiNX::forceHTTP = true; disable HTTPS to speed-up checkin in development
+  // THiNX::forceHTTP = true; // disable HTTPS to speed-up checkin in development
 
   // API Key, Owner ID
   thx = THiNX("4721f08a6df1a36b8517f678768effa8b3f2e53a7a1934423c1f42758dd83db5", "cedc16bb6bb06daaa3ff6d30666d91aacd6e3efbf9abbc151b4dcade59af7c12");

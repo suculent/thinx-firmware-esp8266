@@ -20,7 +20,7 @@ void setup() {
   Serial.setDebugOutput(true);
 #endif
 
-  // THiNX::forceHTTP = true; disable HTTPS to speed-up checkin in development
+  // THiNX::forceHTTP = true; // disable HTTPS to speed-up checkin in development
 
   // 3. initialize with API Key and Owner ID
   thx = THiNX("23a80bf9d8e1ce4d5c0be292b26bf3a935824d19a85344d238089722c6be335a", "cedc16bb6bb06daaa3ff6d30666d91aacd6e3efbf9abbc151b4dcade59af7c12");
