@@ -1,15 +1,15 @@
 /*
  * THiNX Sigfox/WiFi Example
- * 
+ *
  * This sample can be used for dual-network reporting like home security backup:
  * - system is expected to be backed up with a battery (sample sends voltage only)
  * - system can report WiFi and power outages incl. security alerts using Sigfox
  * - system can report important events without working WiFi connection
- * - when WiFi is available, system is listening to MQTT on wakeup 
+ * - when WiFi is available, system is listening to MQTT on wakeup
  * - new firmware can be offered from THiNX backend
- * 
+ *
  * This test sample awakes device every `autoSleepTime` microseconds to send a Sigfox message.
- * Message reports current battery voltage (float) converted to hex string. 
+ * Message reports current battery voltage (float) converted to hex string.
  * In order to measure battery voltage, connect battery (+) using 100k resistor with A0.
  * See: https://arduinodiy.wordpress.com/2016/12/25/monitoring-lipo-battery-voltage-with-wemos-d1-minibattery-shield-and-thingspeak/
  */
@@ -50,7 +50,7 @@ void finalizeCallback () {
   Serial.print("THiNX check-in completed. Waking up in ");
 
   uint32_t micro = SLEEP_TIME_MICROS;
-  //micro = 300e6; // testing 5 minutes 
+  //micro = 300e6; // testing 5 minutes
   Serial.print(micro/1000000); Serial.println(" seconds");
   ESP.deepSleep(micro);
 }
@@ -68,23 +68,23 @@ void measureBatteryVoltage() {
 
 /* Takes current voltage and sends as byte-string to SigFox backends */
 void updateSigfoxStatus() {
-  String voltageString = "ba"; // means battery voltage in THiNX, what about Sigfox?  
-  unsigned char * chpt = (unsigned char *)&voltage;  
+  String voltageString = "ba"; // means battery voltage in THiNX, what about Sigfox?
+  unsigned char * chpt = (unsigned char *)&voltage;
   Serial.print("Here are the bytes in memory order: ");
   for (unsigned int i = 0; i < sizeof(voltage); i++) {
      String byteVal = String(chpt[i],HEX);
      // Pad with zero
      if (byteVal.length() == 1) { byteVal = "0" + byteVal; }
      Serial.print(byteVal);
-     voltageString = voltageString + byteVal;       
+     voltageString = voltageString + byteVal;
   }
   Serial.print("\n");
   Serial.print("Voltage string for sigfox: ");
   Sigfox.println(voltageString);
-  
-  Serial.print("Sending Sigfox command: ");  
+
+  Serial.print("Sending Sigfox command: ");
   Serial.print("AT$SF="); Serial.println(voltageString);
-  
+
   Sigfox.print("AT$SF="); Sigfox.println(voltageString);
 }
 
@@ -96,15 +96,15 @@ void updateDashboardStatus() {
   thx.setStatus(statusString);
 }
 
-void setup() {  
- 
-  pinMode(A0, INPUT);  
+void setup() {
+
+  pinMode(A0, INPUT);
 
   WiFi.begin(ssid, pass);
   while (WiFi.status() != WL_CONNECTED) {
     delay(1);
   }; // wait for connection
-  
+
   Serial.begin(115200);
   while (!Serial);
   Serial.println("\nI'm awake.");
@@ -115,43 +115,43 @@ void setup() {
   while (!Sigfox);
 
   measureBatteryVoltage();
-  
+
   updateSigfoxStatus();
 
-  // API Key, Owner ID  
+  // API Key, Owner ID
   // ENTER YOUR OWN OWNER ID AND API KEY HERE BEFORE FIRST RUN!!!
-  // Otherwise device will be registered to THiNX test account and you'll need to reclaim ownership. 
-  
+  // Otherwise device will be registered to THiNX test account and you'll need to reclaim ownership.
+
   thx = THiNX("4721f08a6df1a36b8517f678768effa8b3f2e53a7a1934423c1f42758dd83db5", "cedc16bb6bb06daaa3ff6d30666d91aacd6e3efbf9abbc151b4dcade59af7c12");
-  
-  // The check-in should not happen before calling thx.loop() for the first time, 
-  // so this is a right  place to pre-set status for first check-in.  
-  updateDashboardStatus();   
+
+  // The check-in should not happen before calling thx.loop() for the first time,
+  // so this is a right  place to pre-set status for first check-in.
+  updateDashboardStatus();
 
   // Optionally, this is called on completion (when MQTT server is contacted).
-  thx.setFinalizeCallback(finalizeCallback);  
+  thx.setFinalizeCallback(finalizeCallback);
 }
 
-void loop() {      
+void loop() {
 
   // Always call the loop or THiNX will not happen (there's callback available, see library example)
   thx.loop();
 
   // serial echo
    if (Sigfox.available()) {
-    Serial.write(Sigfox.read());    
+    Serial.write(Sigfox.read());
     resetAutoSleepTime();
    }
-    
+
   if (Serial.available()) {
     Sigfox.write(Serial.read());
     resetAutoSleepTime();
   }
 
-  // autosleep requires connecting WAKE (D0?) and RST pin  
+  // autosleep requires connecting WAKE (D0?) and RST pin
   if (millis() > autoSleepTime) {
     Serial.println("Going into deep sleep for 1 hour...");
-    Serial.println(millis());    
+    Serial.println(millis());
     ESP.deepSleep(SLEEP_TIME_MICROS);
-  }      
+  }
 }
