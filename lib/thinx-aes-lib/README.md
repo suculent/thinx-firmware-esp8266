@@ -1,7 +1,8 @@
 # THiNX AESLib (ESP32, ESP8266, Arduino)
 
-[![Codacy Badge](https://api.codacy.com/project/badge/Grade/8dded023f3d14a69b3c38c9f5fd66a40)](https://www.codacy.com/app/suculent/thinx-aes-lib?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=suculent/thinx-aes-lib&amp;utm_campaign=Badge_Grade) 
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/8dded023f3d14a69b3c38c9f5fd66a40)](https://www.codacy.com/app/suculent/thinx-aes-lib?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=suculent/thinx-aes-lib&amp;utm_campaign=Badge_Grade)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=suculent_thinx-aes-lib&metric=alert_status)](https://sonarcloud.io/dashboard?id=suculent_thinx-aes-lib)
+[![Build Status](https://travis-ci.org/suculent/thinx-aes-lib.svg?branch=master)](https://travis-ci.org/suculent/thinx-aes-lib)
 
 An ESP32/ESP8266 library for Arduino IDE to wrap AES encryption with Base64 support. This project is originally based on [AESLib by kakopappa](https://github.com/kakopappa/arduino-esp8266-aes-lib). This fork actually works, will be maintained at least for a while, and provides optimized methods that do not require using Arduino's flawed String objects (even though those are still in examples).
 
@@ -15,6 +16,10 @@ Since ESP8266 Arduino Core 2.6.2 is already out, this might be updated to use AE
 * Arduino Uno (OK)
 
 # Changes
+
+`2.0.6` – added Travis CI unit and platform tests
+
+`2.0.5` – restored backwards compatibility with AVR; updated Simple and Medium examples
 
 `2.0.3` – added unit tests; thus fixed getrnd()
 
@@ -57,7 +62,7 @@ void aes_init() {
 String encrypt(char * msg, byte iv[]) {  
   int msgLen = strlen(msg);
   char encrypted[2 * msgLen];
-  aesLib.encrypt64(msg, encrypted, aes_key, iv);  
+  aesLib.encrypt64(msg, msgLen, encrypted, aes_key, iv);  
   return String(encrypted);
 }
 
@@ -65,7 +70,7 @@ String decrypt(char * msg, byte iv[]) {
   unsigned long ms = micros();
   int msgLen = strlen(msg);
   char decrypted[msgLen]; // half may be enough
-  aesLib.decrypt64(msg, decrypted, aes_key, iv);  
+  aesLib.decrypt64(msg, msgLen, decrypted, aes_key, iv);  
   return String(decrypted);
 }
 
