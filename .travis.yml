@@ -20,9 +20,10 @@ install:
 script:
   - bash ./travis-prebuild.sh # allows skipping unsupported platforms
   - cd examples/all
-  - build_main_platforms
+  - build_platform esp8266
+  # - build_main_platforms
   - cd examples/simple
-  - build_main_platforms
+  - build_platform esp8266
 notifications:
   email:
     on_success: change
