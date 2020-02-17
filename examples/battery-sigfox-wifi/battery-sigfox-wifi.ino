@@ -27,6 +27,14 @@ THiNX thx;
 #define D1 22
 #endif
 
+#ifndef D1
+#define D1 22
+#endif
+
+#ifndef D2
+#define D2 21
+#endif
+
 SoftwareSerial Sigfox(D2, D1); // RX (e.g. yellow), TX (e.g. orange) -- it's worth noting wire colors here
 
 #define SLEEP_TIME_MICROS 3600e6

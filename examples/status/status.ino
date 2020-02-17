@@ -28,6 +28,14 @@ THiNX thx;
 #define D1 22
 #endif
 
+#ifndef D1
+#define D1 22
+#endif
+
+#ifndef D2
+#define D2 21
+#endif
+
 SoftwareSerial Sigfox(D2, D1); // RX (yellow), TX (orange) -- fails with other pins!
 
 unsigned long sleepTime = millis() + 3600 * 1e6; // 1e9 is 1 000 000 microseconds = 1 second
