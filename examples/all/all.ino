@@ -25,14 +25,12 @@ THiNX thx;
 
 void pushConfigCallback (char * config_cstring) {
 
-  String config = String(config_cstring);
-
   // Set MQTT status (unretained)
   thx.publish_status_unretained((const char*)"{ \"status\" : \"push configuration received\"}");
 
   // Convert incoming JSON string to Object
-  DynamicJsonBuffer jsonBuffer(512);
-  JsonObject& root = jsonBuffer.parseObject(config.c_str());
+  DynamicJsonDocument root(512); // tightly enough to fit ott as well
+  auto error = deserializeJson(root, config_cstring);  
   JsonObject& configuration = root["configuration"];
 
   if ( !configuration.success() ) {
