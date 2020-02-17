@@ -28,7 +28,7 @@ void pushConfigCallback (char * config_cstring) {
   String config = String(config_cstring);
 
   // Set MQTT status (unretained)
-  thx.publish_status_unretained((const char*)"{ \"status\" : \"push configuration received\"}")
+  thx.publish_status_unretained((const char*)"{ \"status\" : \"push configuration received\"}");
 
   // Convert incoming JSON string to Object
   DynamicJsonBuffer jsonBuffer(512);

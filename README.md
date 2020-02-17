@@ -113,11 +113,11 @@ void finalizeCallback () {
 
 ```
 /* Example of using Environment variables */
-void pushConfigCallback (String config) {
+void pushConfigCallback (char *config) {
 
   // Convert incoming JSON string to Object
   DynamicJsonBuffer jsonBuffer(512);
-  JsonObject& root = jsonBuffer.parseObject(config.c_str());
+  JsonObject& root = jsonBuffer.parseObject(config);
   JsonObject& configuration = root["configuration"];
 
   if ( !configuration.success() ) {
