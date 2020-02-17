@@ -22,6 +22,12 @@
 
 THiNX thx;
 
+#ifdef ESP32
+// TODO: Check this, it might be reversed but those are default numbers for I2C pins.
+#define D2 21
+#define D1 22
+#endif
+
 SoftwareSerial Sigfox(D2, D1); // RX (yellow), TX (orange) -- fails with other pins!
 
 unsigned long sleepTime = millis() + 3600 * 1e6; // 1e9 is 1 000 000 microseconds = 1 second

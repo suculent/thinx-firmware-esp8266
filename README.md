@@ -117,33 +117,31 @@ void finalizeCallback () {
 void pushConfigCallback (char *config) {
 
   // Convert incoming JSON string to Object
-  DynamicJsonBuffer jsonBuffer(512);
-  JsonObject& root = jsonBuffer.parseObject(config);
-  JsonObject& configuration = root["configuration"];
-
-  if ( !configuration.success() ) {
+  DynamicJsonDocument root(512);
+  auto error = deserializeJson(root, config);
+  if (error) {
     Serial.println(F("Failed parsing configuration."));
-  } else {
+    return;
+  }
 
-    // Parse and apply your Environment vars
-    const char *ssid = configuration["THINX_ENV_SSID"];
-    const char *pass = configuration["THINX_ENV_PASS"];
+  // Parse and apply your Environment vars
+  const char *ssid = root["configuration"]["THINX_ENV_SSID"];
+  const char *pass = root["configuration"]["THINX_ENV_PASS"];
 
-    // password may be empty string
-    if ((strlen(ssid) > 2) && (strlen(pass) > 0)) {
-      WiFi.disconnect();
-      WiFi.begin(ssid, pass);
-      unsigned long timeout = millis() + 20000;
-      Serial.println("Attempting WiFi migration...");
-      while (WiFi.status() != WL_CONNECTED) {
-        yield();
-        if (millis() > timeout) break;
-      }
-      if (WiFi.status() != WL_CONNECTED) {
-        Serial.println("WiFi migration failed."); // TODO: Notify using publish() to device status channel
-      } else {
-        Serial.println("WiFi migration successful."); // TODO: Notify using publish() to device status channel
-      }
+  // password may be empty string
+  if ((strlen(ssid) > 2) && (strlen(pass) > 0)) {
+    WiFi.disconnect();
+    WiFi.begin(ssid, pass);
+    unsigned long timeout = millis() + 20000;
+    Serial.println("Attempting WiFi migration...");
+    while (WiFi.status() != WL_CONNECTED) {
+      yield();
+      if (millis() > timeout) break;
+    }
+    if (WiFi.status() != WL_CONNECTED) {
+      Serial.println("WiFi migration failed."); // TODO: Notify using publish() to device status channel
+    } else {
+      Serial.println("WiFi migration successful."); // TODO: Notify using publish() to device status channel
     }
   }
 }

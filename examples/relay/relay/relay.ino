@@ -50,13 +50,13 @@ ESP8266WebServer server(80);
 
 //
 // This is intentionally unusual design pattern, where one WiFi is default and other is fallback.
-// Poses a security risk, but can be used in case where device restarts after WiFi 
+// Poses a security risk, but can be used in case where device restarts after WiFi
 // connection fail on order to reconnect to backup network:
 //
 
 void scan_and_connect_wifi() {
   // If you need to inject WiFi credentials once...
-  WiFi.mode(WIFI_STA);  
+  WiFi.mode(WIFI_STA);
 
   unsigned long timeout; // wifi connection timeout(s)
   int wifi_status = WiFi.waitForConnectResult();
@@ -131,20 +131,20 @@ void set_state(int index, bool state) {
 }
 
 
-void start_http_server() {   
+void start_http_server() {
 
     server.on("/", []() {
       if (server.method() == HTTP_POST) {
         // Sample threat: Processing message: volatile.authentication_failed=true&volatile.login=true&webvars.username=%24VERSION&webvars.password=sawmill_detect&submit=Login
-        // Should accept only json, starting with '{'        
+        // Should accept only json, starting with '{'
         if (server.arg("plain").length() > 64) {
           // Security/availability: ignore messages longer than longest possible commands to prevent DoS crashes and memory leaks
-          Serial.println("Ignoring long message."); 
+          Serial.println("Ignoring long message.");
           return;
         }
         // Security/integrity: we do accept only JSON
         if (server.arg("plain").indexOf("{") == 0) {
-          process_message(server.arg("plain")); 
+          process_message(server.arg("plain"));
         } else {
           Serial.println("Ignoring non-JSON message."); // Security measure
         }
@@ -163,7 +163,7 @@ void start_http_server() {
       Serial.println("\nHTTP help requested...");
       server.send(200, "text/plain", "[on, off, toggle] where toggle has default 5 seconds and starts with terminated state");
     });
-    
+
 
     server.on("/1/on", []() {
       if (server.method() != HTTP_GET) return;
@@ -178,7 +178,7 @@ void start_http_server() {
       set_state(1, true);
       server.send(200, "text/plain", "Toggled ON.");
     });
-    
+
     server.on("/3/on", []() {
       if (server.method() != HTTP_GET) return;
       Serial.println("\nHTTP on 3 requested...");
@@ -206,7 +206,7 @@ void start_http_server() {
       set_state(1, false);
       server.send(200, "text/plain", "Toggled ON.");
     });
-    
+
     server.on("/3/off", []() {
       if (server.method() != HTTP_GET) return;
       Serial.println("\nHTTP off 3 requested...");
@@ -235,7 +235,7 @@ void start_http_server() {
 void setup_relays() {
   // relay_pins = D4 == LED !
   relay_pins[0] = D5;
-  relay_pins[1] = D6;  
+  relay_pins[1] = D6;
   relay_pins[2] = D7;
   relay_pins[3] = D8;
 
@@ -247,27 +247,29 @@ void setup_relays() {
 }
 
 void process_message(String message) {
-  
+
   // Example message:  { "command": { "intent": "off", "port": 0 }}
 
   Serial.print("Processing message: "); Serial.println(message);
 
   // Convert incoming JSON string to Object
-  DynamicJsonBuffer jsonBuffer(256);
-  JsonObject& root = jsonBuffer.parseObject(message);
-  JsonObject& command = root["command"];
+  DynamicJsonDocument root(256);
+  auto error = deserializeJson(root, message.c_str());
+  if (error) {
+    return;
+  }
 
-  int port = command["port"];
-  String intent = command["intent"];
+  int port = root["command"]["port"];
+  String intent = root["command"]["intent"];
 
-  
+
   // Status requestStarting server..
 
   if (intent.indexOf("status") != -1) {
     Serial.println("MQTT: Status requested.");
     report_status();
     return;
-  };      
+  };
 
   // Intent with port parser
 
@@ -292,12 +294,12 @@ void process_message(String message) {
 
 void setup() {
 
-  
+
   //
   // App and version identification
   //
 
-  
+
 
   //
   // OUTPUT PIN Configuration
@@ -313,14 +315,14 @@ void setup() {
 
 #ifdef __DEBUG__
   while (!Serial); // wait for debug console connection
-#endif  
+#endif
 
   scan_and_connect_wifi();
 
 #ifdef ENABLE_HTTP_SERVER
   start_http_server();
 #endif
-  
+
   //
   // THiNX
   //
@@ -330,14 +332,14 @@ void setup() {
   THiNX::forceHTTP = true; // disable HTTPS for faster checkins, enable for production security
 
   /* with https:
-   
+
   HTTP server started at IP: 192.168.1.76
 
   *TH: THiNXLib rev. 230 version: 2.5.230
   cloud.thinx.esp8266-relay@1.0.0
   Build timestamp: May 12 2019 @ 23:14:17
   35160 MEM-DELTA: -5192
-  
+
   34928 MEM-DELTA: -232
   Secure API checkin...
   *TH: API connection failed.
@@ -348,9 +350,9 @@ void setup() {
    */
   THiNX::logging = true;
 
-  thx = THiNX(apikey, owner_id);    
+  thx = THiNX(apikey, owner_id);
 
-  // You can override versioning with your own app identifier before 
+  // You can override versioning with your own app identifier before
   // THiNX checks-in after the first thx.loop();
   thx.thinx_firmware_version = "cloud.thinx.esp8266-relay@1.0.0";
   thx.thinx_firmware_version_short = "1.0.0";
@@ -364,18 +366,18 @@ void setup() {
   //
   // Callbacks
   //
-  
+
   // Called after library gets connected and registered, optional.
   thx.setFinalizeCallback([] {
     Serial.println("THiNX/MQTT connected, reporting initial status.");
     report_status();
   });
-  
+
   // Called after MQTT message arrives
   thx.setMQTTCallback([](byte* raw_message) {
     String message = String((const char*)raw_message);
     process_message(message);
-  });   
+  });
 
   debug_mem();
 }
@@ -390,20 +392,20 @@ void debug_mem() {
       // + f-n
       Serial.print("-");
       Serial.println(freeHeap-newHeap);
-      
+
     } else {
       // + n-f
       Serial.print("+");
       Serial.println(newHeap-freeHeap);
     }
     // save last heap for next time...
-    freeHeap = ESP.getFreeHeap();    
+    freeHeap = ESP.getFreeHeap();
   }
 }
 
 /* Loop must call the thx.loop() in order to pickup MQTT messages and advance the state machine. */
-void loop(void) {  
+void loop(void) {
   thx.loop(); // THiNX/MQTT run-loop
-  server.handleClient(); // HTTP server run-loop  
+  server.handleClient(); // HTTP server run-loop
   debug_mem();
 }
