@@ -12,10 +12,10 @@
 
 #include <THiNXLib.h>
 
-char *apikey = "";
-char *owner_id = "";
-char *ssid = "THiNX-IoT";
-char *pass = "<enter-your-ssid-password>";
+char *apikey    = (const char*) "";
+char *owner_id  = (const char*) "";
+char *ssid      = (const char*) "THiNX-IoT";
+char *pass      = (const char*) "<enter-your-ssid-password>";
 
 THiNX thx;
 
@@ -29,33 +29,30 @@ void pushConfigCallback (char * config_cstring) {
   thx.publish_status_unretained((const char*)"{ \"status\" : \"push configuration received\"}");
 
   // Convert incoming JSON string to Object
-  DynamicJsonDocument root(512); // tightly enough to fit ott as well
-  auto error = deserializeJson(root, config_cstring);  
-  JsonObject& configuration = root["configuration"];
+  DynamicJsonDocument root(512); // tightly enough to fit full OTT response as well
+  auto error = deserializeJson(root, config_cstring);
 
-  if ( !configuration.success() ) {
+  if ( error ) {
     Serial.println(F("Failed parsing configuration."));
-  } else {
-
-    // Parse and apply your Environment vars
-    const char *ssid = configuration["THINX_ENV_SSID"];
-    const char *pass = configuration["THINX_ENV_PASS"];
-
-    // password may be empty string
-    if ((strlen(ssid) > 2) && (strlen(pass) > 0)) {
-      WiFi.disconnect();
-      WiFi.begin(ssid, pass);
-      ssid = ""; pass = "";
-      unsigned long timeout = millis() + 20000;
-      Serial.println("Attempting WiFi migration...");
-      while (WiFi.status() != WL_CONNECTED) {
-        if (millis() > timeout) break;
-      }
-      if (WiFi.status() != WL_CONNECTED) {
-        Serial.println("WiFi migration failed."); // TODO: Notify using publish() to device status channel
-      } else {
-        Serial.println("WiFi migration successful."); // TODO: Notify using publish() to device status channel
-      }
+    return;
+  }
+  // Parse and apply your Environment vars
+  const char *ssid = root["configuration"]["THINX_ENV_SSID"];
+  const char *pass = root["configuration"]["THINX_ENV_PASS"];
+  // password may be empty string
+  if ((strlen(ssid) > 2) && (strlen(pass) > 0)) {
+    WiFi.disconnect();
+    WiFi.begin(ssid, pass);
+    ssid = ""; pass = "";
+    unsigned long timeout = millis() + 20000;
+    Serial.println("Attempting WiFi migration...");
+    while (WiFi.status() != WL_CONNECTED) {
+      if (millis() > timeout) break;
+    }
+    if (WiFi.status() != WL_CONNECTED) {
+      Serial.println("WiFi migration failed."); // TODO: Notify using publish() to device status channel
+    } else {
+      Serial.println("WiFi migration successful."); // TODO: Notify using publish() to device status channel
     }
   }
 }
