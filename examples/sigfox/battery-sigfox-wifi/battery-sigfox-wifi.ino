@@ -21,6 +21,12 @@
 
 THiNX thx;
 
+#ifdef ESP32
+// TODO: Check this, it might be reversed but those are default numbers for I2C pins.
+#define D2 21
+#define D1 22
+#endif
+
 SoftwareSerial Sigfox(D2, D1); // RX (e.g. yellow), TX (e.g. orange) -- it's worth noting wire colors here
 
 #define SLEEP_TIME_MICROS 3600e6
@@ -63,10 +69,9 @@ void measureBatteryVoltage() {
 /* Takes current voltage and sends as byte-string to SigFox backends */
 void updateSigfoxStatus() {
   String voltageString = "ba"; // means battery voltage in THiNX, what about Sigfox?  
-  unsigned char * chpt = (unsigned char *)&voltage;
-  int i;
+  unsigned char * chpt = (unsigned char *)&voltage;  
   Serial.print("Here are the bytes in memory order: ");
-  for (i = 0; i < sizeof(voltage); i++) {
+  for (unsigned int i = 0; i < sizeof(voltage); i++) {
      String byteVal = String(chpt[i],HEX);
      // Pad with zero
      if (byteVal.length() == 1) { byteVal = "0" + byteVal; }
