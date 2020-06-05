@@ -1,6 +1,6 @@
 #include <Arduino.h>
 
-#define DEBUG // takes 8k of sketch and 1+1k of stack/heap size (when measured last time)
+//#define DEBUG // takes 8k of sketch and 1+1k of stack/heap size (when measured last time)
 #define __DISABLE_HTTPS__ // to save memory if needed
 #define __ENABLE_WIFI_MIGRATION__ // enable automatic WiFi disconnect/reconnect on Configuration Push (THINX_ENV_SSID and THINX_ENV_PASS)
 // #define __USE_WIFI_MANAGER__ // if disabled, you need to `WiFi.begin(ssid, pass)` on your own; saves about 3% of sketch space, excludes DNSServer and WebServer
@@ -9,14 +9,14 @@
 
 // Provides placeholder for THINX_FIRMWARE_VERSION_SHORT
 #ifndef VERSION
-#define VERSION "2.8.246"
+#define VERSION "2.8.251"
 #endif
 
 #ifndef THX_REVISION
 #ifdef THINX_FIRMWARE_VERSION_SHORT
 #define THX_REVISION THINX_FIRMWARE_VERSION_SHORT
 #else
-#define THX_REVISION "246"
+#define THX_REVISION "251"
 #endif
 #endif
 
@@ -137,7 +137,7 @@ public:
     void setFirmwareUpdateCallback( void (*func)(void) );
     void setMQTTCallback( void (*func)(byte*) );
     void setMQTTBroker( char * url, int port );
-    void setLastWill(String nextWill);        // disconnect MQTT and reconnect with different lastWill than default
+    void setLastWill(const String& nextWill);        // disconnect MQTT and reconnect with different lastWill than default
 
     bool wifi_connection_in_progress;
     unsigned long wifi_conection_timeout = 0;
@@ -146,11 +146,11 @@ public:
 
     // publish to device status topic only
 
-    void publish_status(const char *message, bool retain);  // send string to status topic, set retain
-    void publish_status_unretained(const char *message);   // send string to status topic, unretained
+    void publish_status(const char* message, bool retain);  // send string to status topic, set retain
+    void publish_status_unretained(const char* message);   // send string to status topic, unretained
 
     // publish to specified topic
-    void publish(String, String, bool);       // send String to any channel, optinally with retain
+    void publish(const String&, const String&, bool);       // send String to any channel, optinally with retain
     void publish(char * message, char * topic, bool retain);
 
     static const char time_format[];
@@ -175,7 +175,7 @@ private:
 
     // Memory allocation debugging
     static uint32_t last_free_heap_size;
-    void printStackHeap(String tag);
+    void printStackHeap(const String& tag);
 
     unsigned long bytes_sent = 0;
 
@@ -228,9 +228,9 @@ private:
     void connect_wifi();                      // start connecting
 
     #ifndef __DISABLE_HTTPS__
-    void send_data_secure(String);            // HTTPS
+    void send_data_secure(const String&);            // HTTPS
     #else
-    void send_data(String);                   // HTTP
+    void send_data(const String&);                   // HTTP
     #endif
 
     #ifndef __DISABLE_HTTPS__
