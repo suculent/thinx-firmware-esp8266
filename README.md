@@ -7,6 +7,12 @@ An Arduino/ESP8266 library to wrap client for OTA updates and RTM (Remote Things
 
 # What's New
 
+### 2021-02-22: 2.9.436
+
+* Synchronized with ESP32 library version, now compatible.
+* Support for programatically configuring custom MQTT and API endpoints/ports
+* Support for OTA update triggered by configuration change (using same source)
+* Migration to new THiNX API (HTTPS/MQTTS)
 ### 2019-12-10: 2.8.238
 
 * Compatibility with Arduino Core 2.6.2

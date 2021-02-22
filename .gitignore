@@ -6,3 +6,5 @@ thinx-firmware-esp8266/Settings.h
 .piolibdeps
 .clang_complete
 .gcc-flags.json
+.vscode
+.pio
