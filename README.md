@@ -3,7 +3,7 @@
 [![Codacy Badge](https://api.codacy.com/project/badge/Grade/8dded023f3d14a69b3c38c9f5fd66a40)](https://www.codacy.com/app/suculent/thinx-lib-esp8266-arduinoc?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=suculent/thinx-lib-esp8266-arduinoc&amp;utm_campaign=Badge_Grade)
 [![Build Status](https://travis-ci.org/suculent/thinx-firmware-esp8266.svg)](https://travis-ci.org/suculent/thinx-firmware-esp8266)
 
-An Arduino/ESP8266 library to wrap client for OTA updates and RTM (Remote Things Management) based on THiNX platform.
+An Arduino/ESP8266 library to wrap client for OTA updates and Device Management based on THiNX platform.
 
 # What's New
 
@@ -29,7 +29,7 @@ An Arduino/ESP8266 library to wrap client for OTA updates and RTM (Remote Things
 ### Older releases
 
 * Added Relay example with twin WiFi access variants.
-* Fixes and improved support for timezones. You can set timezone per device on the [RTM Console](https://rtm.thinx.cloud) and current DST will be applied on checkin, if applicable. It will be also used for the SNTP later.
+* Fixes and improved support for timezones. You can set timezone per device on the [Management Console](https://rtm.thinx.cloud) and current DST will be applied on checkin, if applicable. It will be also used for the SNTP later.
 * HTTPS can be optionally disabled for faster checkins with `THiNX:forceHTTP = true` (speeds up checkin from 120 seconds to 2 seconds)
 * SHA-256 and MD5 firmware validation; currently the MD5 only is supported by ESPhttpUpdate (we're working with Arduino Core team on better implementation)
 * Added setCheckinInterval(long) and setRebootInterval(long) to allow heartbeat and timed restarts (defaults to 24h)
