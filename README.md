@@ -1,18 +1,15 @@
 # THiNX Lib (ESP)
 
 [![Codacy Badge](https://api.codacy.com/project/badge/Grade/8dded023f3d14a69b3c38c9f5fd66a40)](https://www.codacy.com/app/suculent/thinx-lib-esp8266-arduinoc?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=suculent/thinx-lib-esp8266-arduinoc&amp;utm_campaign=Badge_Grade)
-[![Build Status](https://travis-ci.org/suculent/thinx-firmware-esp8266.svg)](https://travis-ci.org/suculent/thinx-firmware-esp8266)
 
 An Arduino/ESP8266 library to wrap client for OTA updates and RTM (Remote Things Management) based on THiNX platform.
 
 # What's New
 
-### 2021-02-22: 2.9.436
+### 2022-05-01: 3.0.270
 
-* Synchronized with ESP32 library version, now compatible.
-* Support for programatically configuring custom MQTT and API endpoints/ports
-* Support for OTA update triggered by configuration change (using same source)
-* Migration to new THiNX API (HTTPS/MQTTS)
+* Compatibility with Arduino Core 3.0.2
+
 ### 2019-12-10: 2.8.238
 
 * Compatibility with Arduino Core 2.6.2
@@ -120,34 +117,36 @@ void finalizeCallback () {
 
 ```
 /* Example of using Environment variables */
-void pushConfigCallback (char *config) {
+void pushConfigCallback (String config) {
 
   // Convert incoming JSON string to Object
-  DynamicJsonDocument root(512);
-  auto error = deserializeJson(root, config);
-  if (error) {
+  DynamicJsonBuffer jsonBuffer(512);
+  JsonObject& root = jsonBuffer.parseObject(config.c_str());
+  JsonObject& configuration = root["configuration"];
+
+  if ( !configuration.success() ) {
     Serial.println(F("Failed parsing configuration."));
-    return;
-  }
+  } else {
 
-  // Parse and apply your Environment vars
-  const char *ssid = root["configuration"]["THINX_ENV_SSID"];
-  const char *pass = root["configuration"]["THINX_ENV_PASS"];
+    // Parse and apply your Environment vars
+    const char *ssid = configuration["THINX_ENV_SSID"];
+    const char *pass = configuration["THINX_ENV_PASS"];
 
-  // password may be empty string
-  if ((strlen(ssid) > 2) && (strlen(pass) > 0)) {
-    WiFi.disconnect();
-    WiFi.begin(ssid, pass);
-    unsigned long timeout = millis() + 20000;
-    Serial.println("Attempting WiFi migration...");
-    while (WiFi.status() != WL_CONNECTED) {
-      yield();
-      if (millis() > timeout) break;
-    }
-    if (WiFi.status() != WL_CONNECTED) {
-      Serial.println("WiFi migration failed."); // TODO: Notify using publish() to device status channel
-    } else {
-      Serial.println("WiFi migration successful."); // TODO: Notify using publish() to device status channel
+    // password may be empty string
+    if ((strlen(ssid) > 2) && (strlen(pass) > 0)) {
+      WiFi.disconnect();
+      WiFi.begin(ssid, pass);
+      unsigned long timeout = millis() + 20000;
+      Serial.println("Attempting WiFi migration...");
+      while (WiFi.status() != WL_CONNECTED) {
+        yield();
+        if (millis() > timeout) break;
+      }
+      if (WiFi.status() != WL_CONNECTED) {
+        Serial.println("WiFi migration failed."); // TODO: Notify using publish() to device status channel
+      } else {
+        Serial.println("WiFi migration successful."); // TODO: Notify using publish() to device status channel
+      }
     }
   }
 }
