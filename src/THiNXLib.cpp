@@ -869,7 +869,7 @@ void THiNX::send_data_secure(const String &body)
 
 int strpos(char *hay, char *needle, int offset)
 {
-  char haystack[strlen(hay)];
+  char haystack[strlen(hay)] = {0};
   strncpy(haystack, hay + offset, strlen(hay) - offset);
   char *p = strstr(haystack, needle);
   if (p)
