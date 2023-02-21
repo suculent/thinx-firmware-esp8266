@@ -74,7 +74,7 @@ class AES
    *  (valid inputs are hence 128, 192, 16, 24 and 32).
    *
    */
-  byte set_key (byte key[], uint16_t keylen) ;
+  byte set_key (const byte key[], uint16_t keylen) ;
 
   /** clean up subkeys after use.
    *
@@ -89,7 +89,7 @@ class AES
    *  i have not updated the function in the implementation yet, but it is considered a future plan.
    *
    */
-  void copy_n_bytes (byte * AESt, byte * src, byte n) ;
+  void copy_n_bytes (byte * AESt, const byte * src, byte n) ;
 
 
   /** get a random number
@@ -111,7 +111,7 @@ class AES
    *  @Return 0 if SUCCESS or -1 if FAILURE
    *
    */
-  byte encrypt (byte plain [N_BLOCK], byte cipher [N_BLOCK]) ;
+  byte encrypt (const byte plain [N_BLOCK], byte cipher [N_BLOCK]) ;
 
   /** CBC encrypt a number of blocks (input and return an IV).
    *
@@ -122,18 +122,7 @@ class AES
    *  @Return 0 if SUCCESS or -1 if FAILURE
    *
    */
-  byte cbc_encrypt (byte * plain, byte * cipher, int n_block, byte iv [N_BLOCK]) ;
-
-  /** CBC encrypt a number of blocks (input and return an IV).
-   *
-   *  @param *plain Pointer, points to the plaintex.
-   *  @param *cipher Pointer, points to the ciphertext that will be created.
-   *  @param n_block integer, indicated the number of blocks to be ciphered.
-   *  @Return 0 if SUCCESS or -1 if FAILURE
-   *
-   */
-  byte cbc_encrypt (byte * plain, byte * cipher, int n_block) ;
-
+  byte cbc_encrypt (const byte * plain, byte * cipher, int n_block, byte iv [N_BLOCK]) ;
 
   /**  Decrypt a single block of 16 bytes
    *  @param cipher[N_BLOCK] Array of the ciphertext.
@@ -147,7 +136,7 @@ class AES
    *  @Return 0 if SUCCESS or -1 if FAILURE
    *
    */
-  byte decrypt (byte cipher [N_BLOCK], byte plain [N_BLOCK]) ;
+  byte decrypt (const byte cipher [N_BLOCK], byte plain [N_BLOCK]) ;
 
   /** CBC decrypt a number of blocks (input and return an IV)
    *
@@ -158,33 +147,7 @@ class AES
    *  @Return 0 if SUCCESS or -1 if FAILURE
    *
    */
-  byte cbc_decrypt (byte * cipher, byte * plain, int n_block, byte iv [N_BLOCK]) ;
-
-  /** CBC decrypt a number of blocks (input and return an IV)
-   *
-   *  @param *cipher Pointer, points to the ciphertext that will be created.
-   *  @param *plain Pointer, points to the plaintex.
-   *  @param n_block integer, indicated the number of blocks to be ciphered.
-   *  @Return 0 if SUCCESS or -1 if FAILURE
-   *
-   */
-  byte cbc_decrypt (byte * cipher, byte * plain, int n_block) ;
-
-  /** Sets IV (initialization vector) and IVC (IV counter).
-   *  This function changes the ivc and iv variables needed for AES.
-   *
-   *  @param IVCl int or hex value of iv , ex. 0x0000000000000001
-   *  @note example:
-   *  @code unsigned long long int my_iv = 01234567; @endcode
-  */
-  void set_IV(unsigned long long int IVCl);
-
-  /** increase the iv (initialization vector) and IVC (IV counter) by 1
-   *
-   *  This function increased the VI by one step in order to have a different IV each time
-   *
-  */
-  void iv_inc();
+  byte cbc_decrypt (const byte * cipher, byte * plain, int n_block, byte iv [N_BLOCK]) ;
 
   /** Getter method for size
    *
@@ -200,14 +163,6 @@ class AES
    *
    */
   void set_size(int sizel);
-
-  /** Getter method for IV
-  *
-  * This function return the IV
-  * @param out byte pointer that gets the IV.
-  * @return none, the IV is writed to the out pointer.
-  */
-  void get_IV(byte *out);
 
   /** Calculates the size of the plaintext and the padding.
    *
@@ -234,7 +189,7 @@ class AES
    * @param in the array of the padded text
    * @param p_size the size of the byte array ex sizeof(paddedtext)
   */
-  int get_unpadded_len(byte *in , int p_size);
+  int get_unpadded_len(const byte *in , int p_size);
 
   /** returns the number of padding characters.
    *
@@ -256,7 +211,7 @@ class AES
    * @param out The string of the out array.
    * @return no return, The padded plaintext is stored in the out pointer.
    */
-  void padPlaintext(void* in,byte* out);
+  void padPlaintext(const void* in,byte* out);
 
   /** Check the if the padding is correct.
    *
@@ -266,7 +221,7 @@ class AES
    * @param size the size of the string
    * @return true if correct / false if not
    */
-  bool CheckPad(byte* in,int size);
+  bool CheckPad(const byte* in,int size);
 
   /** Sets the padding mode
    *
@@ -291,7 +246,7 @@ class AES
    * @param output[] the string of the text in a byte array
    * @param p_pad optional, used to print with out the padding characters
   */
-  void printArray(byte output[],bool p_pad = true);
+  void printArray(const byte output[],bool p_pad = true);
 
   /** Prints the array given.
    *
@@ -300,7 +255,7 @@ class AES
    * @param output[] the string of the text in a byte array
    * @param sizel the size of the array.
   */
-  void printArray(byte output[],int sizel);
+  void printArray(const byte output[],int sizel);
 
   /** User friendly implementation of AES-CBC encryption.
    *
@@ -312,18 +267,7 @@ class AES
    * @param ivl[N_BLOCK] the initialization vector IV that will be used for encryption.
    * @note The key will be stored in class variable.
    */
-  void do_aes_encrypt(byte *plain,int size_p,byte *cipher,byte *key, int bits, byte ivl [N_BLOCK]);
-
-  /** User friendly implementation of AES-CBC encryption.
-   *
-   * @param *plain pointer to the plaintext
-   * @param size_p size of the plaintext
-   * @param *cipher pointer to the ciphertext
-   * @param *key pointer to the key that will be used.
-   * @param bits bits of the encryption/decrpytion
-   * @note The key will be stored in class variable.
-   */
-  void do_aes_encrypt(byte *plain,int size_p,byte *cipher,byte *key, int bits);
+  void do_aes_encrypt(const byte *plain,int size_p,byte *cipher,const byte *key,int bits, byte ivl [N_BLOCK]);
 
   /** User friendly implementation of AES-CBC decryption.
    *
@@ -335,41 +279,15 @@ class AES
    * @param ivl[N_BLOCK] the initialization vector IV that will be used for decryption.
    * @note The key will be stored in class variable.
    */
-  int do_aes_decrypt(byte *cipher,int size_c,byte *plain,byte *key, int bits, byte ivl [N_BLOCK]);
+  int do_aes_decrypt(const byte *cipher,int size_c,byte *plain,const byte *key, int bits, byte ivl [N_BLOCK]);
 
-  /** User friendly implementation of AES-CBC decryption.
-   *
-   * @param *cipher pointer to the ciphertext
-   * @param size_c size of the ciphertext
-   * @param *plain pointer to the plaintext
-   * @param *key pointer to the key that will be used.
-   * @param bits bits of the encryption/decrpytion
-   * @note The key will be stored in class variable.
-   */
-  int do_aes_decrypt(byte *cipher,int size_c,byte *plain,byte *key, int bits);
-
-  #if defined(AES_LINUX)
-    /**
-     * used in linux in order to retrieve the time in milliseconds.
-     *
-     * @return returns the milliseconds in a double format.
-     */
-    double millis();
-  #endif
  private:
   byte round ;/**< holds the number of rounds to be used. */
   paddingMode padmode;
   byte key_sched [KEY_SCHEDULE_BYTES] ;/**< holds the pre-computed key for the encryption/decrpytion. */
-  unsigned long long int IVC;/**< holds the initialization vector counter in numerical format. */
-  byte iv[16];/**< holds the initialization vector that will be used in the cipher. */
   int pad;/**< holds the size of the padding. */
   int size;/**< hold the size of the plaintext to be ciphered */
-  #if defined(AES_LINUX)
-  timeval tv;/**< holds the time value on linux */
-  byte arr_pad[15];/**< holds the hexadecimal padding values on linux */
-  #else
   byte arr_pad[15] = { 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00 };/**< holds the hexadecimal padding values */
-  #endif
 } ;
 
 
