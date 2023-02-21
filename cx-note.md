@@ -1,0 +1,1 @@
+# Commit to show that submodules being on different branch name than main repository fail to fetch, because CxAST mistakes the main project branch with submodule branches that can have any name.
