@@ -3,3 +3,4 @@ node_modules/
 *.gch
 build_wrapper_output_directory/
 **/build_wrapper_output_directory/
+**/coverage/**
