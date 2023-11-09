@@ -9,6 +9,6 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "crypto-js": "^4.0.0"
+    "crypto-js": "^4.2.0"
   }
 }
