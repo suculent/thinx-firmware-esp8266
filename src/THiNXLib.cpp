@@ -455,7 +455,7 @@ char* THiNX::generate_checkin_body() {
 
   DynamicJsonDocument wrapper(512);
   wrapper["registration"] = root;
-  deserializeJson(wrapper, json_buffer);
+  serializeJson(wrapper, json_buffer, sizeof(json_buffer)); // was deserializeJson — wrong direction, left json_buffer empty
 #ifdef DEBUG
   if (logging) {
     Serial.print("json_buffer body length: ");
@@ -1431,6 +1431,7 @@ void THiNX::restore_device_info() {
   #ifndef __USE_SPIFFS__
 
   int value;
+  int json_end = 0; // bracket-balance counter; was used undeclared upstream
   long buf_len = 512;
   long data_len = 0;
 
@@ -1591,10 +1592,10 @@ void THiNX::save_device_info()
   }
   #else
   if (logging) Serial.println(F("*TH: Saving configuration to EEPROM: "));
-  for (long addr = 0; addr < strlen((const char*)json_info); addr++) {
-    uint8_t byte = json_info[addr];
-    EEPROM.put(addr, json_info[addr]);
-    if (byte == 0) break;
+  char json_info[512] = {}; // was used undeclared/unfilled upstream
+  size_t json_len = serializeJson(root, json_info, sizeof(json_info));
+  for (size_t addr = 0; addr <= json_len && addr < sizeof(json_info); addr++) {
+    EEPROM.put(addr, json_info[addr]); // include the terminating NUL so restore finds the end
   }
   EEPROM.commit();
   #endif
