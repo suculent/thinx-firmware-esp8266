@@ -2017,10 +2017,17 @@ void THiNX::loop() {
     // If not connected manually or using WiFiManager, start connection in progress...
     if (WiFi.status() != WL_CONNECTED) {
       wifi_connected = false;
+      // An attempt that never completes must not latch forever. connect() owns
+      // a timeout check, but it is unreachable while the flag is set, so the
+      // first failed WiFi.begin() used to leave the device offline until reset.
+      if (wifi_connection_in_progress && (millis() > wifi_connection_timeout)) {
+        wifi_connection_in_progress = false;
+      }
       if (wifi_connection_in_progress != true) {
         //if (logging) Serial.println(F("*TH: CONNECTING »"));
         connect(); // blocking
         wifi_connection_in_progress = true;
+        wifi_connection_timeout = millis() + 30000; // retry window
         return;
       } else {
         return;
